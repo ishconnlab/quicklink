@@ -13,10 +13,11 @@ const env = explicitNodeEnv || (ON_RENDER ? 'production' : 'development');
 const isProd = env === 'production';
 const isTest = env === 'test';
 
-const DEV_ORIGINS = ['http://localhost:5173', 'http://localhost:5174'];
+const DEFAULT_ORIGINS = ['https://quicklink-zeta.vercel.app'];
 // Known deployed frontend origins. Always allowed in production so the API
 // keeps working even if CORS_ORIGIN is unset; CORS_ORIGIN can additionally add
-// custom domains.
+// custom domains. In development, localhost origins are also allowed via
+// isAllowedOrigin() below.
 const PROD_ORIGINS = ['https://quicklink-zeta.vercel.app'];
 
 const configuredOrigins = (process.env.CORS_ORIGIN || '')
@@ -28,7 +29,7 @@ const corsOrigin = isProd
   ? Array.from(new Set([...configuredOrigins, ...PROD_ORIGINS]))
   : configuredOrigins.length
     ? configuredOrigins
-    : DEV_ORIGINS;
+    : DEFAULT_ORIGINS;
 
 export const config = {
   env,

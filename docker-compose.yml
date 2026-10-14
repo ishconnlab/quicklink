@@ -18,7 +18,7 @@ services:
       MONGODB_URI: mongodb://mongo:27017/quicklink
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       JWT_EXPIRES_IN: 12h
-      CORS_ORIGIN: http://localhost:8080
+      CORS_ORIGIN: https://quicklink-zeta.vercel.app
       OWNER_NAME: ${OWNER_NAME:-QuickLink Owner}
       OWNER_EMAIL: ${OWNER_EMAIL:-owner@quicklink.local}
       OWNER_PASSWORD: ${OWNER_PASSWORD:-ChangeMe123!}

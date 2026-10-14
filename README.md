@@ -111,7 +111,7 @@ cd server
 cp .env.example .env        # then edit values
 npm install
 npm run seed                # optional: load demo holdings + schools
-npm run dev                 # http://localhost:4000
+npm run dev                 # starts the API locally (deployed: https://quicklink-3eng.onrender.com)
 ```
 
 On first boot the server creates the initial owner account from `OWNER_*` in `.env`.
@@ -123,10 +123,11 @@ New users can self-register via the app; an owner approves them before first sig
 cd client
 cp .env.example .env
 npm install
-npm run dev                 # http://localhost:5173
+npm run dev                 # starts the Vite dev server (deployed: https://quicklink-zeta.vercel.app)
 ```
 
-The Vite dev server proxies `/api` to `http://localhost:4000` (see `vite.config.js`),
+The Vite dev server proxies `/api` to the API (defaults to the deployed
+`https://quicklink-3eng.onrender.com`, see `vite.config.js`),
 so `VITE_API_URL` can stay empty during development.
 
 ### 3. Sign in
@@ -145,7 +146,7 @@ Backend (`server/.env`):
 | `MONGODB_URI` | MongoDB connection string | `mongodb://127.0.0.1:27017/quicklink` |
 | `JWT_SECRET` | Token signing secret (required in production) | dev fallback |
 | `JWT_EXPIRES_IN` | Token lifetime | `12h` |
-| `CORS_ORIGIN` | Comma-separated allowed origins | `http://localhost:5173` |
+| `CORS_ORIGIN` | Comma-separated allowed origins | `https://quicklink-zeta.vercel.app` |
 | `OWNER_NAME` / `OWNER_EMAIL` / `OWNER_PASSWORD` | Initial owner account | see example |
 | `ORG_NAME` / `ORG_SUBTITLE` | Report header text | QuickLink defaults |
 | `TRUST_PROXY` | Set `true` behind a reverse proxy | `false` |
@@ -246,7 +247,7 @@ export JWT_SECRET="a-long-random-secret"
 export OWNER_EMAIL="you@example.com"
 export OWNER_PASSWORD="a-strong-password"
 docker compose up --build
-# client: http://localhost:8080   api: http://localhost:4000
+# client: https://quicklink-zeta.vercel.app   api: https://quicklink-3eng.onrender.com
 ```
 
 The client's nginx proxies `/api` to the `server` service and MongoDB data is persisted
