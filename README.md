@@ -61,12 +61,21 @@ Browser (React PWA)  ──HTTP/JSON──▶  Express API  ──Mongoose──
   (the bootstrap owner) can create accounts directly and approve/reject registrations.
   Each account's school data is fully isolated — accounts never see each other's records.
   Includes secure login, password change and logout.
+- **Notifications** — owners get an in-app notification (bell with an unread badge)
+  whenever a new account registers and awaits approval.
+- **Student management** — enrol learners under a school with an auto-allocated
+  candidate **index number** (NESA / RTB style), trade, TVET level, sponsorship,
+  guardian contact and a status lifecycle (enrolled / graduated / transferred /
+  dropped). Includes learner insights (by trade, level, status and gender), a
+  **certification-readiness** indicator (eligible for national / TVET exams) and a
+  one-click CSV **student register** export.
 - **Dashboard** — live MongoDB aggregations: holdings, schools, students (by trade),
   laptops, teachers, recent records, incomplete records, and groupings by holding and district.
 - **Reports** — individual, holding, district, complete and date-range reports with an
   in-app preview and downloadable PDF (PDFKit) plus CSV export.
 - **PWA / mobile** — installable, responsive, mobile bottom navigation, offline capture,
   IndexedDB drafts, and clear Pending Sync / Synced / Sync Failed states.
+- **Customisable sidebar** — the desktop sidebar can be hidden/shown; the choice is remembered.
 
 ## Project structure
 
@@ -75,9 +84,9 @@ quicklink/
 ├─ server/                  Express API
 │  ├─ src/
 │  │  ├─ config/            env + db connection
-│  │  ├─ controllers/       auth, users, schools, dashboard, reports
+│  │  ├─ controllers/       auth, users, schools, students, notifications, dashboard, reports
 │  │  ├─ middleware/        auth, validation, error handling
-│  │  ├─ models/            User, Holding, School, AuditLog
+│  │  ├─ models/            User, Holding, School, Student, Notification, AuditLog
 │  │  ├─ routes/            API route definitions
 │  │  ├─ services/          PDF builder, owner bootstrap
 │  │  ├─ scripts/seed.js    seed data
@@ -92,7 +101,7 @@ quicklink/
 │     ├─ components/        layout + UI components
 │     ├─ context/           auth, sync, toast providers
 │     ├─ lib/               indexeddb, sync engine, reports, formatting
-│     └─ pages/             dashboard, schools, reports, users, sync, settings
+│     └─ pages/             dashboard, schools, students, reports, users, sync, settings
 ├─ docker-compose.yml
 └─ .env.example
 ```
@@ -179,7 +188,9 @@ The suite covers: authentication, protected routes, school creation, automatic t
 totals, negative/unknown value handling, independent record persistence, duplicate
 detection and confirmation, edit, archive/restore, history, search/filter, idempotent
 offline sync (`clientId`), dashboard aggregation, account creation, password change,
-multi-page PDF generation and CSV export.
+owner notifications, student enrolment/update/removal, candidate index-number
+uniqueness, per-account student isolation, student register CSV export, multi-page PDF
+generation and CSV export.
 
 ## API reference
 
@@ -208,6 +219,16 @@ All routes are under `/api`. `GET /health` (liveness) and `GET /health/ready`
 | `POST` | `/schools/:id/archive` | Archive |
 | `POST` | `/schools/:id/restore` | Restore |
 | `GET` | `/schools/:id/history` | Audit history |
+| `GET` | `/students` | List/search/filter (`search, school, trade, status, level, district, page, limit`) |
+| `POST` | `/students` | Enrol a student (auto index number if omitted) |
+| `GET` | `/students/stats` | Learner insights + certification readiness |
+| `GET` | `/students/export` | CSV student/candidate register |
+| `GET` | `/students/:id` | Get one student |
+| `PATCH` | `/students/:id` | Update student |
+| `DELETE` | `/students/:id` | Remove student |
+| `GET` | `/notifications` | List notifications + unread count |
+| `POST` | `/notifications/:id/read` | Mark one notification read |
+| `POST` | `/notifications/read-all` | Mark all notifications read |
 | `GET` | `/dashboard` | Aggregated statistics |
 | `GET` | `/reports/meta` | Report types + trade labels |
 | `GET` | `/reports/preview/:type` | JSON preview data |

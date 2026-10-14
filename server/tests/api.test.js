@@ -12,6 +12,8 @@ import { User } from '../src/models/User.js';
 import { School } from '../src/models/School.js';
 import { Holding } from '../src/models/Holding.js';
 import { AuditLog } from '../src/models/AuditLog.js';
+import { Student } from '../src/models/Student.js';
+import { Notification } from '../src/models/Notification.js';
 
 let app;
 let token;
@@ -43,6 +45,8 @@ beforeEach(async () => {
     School.deleteMany({}),
     Holding.deleteMany({}),
     AuditLog.deleteMany({}),
+    Student.deleteMany({}),
+    Notification.deleteMany({}),
   ]);
   const user = await createTestUser();
   const res = await request(app)
@@ -434,4 +438,123 @@ test('each account only sees its own school data', async () => {
     .get('/api/dashboard')
     .set('Authorization', `Bearer ${tokenB}`);
   assert.equal(dashB.body.data.totals.schools, 1);
+});
+
+const createSchool = async (name = 'Central Community School') => {
+  const res = await auth(request(app).post('/api/schools')).send(sampleSchool({ schoolName: name }));
+  return res.body.data.school;
+};
+
+test('students can be enrolled, listed, updated and removed', async () => {
+  const school = await createSchool();
+
+  const created = await auth(request(app).post('/api/students')).send({
+    school: school.id,
+    fullName: 'Mugisha Aline',
+    trade: 'sod',
+    level: 'Level 3',
+    gender: 'female',
+  });
+  assert.equal(created.status, 201);
+  const student = created.body.data.student;
+  assert.match(student.indexNumber, /^QL-\d{4}-\d{5}$/);
+  assert.equal(student.schoolName, school.schoolName);
+  assert.equal(student.certificationReady, true);
+
+  const list = await auth(request(app).get('/api/students'));
+  assert.equal(list.body.data.total, 1);
+  assert.equal(list.body.data.students[0].fullName, 'Mugisha Aline');
+
+  const updated = await auth(request(app).patch(`/api/students/${student.id}`)).send({
+    status: 'graduated',
+  });
+  assert.equal(updated.body.data.student.status, 'graduated');
+  assert.equal(updated.body.data.student.certificationReady, false);
+
+  const stats = await auth(request(app).get('/api/students/stats'));
+  assert.equal(stats.body.data.total, 1);
+
+  const del = await auth(request(app).delete(`/api/students/${student.id}`));
+  assert.equal(del.status, 200);
+});
+
+test('a supplied candidate index number must be unique per account', async () => {
+  const school = await createSchool();
+  const body = {
+    school: school.id,
+    fullName: 'Dup One',
+    indexNumber: 'NESA-0001',
+    trade: 'nit',
+    level: 'Level 4',
+  };
+  const first = await auth(request(app).post('/api/students')).send(body);
+  assert.equal(first.status, 201);
+  assert.equal(first.body.data.student.indexNumber, 'NESA-0001');
+
+  const dup = await auth(request(app).post('/api/students')).send({
+    ...body,
+    fullName: 'Dup Two',
+  });
+  assert.equal(dup.status, 409);
+});
+
+test('student register exports as CSV', async () => {
+  const school = await createSchool('CSV Student School');
+  await auth(request(app).post('/api/students')).send({
+    school: school.id,
+    fullName: 'Uwase Keza',
+    trade: 'nit',
+    level: 'Level 4',
+  });
+  const res = await auth(request(app).get('/api/students/export'));
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /text\/csv/);
+  assert.ok(res.text.includes('Uwase Keza'));
+  assert.ok(res.text.includes('Index Number'));
+  assert.ok(res.text.includes('Certification Ready'));
+});
+
+test('students are isolated per account', async () => {
+  const school = await createSchool();
+  await auth(request(app).post('/api/students')).send({
+    school: school.id,
+    fullName: 'Owner A Student',
+  });
+
+  await auth(request(app).post('/api/users')).send({
+    name: 'Owner C',
+    email: 'ownerc@test.local',
+    password: 'OwnerCPass123!',
+  });
+  const loginC = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'ownerc@test.local', password: 'OwnerCPass123!' });
+  const tokenC = loginC.body.data.token;
+
+  const listC = await request(app)
+    .get('/api/students')
+    .set('Authorization', `Bearer ${tokenC}`);
+  assert.equal(listC.body.data.total, 0);
+});
+
+test('owners are notified when a new account registers', async () => {
+  const reg = await request(app).post('/api/auth/register').send({
+    name: 'Notify Me',
+    email: 'notify@test.local',
+    password: 'NotifyPass123!',
+  });
+  assert.equal(reg.status, 201);
+
+  const res = await auth(request(app).get('/api/notifications'));
+  assert.equal(res.status, 200);
+  assert.ok(res.body.data.unreadCount >= 1);
+  assert.equal(res.body.data.notifications[0].type, 'registration');
+
+  const first = res.body.data.notifications[0];
+  const read = await auth(request(app).post(`/api/notifications/${first.id}/read`));
+  assert.equal(read.status, 200);
+  assert.equal(read.body.data.notification.read, true);
+
+  const after = await auth(request(app).get('/api/notifications'));
+  assert.equal(after.body.data.unreadCount, 0);
 });

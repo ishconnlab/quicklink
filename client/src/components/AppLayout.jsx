@@ -10,14 +10,19 @@ import {
   WifiOff,
   CloudOff,
   ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen,
+  GraduationCap,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSync } from '../context/SyncContext.jsx';
 import { classNames } from '../lib/format.js';
+import NotificationBell from './NotificationBell.jsx';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/schools', label: 'Schools', icon: School },
+  { to: '/students', label: 'Students', icon: GraduationCap },
   { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -25,6 +30,7 @@ const NAV = [
 const MOBILE_NAV = [
   { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
   { to: '/schools', label: 'Schools', icon: School },
+  { to: '/students', label: 'Students', icon: GraduationCap },
   { to: '/schools/new', label: 'Add', icon: Plus, primary: true },
   { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/settings', label: 'Settings', icon: Settings },
@@ -95,19 +101,10 @@ function AccountMenu({ openUp = false }) {
           <button
             onClick={() => {
               setOpen(false);
-              navigate('/settings');
-            }}
-            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50"
-          >
-            <Settings size={15} /> Settings
-          </button>
-          <button
-            onClick={() => {
-              setOpen(false);
               logout();
               navigate('/login', { replace: true });
             }}
-            className="flex w-full items-center gap-2 border-t border-slate-100 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
+            className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50"
           >
             <LogOut size={15} /> Sign out
           </button>
@@ -120,6 +117,16 @@ function AccountMenu({ openUp = false }) {
 export default function AppLayout() {
   const { online, pendingCount } = useSync();
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(
+    () => localStorage.getItem('quicklink.sidebar.collapsed') === '1'
+  );
+
+  const toggleSidebar = () =>
+    setCollapsed((c) => {
+      const next = !c;
+      localStorage.setItem('quicklink.sidebar.collapsed', next ? '1' : '0');
+      return next;
+    });
 
   const offlineBanner = (!online || pendingCount > 0) && (
     <div
@@ -137,12 +144,33 @@ export default function AppLayout() {
 
   return (
     <div className="min-h-screen bg-slate-100">
-      {/* Desktop sidebar (large screens) */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white lg:flex">
-        <div className="flex h-14 items-center border-b border-slate-200 px-5">
+      {/* Desktop sidebar (large screens) — can be hidden */}
+      {collapsed && (
+        <button
+          onClick={toggleSidebar}
+          title="Show sidebar"
+          className="fixed left-0 top-1/2 z-40 hidden -translate-y-1/2 rounded-r-lg border border-l-0 border-slate-200 bg-white py-3 pl-1.5 pr-1 text-slate-400 shadow-sm hover:text-slate-700 lg:block"
+        >
+          <PanelLeftOpen size={18} />
+        </button>
+      )}
+      <aside
+        className={classNames(
+          'fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-slate-200 bg-white',
+          !collapsed && 'lg:flex'
+        )}
+      >
+        <div className="flex h-14 items-center justify-between border-b border-slate-200 px-5">
           <NavLink to="/">
             <Brand />
           </NavLink>
+          <button
+            onClick={toggleSidebar}
+            title="Hide sidebar"
+            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          >
+            <PanelLeftClose size={18} />
+          </button>
         </div>
         <nav className="flex-1 space-y-1 p-3">
           {NAV.map(({ to, label, icon: Icon, end }) => (
@@ -167,7 +195,10 @@ export default function AppLayout() {
         <div className="border-t border-slate-200 p-3">
           <div className="flex items-center justify-between gap-2">
             <AccountIdentity />
-            <AccountMenu openUp />
+            <div className="flex items-center gap-1">
+              <NotificationBell openUp />
+              <AccountMenu openUp />
+            </div>
           </div>
         </div>
       </aside>
@@ -178,11 +209,14 @@ export default function AppLayout() {
           <NavLink to="/" className="shrink-0">
             <Brand />
           </NavLink>
-          <AccountMenu />
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <AccountMenu />
+          </div>
         </div>
       </header>
 
-      <div className="lg:pl-64">
+      <div className={classNames(collapsed ? 'lg:pl-0' : 'lg:pl-64')}>
         {offlineBanner}
 
         <main className="mx-auto w-full max-w-6xl px-4 pb-28 pt-4 sm:px-6 lg:pb-10 lg:pt-6">
@@ -197,7 +231,7 @@ export default function AppLayout() {
         className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white lg:hidden"
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
       >
-        <div className="grid grid-cols-5">
+        <div className="grid grid-cols-6">
           {MOBILE_NAV.map(({ to, label, icon: Icon, end, primary }) => (
             <NavLink
               key={to}

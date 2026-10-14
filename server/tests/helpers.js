@@ -3,6 +3,8 @@ import { createApp } from '../src/app.js';
 import { User } from '../src/models/User.js';
 import { School } from '../src/models/School.js';
 import { Holding } from '../src/models/Holding.js';
+import { Notification } from '../src/models/Notification.js';
+import { Student } from '../src/models/Student.js';
 
 let mongod = null;
 const TEST_DB = 'quicklink_test';
@@ -11,7 +13,13 @@ const TEST_DB = 'quicklink_test';
 // schemas can linger. Drop everything and rebuild from the current schema.
 async function resetSchema() {
   await mongoose.connection.dropDatabase();
-  await Promise.all([User.syncIndexes(), School.syncIndexes(), Holding.syncIndexes()]);
+  await Promise.all([
+    User.syncIndexes(),
+    School.syncIndexes(),
+    Holding.syncIndexes(),
+    Student.syncIndexes(),
+    Notification.syncIndexes(),
+  ]);
 }
 
 // Prefer an isolated in-memory MongoDB. If it is unavailable (e.g. the mongod

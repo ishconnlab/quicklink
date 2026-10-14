@@ -102,6 +102,56 @@ export const archiveSchema = z.object({
   reason: z.string().max(500).optional().default(''),
 });
 
+// --- Students -------------------------------------------------------------
+
+const GENDER_VALUES = ['male', 'female', 'other'];
+const TRADE_VALUES = ['sod', 'nit', 'csa', 'acc', 'other'];
+const SPONSORSHIP_VALUES = ['government', 'private', 'sponsored', 'self', 'other'];
+const STUDENT_STATUS_VALUES = ['enrolled', 'graduated', 'transferred', 'dropped'];
+
+const nullify = (v) => (v === '' || v === undefined ? null : v);
+const optionalEnumOrNull = (values) =>
+  z.preprocess(nullify, z.enum(values).nullable()).optional();
+const optionalDateOrNull = z.preprocess(nullify, z.union([z.coerce.date(), z.null()])).optional();
+
+const optionalIndexNumber = z
+  .preprocess(nullify, z.string().trim().min(1).max(60).nullable())
+  .optional();
+
+export const createStudentSchema = z.object({
+  school: z.string().regex(/^[0-9a-fA-F]{24}$/, 'A valid school is required'),
+  fullName: z.string().trim().min(2, 'Full name is required').max(200),
+  indexNumber: optionalIndexNumber,
+  gender: optionalEnumOrNull(GENDER_VALUES),
+  dateOfBirth: optionalDateOrNull,
+  trade: optionalEnumOrNull(TRADE_VALUES),
+  level: z.string().trim().max(40).optional().default(''),
+  sponsorship: optionalEnumOrNull(SPONSORSHIP_VALUES),
+  guardianName: z.string().trim().max(160).optional().default(''),
+  guardianPhone: z.string().trim().max(40).optional().default(''),
+  status: z.enum(STUDENT_STATUS_VALUES).optional().default('enrolled'),
+  enrolledAt: optionalDateOrNull,
+  notes: z.string().trim().max(2000).optional().default(''),
+  clientId: z.string().trim().max(120).optional().nullable(),
+});
+
+export const updateStudentSchema = z.object({
+  school: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid school').optional(),
+  fullName: z.string().trim().min(2, 'Full name is required').max(200).optional(),
+  indexNumber: optionalIndexNumber,
+  gender: optionalEnumOrNull(GENDER_VALUES),
+  dateOfBirth: optionalDateOrNull,
+  trade: optionalEnumOrNull(TRADE_VALUES),
+  level: z.string().trim().max(40).optional(),
+  sponsorship: optionalEnumOrNull(SPONSORSHIP_VALUES),
+  guardianName: z.string().trim().max(160).optional(),
+  guardianPhone: z.string().trim().max(40).optional(),
+  status: z.enum(STUDENT_STATUS_VALUES).optional(),
+  enrolledAt: optionalDateOrNull,
+  notes: z.string().trim().max(2000).optional(),
+  clientId: z.string().trim().max(120).optional().nullable(),
+});
+
 export const idParamSchema = z.object({
   id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id'),
 });

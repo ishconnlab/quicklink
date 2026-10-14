@@ -11,6 +11,8 @@ import userRoutes from './routes/userRoutes.js';
 import schoolRoutes from './routes/schoolRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
+import studentRoutes from './routes/studentRoutes.js';
 
 export function createApp() {
   const app = express();
@@ -65,8 +67,10 @@ export function createApp() {
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
   app.use('/api/schools', schoolRoutes);
+  app.use('/api/students', studentRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/reports', reportRoutes);
+  app.use('/api/notifications', notificationRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

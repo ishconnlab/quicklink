@@ -314,11 +314,11 @@ export default function SchoolFormPage() {
       </div>
       <input
         type="text"
-        inputMode="numeric"
+        inputMode="text"
         value={form[name]}
         onChange={(e) => setField(name, e.target.value)}
         className={`input ${errors[name] ? 'ring-2 ring-red-400' : ''}`}
-        placeholder="Unknown"
+        placeholder="Enter number or N/A"
       />
       {errors[name] && <p className="mt-1 text-xs text-red-600">{errors[name]}</p>}
     </div>

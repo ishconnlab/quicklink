@@ -2,6 +2,7 @@ import { User } from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { signToken } from '../utils/token.js';
+import { notifyOwners } from '../services/notify.js';
 
 // Public self-registration. New accounts are created in 'pending' state and
 // cannot sign in until an account owner approves them.
@@ -21,6 +22,21 @@ export const register = asyncHandler(async (req, res) => {
   });
   await user.setPassword(password);
   await user.save();
+
+  // Notify account owners so the request can be reviewed promptly. Delivery
+  // failures must never block a successful registration.
+  try {
+    await notifyOwners({
+      type: 'registration',
+      title: 'New account awaiting approval',
+      message: `${user.name} (${user.email}) requested access.`,
+      link: '/settings',
+      meta: { userId: user._id.toString() },
+    });
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn('[notify] Failed to notify owners of new registration:', err.message);
+  }
 
   res.status(201).json({
     success: true,

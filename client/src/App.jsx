@@ -7,6 +7,8 @@ import DashboardPage from './pages/DashboardPage.jsx';
 import SchoolsPage from './pages/SchoolsPage.jsx';
 import SchoolFormPage from './pages/SchoolFormPage.jsx';
 import SchoolDetailPage from './pages/SchoolDetailPage.jsx';
+import StudentsPage from './pages/StudentsPage.jsx';
+import StudentFormPage from './pages/StudentFormPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
 import ReportsPage from './pages/ReportsPage.jsx';
 import SyncPage from './pages/SyncPage.jsx';
@@ -41,6 +43,9 @@ export default function App() {
         <Route path="/schools/new" element={<SchoolFormPage />} />
         <Route path="/schools/:id" element={<SchoolDetailPage />} />
         <Route path="/schools/:id/edit" element={<SchoolFormPage />} />
+        <Route path="/students" element={<StudentsPage />} />
+        <Route path="/students/new" element={<StudentFormPage />} />
+        <Route path="/students/:id/edit" element={<StudentFormPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/sync" element={<SyncPage />} />
         <Route path="/users" element={<UsersPage />} />
