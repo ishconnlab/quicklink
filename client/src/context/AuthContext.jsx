@@ -43,13 +43,20 @@ export function AuthProvider({ children }) {
     return res.data.data.user;
   }, []);
 
+  // Public self-registration. The account starts pending until an owner
+  // approves it, so we do not sign the user in here.
+  const register = useCallback(async ({ name, email, password }) => {
+    const res = await api.post('/auth/register', { name, email, password });
+    return res.data.data;
+  }, []);
+
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     await api.post('/auth/change-password', { currentPassword, newPassword });
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, logout, changePassword, refresh: loadUser }}
+      value={{ user, loading, login, register, logout, changePassword, refresh: loadUser }}
     >
       {children}
     </AuthContext.Provider>

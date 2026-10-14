@@ -1,9 +1,17 @@
 node_modules/
 dist/
-.env
-.env.local
-*.log
 coverage/
 .DS_Store
+
+# Environment files — never commit real secrets. Only the example files are kept.
+.env
+.env.*
+.env.local
+!.env.example
+
+# Logs
+*.log
+
+# Build artifacts / uploads
 /client/dist/
 /server/uploads/

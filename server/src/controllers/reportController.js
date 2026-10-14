@@ -62,9 +62,9 @@ function resolveType(req) {
   return req.params.type || (req.params.id ? 'school' : null);
 }
 
-function buildFilter(query) {
+function buildFilter(query, ownerId) {
   const { holding, district, from, to, includeArchived } = query;
-  const filter = {};
+  const filter = { owner: ownerId };
   if (includeArchived !== 'true') filter.status = 'active';
   if (holding) filter.holding = holding;
   if (district) filter.district = district;
@@ -81,7 +81,8 @@ function buildFilter(query) {
 }
 
 async function loadSchools(req, type) {
-  const filter = buildFilter(req.query);
+  const ownerId = req.user._id;
+  const filter = buildFilter(req.query, ownerId);
   let title = 'Complete School Data Report';
   let subtitle = 'All recorded schools';
   let holdingName = 'All holdings';
@@ -93,7 +94,7 @@ async function loadSchools(req, type) {
 
   if (type === 'school') {
     const { id } = req.params;
-    const school = await School.findById(id);
+    const school = await School.findOne({ _id: id, owner: ownerId });
     if (!school) throw ApiError.notFound('School record not found');
     return {
       schools: [school],
@@ -110,7 +111,7 @@ async function loadSchools(req, type) {
   if (type === 'holding') {
     const { holding } = req.query;
     if (!holding) throw ApiError.badRequest('holding is required for a holding report');
-    const [first] = await School.find({ holding }).limit(1);
+    const [first] = await School.find({ owner: ownerId, holding }).limit(1);
     holdingName = first?.holdingName || 'Selected holding';
     title = 'Holding / Project Report';
     subtitle = `All schools under ${holdingName}`;
@@ -132,7 +133,7 @@ async function loadSchools(req, type) {
 
   const [h, d] = await Promise.all([
     req.query.holding
-      ? School.findOne({ holding: req.query.holding }).select('holdingName').lean()
+      ? School.findOne({ owner: ownerId, holding: req.query.holding }).select('holdingName').lean()
       : Promise.resolve(null),
     Promise.resolve(req.query.district || null),
   ]);
@@ -191,9 +192,12 @@ export const previewReport = asyncHandler(async (req, res) => {
   let teachers = 0;
   for (const s of schools) {
     students += s.totalStudents || 0;
-    laptops += s.laptops || 0;
-    teachers += s.teachers || 0;
-    for (const k of TRADE_KEYS) totals[k] += s.trades?.[k] || 0;
+    if (typeof s.laptops === 'number') laptops += s.laptops;
+    if (typeof s.teachers === 'number') teachers += s.teachers;
+    for (const k of TRADE_KEYS) {
+      const v = s.trades?.[k];
+      if (typeof v === 'number') totals[k] += v;
+    }
   }
 
   res.json({

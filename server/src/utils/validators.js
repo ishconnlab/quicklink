@@ -5,13 +5,22 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 });
 
-export const createUserSchema = z.object({
+export const registerSchema = z.object({
   name: z.string().trim().min(2, 'Name is too short').max(120),
   email: z.string().trim().toLowerCase().email('A valid email is required'),
   password: z
     .string()
     .min(8, 'Password must be at least 8 characters')
     .max(200, 'Password is too long'),
+});
+
+export const createUserSchema = registerSchema;
+
+export const updateUserSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  isActive: z.boolean().optional(),
+  password: z.string().min(8).max(200).optional(),
+  role: z.enum(['owner', 'user']).optional(),
 });
 
 export const changePasswordSchema = z.object({
@@ -22,31 +31,32 @@ export const changePasswordSchema = z.object({
     .max(200),
 });
 
+const NA_PATTERN = /^(n\/?a|na|nil|none|unknown|not[\s-]?applicable|no[\s-]?record|-{1,2})$/i;
+
+// A flexible count: a non-negative integer, the literal "N/A", a known word
+// for "no record", or blank (unknown -> null). Normalised to number | 'N/A' | null.
+function normaliseCount(v) {
+  if (v === null || v === undefined || v === '') return null;
+  if (typeof v === 'number') return v;
+  const s = String(v).trim();
+  if (s === '') return null;
+  if (NA_PATTERN.test(s)) return 'N/A';
+  const n = Number(s);
+  return Number.isNaN(n) ? Number.NaN : n;
+}
+
+const isCount = (v) => v === null || v === 'N/A' || (Number.isInteger(v) && v >= 0);
+
 const countField = z
   .union([z.number(), z.string(), z.null(), z.undefined()])
-  .transform((v) => {
-    if (v === null || v === undefined || v === '') return null;
-    const n = typeof v === 'string' ? Number(v) : v;
-    if (Number.isNaN(n)) return Number.NaN;
-    return n;
-  })
-  .refine((v) => v === null || (Number.isInteger(v) && v >= 0), {
-    message: 'Must be a non-negative integer or left blank (unknown)',
-  });
+  .transform(normaliseCount)
+  .refine(isCount, { message: 'Must be a non-negative whole number or "N/A"' });
 
-// Optional variant used by updates: absent fields stay undefined so a partial
-// update does not overwrite the other trade values.
+// Update variant: absent fields stay undefined so partial updates are safe.
 const countFieldOptional = z
   .union([z.number(), z.string(), z.null()])
-  .transform((v) => {
-    if (v === null || v === '') return null;
-    const n = typeof v === 'string' ? Number(v) : v;
-    if (Number.isNaN(n)) return Number.NaN;
-    return n;
-  })
-  .refine((v) => v === null || (Number.isInteger(v) && v >= 0), {
-    message: 'Must be a non-negative integer or left blank (unknown)',
-  })
+  .transform(normaliseCount)
+  .refine(isCount, { message: 'Must be a non-negative whole number or "N/A"' })
   .optional();
 
 const tradesSchema = z.object({

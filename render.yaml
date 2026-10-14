@@ -1,21 +1,34 @@
+# Render Blueprint for the QuickLink backend API.
+#
+# IMPORTANT: If this service was created manually in the Render dashboard
+# (rather than via this Blueprint), the dashboard settings are what actually
+# apply. Make sure the dashboard matches this file:
+#   Root Directory:     server
+#   Build Command:      npm ci
+#   Start Command:      npm start
+#   Health Check Path:  /health
+# The previous misconfiguration used `npm run dev` as the build command, which
+# does not install dependencies and crashed with "Cannot find package 'express'".
 services:
   - type: web
-    name: quicklink-api
+    name: quicklink-rwanda-school
     runtime: node
     rootDir: server
     plan: free
     buildCommand: npm ci
-    startCommand: node src/index.js
-    healthCheckPath: /api/health
+    startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
+      # MongoDB Atlas connection string (set in the Render dashboard, never commit).
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 12h
+      # Comma-separated allowed browser origins (the Vercel frontend URL).
       - key: CORS_ORIGIN
         sync: false
       - key: OWNER_NAME
@@ -27,6 +40,8 @@ services:
       - key: TRUST_PROXY
         value: 'true'
 
+  # Optional: only needed if you ever want Render to serve the frontend.
+  # The live frontend is hosted on Vercel, so this service can be omitted.
   - type: web
     name: quicklink-client
     runtime: static
@@ -35,7 +50,7 @@ services:
     staticPublishPath: dist
     envVars:
       - key: VITE_API_URL
-        sync: false
+        value: https://quicklink-3eng.onrender.com
     routes:
       - type: rewrite
         source: /*

@@ -10,8 +10,14 @@ export function setToken(token) {
   else localStorage.removeItem(TOKEN_KEY);
 }
 
+// Backend base URL. VITE_API_URL always wins; when it is not provided in a
+// production build we fall back to the deployed Render API so the frontend
+// still reaches the backend. In development an empty value uses the Vite proxy.
+const RAW_BASE = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+const API_BASE = RAW_BASE || (import.meta.env.PROD ? 'https://quicklink-3eng.onrender.com' : '');
+
 const api = axios.create({
-  baseURL: `${import.meta.env.VITE_API_URL || ''}/api`,
+  baseURL: `${API_BASE}/api`,
   timeout: 20000,
 });
 

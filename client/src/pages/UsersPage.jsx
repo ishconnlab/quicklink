@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Navigate } from 'react-router-dom';
 import { UserPlus, ShieldCheck, Mail, Calendar, Power } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { PageHeader, Modal, Badge } from '../components/layout.jsx';
@@ -33,6 +34,10 @@ export default function UsersPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  if (currentUser && !currentUser.isOwner) {
+    return <Navigate to="/settings" replace />;
+  }
 
   const createUser = async (e) => {
     e.preventDefault();
@@ -72,7 +77,7 @@ export default function UsersPage() {
     <div>
       <PageHeader
         title="User accounts"
-        subtitle="Every account shares the same role and permissions"
+        subtitle="Owners manage accounts and approvals"
         actions={
           <button onClick={() => setModal(true)} className="btn-primary">
             <UserPlus size={18} /> New account
@@ -83,8 +88,8 @@ export default function UsersPage() {
       <div className="mb-4 flex items-start gap-2 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">
         <ShieldCheck size={18} className="mt-0.5 shrink-0" />
         <span>
-          QuickLink has a single role model. All authorised users can create, view and manage school
-          records. There is no public registration — only signed-in users can add accounts.
+          Owners can create accounts and approve or reject self-registrations. Every account keeps
+          its own separate school data — accounts never see each other&apos;s records.
         </span>
       </div>
 

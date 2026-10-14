@@ -56,8 +56,11 @@ Browser (React PWA)  ──HTTP/JSON──▶  Express API  ──Mongoose──
 - **Duplicate detection** — the API flags a same-name school under the same holding
   and the user explicitly confirms before saving.
 - **History** — create / update / archive / restore events are written to an audit log.
-- **Accounts** — secure login, account creation by signed-in users, password change,
-  logout. A single role model: every user has identical permissions. No public registration.
+- **Accounts (multi-user)** — public registration with **owner approval**. New sign-ups
+  start as *pending* and cannot sign in until an owner approves them. The first account
+  (the bootstrap owner) can create accounts directly and approve/reject registrations.
+  Each account's school data is fully isolated — accounts never see each other's records.
+  Includes secure login, password change and logout.
 - **Dashboard** — live MongoDB aggregations: holdings, schools, students (by trade),
   laptops, teachers, recent records, incomplete records, and groupings by holding and district.
 - **Reports** — individual, holding, district, complete and date-range reports with an
@@ -112,7 +115,7 @@ npm run dev                 # http://localhost:4000
 ```
 
 On first boot the server creates the initial owner account from `OWNER_*` in `.env`.
-There is no public registration endpoint.
+New users can self-register via the app; an owner approves them before first sign-in.
 
 ### 2. Frontend
 
@@ -179,18 +182,23 @@ multi-page PDF generation and CSV export.
 
 ## API reference
 
-All routes are under `/api`. Except `/health` and `/auth/login`, every route requires
-`Authorization: Bearer <token>`.
+All routes are under `/api`. `GET /health` (liveness) and `GET /health/ready`
+(database readiness) live at the root. Except `/api/health`, `/api/auth/login` and
+`/api/auth/register`, every route requires `Authorization: Bearer <token>`.
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/health` | Health check |
+| `GET` | `/health` · `/health/ready` | Liveness / readiness probes |
+| `GET` | `/api/health` | API health check |
+| `POST` | `/auth/register` | Self-register (creates a *pending* account) |
 | `POST` | `/auth/login` | Sign in, returns JWT |
 | `GET` | `/auth/me` | Current user |
 | `POST` | `/auth/change-password` | Change own password |
-| `GET` | `/users` | List accounts |
-| `POST` | `/users` | Create account |
-| `PATCH` | `/users/:id` | Update account (name, active, password) |
+| `GET` | `/users` | List accounts (owner only) |
+| `GET` | `/users/pending` | List pending registrations (owner only) |
+| `POST` | `/users` | Create account (owner only) |
+| `POST` | `/users/:id/approve` · `/users/:id/reject` | Approve/reject a registration (owner only) |
+| `PATCH` | `/users/:id` | Update account (name, active, password) (owner only) |
 | `GET` | `/schools` | List/search/filter (`search, holding, district, status, incomplete, from, to, page, limit, sort`) |
 | `POST` | `/schools` | Create school (idempotent via `clientId`) |
 | `GET` | `/schools/check-duplicate` | Duplicate check (`schoolName`, `holding`) |
@@ -249,17 +257,31 @@ in the `mongo-data` volume.
 **MongoDB** — create a free cluster on MongoDB Atlas, create a database user, allow your
 host IPs, and copy the connection string into `MONGODB_URI`.
 
-**Backend** — deploy `server/` (e.g. Render, Railway, Fly.io, a VM with Docker).
-Build: `npm ci`; start: `node src/index.js`. Set all backend env vars, including
-`MONGODB_URI`, a strong `JWT_SECRET`, `CORS_ORIGIN` set to your frontend URL, and
-`TRUST_PROXY=true` behind a proxy. A `render.yaml` blueprint is included.
+**Backend (Render)** — the live service is `quicklink-rwanda-school`
+(`https://quicklink-3eng.onrender.com`). Configure it as:
 
-**Frontend** — deploy `client/` to any static host (Vercel, Netlify, Cloudflare Pages,
-nginx). Build: `npm ci && npm run build`, output: `dist`. Set `VITE_API_URL` to your
-backend URL at build time. Ensure SPA fallback routes all paths to `index.html`
-(the bundled `nginx.conf` does this).
+| Setting | Value |
+| --- | --- |
+| Root Directory | `server` |
+| Build Command | `npm ci` |
+| Start Command | `npm start` |
+| Health Check Path | `/health` |
 
-**Important:** sgorve over HTTPS so the service worker and install prompt work.
+Environment variables: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`,
+`JWT_EXPIRES_IN=12h`, `CORS_ORIGIN=https://quicklink-zeta.vercel.app`,
+`OWNER_EMAIL`, `OWNER_PASSWORD`, `TRUST_PROXY=true`. (`PORT` is set by Render.)
+A matching `render.yaml` blueprint is included. **Note:** the build command must be
+`npm ci` (or `npm install`) — using `npm run dev` as the build command skips dependency
+installation and crashes with `Cannot find package 'express'`.
+
+**Frontend (Vercel)** — the live site is `https://quicklink-zeta.vercel.app`, project
+root `client`, framework **Vite**, output `dist`. Set `VITE_API_URL` to the backend URL
+(`https://quicklink-3eng.onrender.com`) in Vercel → Settings → Environment Variables for
+the Production environment (a built-in fallback exists in `src/api/client.js`). SPA
+routing is configured by `client/vercel.json`, which rewrites unknown paths to
+`index.html` so deep links like `/schools` load instead of returning 404.
+
+**Important:** serve over HTTPS so the service worker and install prompt work.
 
 ## Security notes
 

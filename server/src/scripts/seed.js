@@ -35,10 +35,10 @@ async function seed() {
     process.exit(1);
   }
 
-  // Clear existing collection data (keeps user accounts).
+  // Clear existing collection data for this owner (keeps user accounts).
   await Promise.all([
-    School.deleteMany({}),
-    Holding.deleteMany({}),
+    School.deleteMany({ owner: actor._id }),
+    Holding.deleteMany({ owner: actor._id }),
   ]);
   console.log('[seed] Cleared schools and holdings');
 
@@ -47,6 +47,7 @@ async function seed() {
     holdings.push(
       await Holding.create({
         ...h,
+        owner: actor._id,
         nameKey: h.name.toLowerCase().replace(/\s+/g, ' '),
         createdBy: actor._id,
       })
@@ -69,6 +70,7 @@ async function seed() {
       const incomplete = rand() < 0.15;
 
       schools.push({
+        owner: actor._id,
         holding: holding._id,
         holdingName: holding.name,
         schoolName: `${district} Community School ${hi + 1}-${i}`,

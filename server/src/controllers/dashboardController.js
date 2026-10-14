@@ -4,8 +4,8 @@ import asyncHandler from '../utils/asyncHandler.js';
 
 const num = (v) => (typeof v === 'number' && !Number.isNaN(v) ? v : 0);
 
-export const getDashboard = asyncHandler(async (_req, res) => {
-  const activeMatch = { status: 'active' };
+export const getDashboard = asyncHandler(async (req, res) => {
+  const activeMatch = { owner: req.user._id, status: 'active' };
 
   const [totalsAgg] = await School.aggregate([
     { $match: activeMatch },
@@ -14,21 +14,21 @@ export const getDashboard = asyncHandler(async (_req, res) => {
         _id: null,
         totalSchools: { $sum: 1 },
         totalStudents: { $sum: '$totalStudents' },
-        sod: { $sum: '$trades.sod' },
-        nit: { $sum: '$trades.nit' },
-        csa: { $sum: '$trades.csa' },
-        acc: { $sum: '$trades.acc' },
-        other: { $sum: '$trades.other' },
-        laptops: { $sum: '$laptops' },
-        teachers: { $sum: '$teachers' },
+        sod: { $sum: { $cond: [{ $isNumber: '$trades.sod' }, '$trades.sod', 0] } },
+        nit: { $sum: { $cond: [{ $isNumber: '$trades.nit' }, '$trades.nit', 0] } },
+        csa: { $sum: { $cond: [{ $isNumber: '$trades.csa' }, '$trades.csa', 0] } },
+        acc: { $sum: { $cond: [{ $isNumber: '$trades.acc' }, '$trades.acc', 0] } },
+        other: { $sum: { $cond: [{ $isNumber: '$trades.other' }, '$trades.other', 0] } },
+        laptops: { $sum: { $cond: [{ $isNumber: '$laptops' }, '$laptops', 0] } },
+        teachers: { $sum: { $cond: [{ $isNumber: '$teachers' }, '$teachers', 0] } },
         incomplete: { $sum: { $cond: ['$isIncomplete', 1, 0] } },
       },
     },
   ]);
 
   const [holdingCount, archivedCount] = await Promise.all([
-    Holding.countDocuments({}),
-    School.countDocuments({ status: 'archived' }),
+    Holding.countDocuments({ owner: req.user._id }),
+    School.countDocuments({ owner: req.user._id, status: 'archived' }),
   ]);
 
   const byTrades = {};
@@ -43,8 +43,8 @@ export const getDashboard = asyncHandler(async (_req, res) => {
           _id: { holding: '$holding', name: '$holdingName' },
           schools: { $sum: 1 },
           students: { $sum: '$totalStudents' },
-          laptops: { $sum: '$laptops' },
-          teachers: { $sum: '$teachers' },
+          laptops: { $sum: { $cond: [{ $isNumber: '$laptops' }, '$laptops', 0] } },
+          teachers: { $sum: { $cond: [{ $isNumber: '$teachers' }, '$teachers', 0] } },
         },
       },
       { $sort: { schools: -1 } },
@@ -56,8 +56,8 @@ export const getDashboard = asyncHandler(async (_req, res) => {
           _id: '$district',
           schools: { $sum: 1 },
           students: { $sum: '$totalStudents' },
-          laptops: { $sum: '$laptops' },
-          teachers: { $sum: '$teachers' },
+          laptops: { $sum: { $cond: [{ $isNumber: '$laptops' }, '$laptops', 0] } },
+          teachers: { $sum: { $cond: [{ $isNumber: '$teachers' }, '$teachers', 0] } },
         },
       },
       { $sort: { schools: -1 } },

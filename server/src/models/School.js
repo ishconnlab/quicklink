@@ -9,21 +9,51 @@ export const TRADE_LABELS = {
   other: 'Other',
 };
 
-// A trade count may be a non-negative integer or null (unknown).
-const tradeField = {
-  type: Number,
+// Sentinel for "explicitly no record / not applicable". Distinct from null,
+// which means "unknown / not entered yet". Neither is counted as zero.
+export const TRADE_NA = 'N/A';
+
+const NA_PATTERN = /^(n\/?a|na|nil|none|unknown|not[\s-]?applicable|no[\s-]?record|-{1,2})$/i;
+
+// Normalises a flexible count input (number, numeric string, "N/A", blank).
+export function normalizeCount(value) {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  const s = String(value).trim();
+  if (s === '') return null;
+  if (NA_PATTERN.test(s)) return TRADE_NA;
+  const n = Number(s);
+  return Number.isNaN(n) ? s : n;
+}
+
+export const isUnknownCount = (v) => v === null || v === undefined;
+export const isKnownCount = (v) => typeof v === 'number' || v === TRADE_NA;
+
+// A trade/count field accepts a non-negative integer, the literal "N/A",
+// or null (blank). Values are normalised in pre('validate').
+const countField = {
+  type: mongoose.Schema.Types.Mixed,
   default: null,
-  min: [0, 'Trade count cannot be negative'],
   validate: {
     validator(v) {
-      return v === null || v === undefined || (Number.isInteger(v) && v >= 0);
+      if (v === null || v === undefined) return true;
+      if (typeof v === 'number') return Number.isInteger(v) && v >= 0;
+      return v === TRADE_NA;
     },
-    message: 'Trade count must be a non-negative integer',
+    message: 'Value must be a non-negative whole number or "N/A"',
   },
 };
 
 const schoolSchema = new mongoose.Schema(
   {
+    // Every record belongs to exactly one account (multi-tenant isolation).
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
+    },
+
     holding: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Holding',
@@ -40,37 +70,17 @@ const schoolSchema = new mongoose.Schema(
     dateOfCollection: { type: Date, required: true, index: true },
 
     trades: {
-      sod: tradeField,
-      nit: tradeField,
-      csa: tradeField,
-      acc: tradeField,
-      other: tradeField,
+      sod: countField,
+      nit: countField,
+      csa: countField,
+      acc: countField,
+      other: countField,
     },
 
     totalStudents: { type: Number, default: 0, min: 0 },
 
-    laptops: {
-      type: Number,
-      default: null,
-      min: [0, 'Laptops cannot be negative'],
-      validate: {
-        validator(v) {
-          return v === null || v === undefined || (Number.isInteger(v) && v >= 0);
-        },
-        message: 'Laptops must be a non-negative integer',
-      },
-    },
-    teachers: {
-      type: Number,
-      default: null,
-      min: [0, 'Teachers cannot be negative'],
-      validate: {
-        validator(v) {
-          return v === null || v === undefined || (Number.isInteger(v) && v >= 0);
-        },
-        message: 'Teachers must be a non-negative integer',
-      },
-    },
+    laptops: countField,
+    teachers: countField,
 
     feedback: { type: String, trim: true, maxlength: 5000, default: '' },
 
@@ -98,10 +108,16 @@ const schoolSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Not unique: duplicates are detected in the controller and the user may
-// explicitly confirm a genuine same-name school under the same holding.
-schoolSchema.index({ holding: 1, schoolNameKey: 1 });
-schoolSchema.index({ clientId: 1 }, { unique: true, sparse: true });
+// Duplicates are detected in the controller (per owner + holding); the user
+// may explicitly confirm a genuine same-name school under the same holding.
+schoolSchema.index({ owner: 1, holding: 1, schoolNameKey: 1 });
+// Idempotent offline sync is scoped per account. Must be a PARTIAL index:
+// a compound sparse index indexes every doc (because owner always exists),
+// which would make all clientId-less records collide on null.
+schoolSchema.index(
+  { owner: 1, clientId: 1 },
+  { unique: true, partialFilterExpression: { clientId: { $type: 'string' } } }
+);
 
 schoolSchema.pre('validate', function computeTotals(next) {
   if (this.isModified('schoolName') || !this.schoolNameKey) {
@@ -114,17 +130,18 @@ schoolSchema.pre('validate', function computeTotals(next) {
   const known = [];
   const missing = [];
   for (const key of TRADE_KEYS) {
-    const val = this.trades?.[key];
-    if (val === null || val === undefined) {
-      missing.push(`trades.${key}`);
-    } else {
-      known.push(val);
-    }
+    const value = normalizeCount(this.trades?.[key]);
+    if (this.trades) this.trades[key] = value;
+    if (isUnknownCount(value)) missing.push(`trades.${key}`);
+    else if (typeof value === 'number') known.push(value);
   }
   this.totalStudents = known.reduce((a, b) => a + b, 0);
 
-  if (this.laptops === null || this.laptops === undefined) missing.push('laptops');
-  if (this.teachers === null || this.teachers === undefined) missing.push('teachers');
+  this.laptops = normalizeCount(this.laptops);
+  if (isUnknownCount(this.laptops)) missing.push('laptops');
+
+  this.teachers = normalizeCount(this.teachers);
+  if (isUnknownCount(this.teachers)) missing.push('teachers');
 
   this.isIncomplete = missing.length > 0;
   this.incompleteFields = missing;

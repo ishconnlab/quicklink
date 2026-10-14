@@ -15,9 +15,22 @@ import { PageLoader, Spinner } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useSync } from '../context/SyncContext.jsx';
 import idb, { STORES, makeClientId } from '../lib/db.js';
-import { TRADE_KEYS, TRADE_LABELS, toInputDate } from '../lib/format.js';
+import { TRADE_KEYS, TRADE_LABELS, toInputDate, classNames } from '../lib/format.js';
 
 const DRAFT_ID = 'new-school-draft';
+
+const NA_WORDS = /^(n\/?a|na|nil|none|unknown|not[\s-]?applicable|no[\s-]?record|-{1,2})$/i;
+
+// Flexible count: blank -> null (unknown), NA words -> 'N/A' (explicit no
+// record), otherwise a number (NaN when invalid).
+function normaliseCount(value) {
+  const s = String(value ?? '').trim();
+  if (s === '') return null;
+  if (NA_WORDS.test(s)) return 'N/A';
+  const n = Number(s);
+  return Number.isNaN(n) ? Number.NaN : n;
+}
+const isValidCount = (v) => v === null || v === 'N/A' || (Number.isInteger(v) && v >= 0);
 
 const emptyForm = () => ({
   holding: '',
@@ -105,11 +118,14 @@ export default function SchoolFormPage() {
     setErrors((e) => ({ ...e, [key]: undefined }));
   };
 
-  // Live total: blank values are treated as unknown, not zero.
-  const knownTrades = TRADE_KEYS.map((k) => form[k]).filter((v) => v !== '' && v !== null);
-  const total = knownTrades.reduce((a, v) => a + (Number(v) || 0), 0);
-  const unknownTrades = TRADE_KEYS.filter((k) => form[k] === '');
-  const hasUnknowns = unknownTrades.length > 0 || form.laptops === '' || form.teachers === '';
+  // Live total: blank values are unknown (not counted); "N/A" counts as zero.
+  const tradeValues = TRADE_KEYS.map((k) => normaliseCount(form[k]));
+  const total = tradeValues.reduce((a, v) => a + (typeof v === 'number' ? v : 0), 0);
+  const unknownTrades = TRADE_KEYS.filter((k) => normaliseCount(form[k]) === null);
+  const hasUnknowns =
+    unknownTrades.length > 0 ||
+    normaliseCount(form.laptops) === null ||
+    normaliseCount(form.teachers) === null;
 
   const validate = () => {
     const e = {};
@@ -118,19 +134,23 @@ export default function SchoolFormPage() {
     if (!form.district.trim()) e.district = 'District is required';
     if (!form.dateOfCollection) e.dateOfCollection = 'Date is required';
     for (const k of TRADE_KEYS) {
-      const v = form[k];
-      if (v !== '' && (!Number.isInteger(Number(v)) || Number(v) < 0)) {
-        e[k] = 'Must be a non-negative whole number';
+      if (!isValidCount(normaliseCount(form[k]))) {
+        e[k] = 'Enter a whole number or N/A';
       }
     }
-    if (form.laptops !== '' && (!Number.isInteger(Number(form.laptops)) || Number(form.laptops) < 0)) {
-      e.laptops = 'Must be a non-negative whole number';
+    if (!isValidCount(normaliseCount(form.laptops))) {
+      e.laptops = 'Enter a whole number or N/A';
     }
-    if (form.teachers !== '' && (!Number.isInteger(Number(form.teachers)) || Number(form.teachers) < 0)) {
-      e.teachers = 'Must be a non-negative whole number';
+    if (!isValidCount(normaliseCount(form.teachers))) {
+      e.teachers = 'Enter a whole number or N/A';
     }
     setErrors(e);
     return Object.keys(e).length === 0;
+  };
+
+  const payloadCount = (v) => {
+    const n = normaliseCount(v);
+    return typeof n === 'number' || n === 'N/A' || n === null ? n : null;
   };
 
   const buildPayload = () => ({
@@ -139,14 +159,14 @@ export default function SchoolFormPage() {
     district: form.district.trim(),
     dateOfCollection: form.dateOfCollection,
     trades: {
-      sod: form.sod === '' ? null : Number(form.sod),
-      nit: form.nit === '' ? null : Number(form.nit),
-      csa: form.csa === '' ? null : Number(form.csa),
-      acc: form.acc === '' ? null : Number(form.acc),
-      other: form.other === '' ? null : Number(form.other),
+      sod: payloadCount(form.sod),
+      nit: payloadCount(form.nit),
+      csa: payloadCount(form.csa),
+      acc: payloadCount(form.acc),
+      other: payloadCount(form.other),
     },
-    laptops: form.laptops === '' ? null : Number(form.laptops),
-    teachers: form.teachers === '' ? null : Number(form.teachers),
+    laptops: payloadCount(form.laptops),
+    teachers: payloadCount(form.teachers),
     feedback: form.feedback.trim(),
   });
 
@@ -274,12 +294,26 @@ export default function SchoolFormPage() {
 
   if (loading) return <PageLoader label="Loading record…" />;
 
-  const NumberField = ({ name, label }) => (
+  const CountField = ({ name, label }) => (
     <div>
-      <label className="label">{label}</label>
+      <div className="mb-1 flex items-center justify-between">
+        <label className="label mb-0">{label}</label>
+        <button
+          type="button"
+          onClick={() => setField(name, form[name] === 'N/A' ? '' : 'N/A')}
+          title="No record / not applicable"
+          className={classNames(
+            'rounded px-1.5 py-0.5 text-[11px] font-semibold transition-colors',
+            form[name] === 'N/A'
+              ? 'bg-brand-100 text-brand-700'
+              : 'text-slate-400 hover:bg-slate-100'
+          )}
+        >
+          N/A
+        </button>
+      </div>
       <input
-        type="number"
-        min="0"
+        type="text"
         inputMode="numeric"
         value={form[name]}
         onChange={(e) => setField(name, e.target.value)}
@@ -377,17 +411,18 @@ export default function SchoolFormPage() {
             <Badge color="brand">Total: {total}</Badge>
           </div>
           <p className="text-xs text-slate-500">
-            Leave a field blank if the value is unknown. Blank values are recorded as incomplete
-            and are never counted as zero.
+            Leave a field blank if the value is unknown (recorded as incomplete, never counted as
+            zero). Tap <span className="font-semibold">N/A</span> when a value explicitly does not
+            apply.
           </p>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             {TRADE_KEYS.map((k) => (
-              <NumberField key={k} name={k} label={TRADE_LABELS[k]} />
+              <CountField key={k} name={k} label={TRADE_LABELS[k]} />
             ))}
           </div>
           <div className="grid grid-cols-2 gap-4">
-            <NumberField name="laptops" label="Laptops" />
-            <NumberField name="teachers" label="Teachers" />
+            <CountField name="laptops" label="Laptops" />
+            <CountField name="teachers" label="Teachers" />
           </div>
           {hasUnknowns && (
             <div className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">

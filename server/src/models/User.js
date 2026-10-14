@@ -13,8 +13,16 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     passwordHash: { type: String, required: true, select: false },
-    // Single role model: every user has identical permissions.
-    role: { type: String, enum: ['user'], default: 'user', immutable: true },
+    // Owners manage approvals; regular users only manage their own data.
+    role: { type: String, enum: ['owner', 'user'], default: 'user', index: true },
+    // Accounts created via public registration start as 'pending' until an
+    // owner approves them. 'rejected' accounts are kept for the audit trail.
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'approved',
+      index: true,
+    },
     isActive: { type: Boolean, default: true },
     lastLoginAt: { type: Date, default: null },
     passwordChangedAt: { type: Date, default: null },
@@ -32,13 +40,19 @@ userSchema.methods.verifyPassword = function verifyPassword(plain) {
   return bcrypt.compare(plain, this.passwordHash);
 };
 
+userSchema.methods.isOwner = function isOwner() {
+  return this.role === 'owner';
+};
+
 userSchema.methods.toSafeJSON = function toSafeJSON() {
   return {
     id: this._id,
     name: this.name,
     email: this.email,
     role: this.role,
+    approvalStatus: this.approvalStatus,
     isActive: this.isActive,
+    isOwner: this.role === 'owner',
     lastLoginAt: this.lastLoginAt,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,

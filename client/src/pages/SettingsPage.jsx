@@ -1,15 +1,120 @@
-import { useState, useEffect } from 'react';
-import { KeyRound, User, ShieldCheck, Smartphone, Info, Download, RefreshCw } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  KeyRound,
+  User,
+  ShieldCheck,
+  Smartphone,
+  Info,
+  Download,
+  RefreshCw,
+  Users,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  CloudUpload,
+  WifiOff,
+} from 'lucide-react';
 import { PageHeader } from '../components/layout.jsx';
 import { Spinner } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useSync } from '../context/SyncContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { apiError } from '../api/client.js';
+import api, { apiError } from '../api/client.js';
 import { formatDateTime } from '../lib/format.js';
 import { hardRefresh } from '../lib/cache.js';
 
+function ApprovalsCard() {
+  const toast = useToast();
+  const [pending, setPending] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get('/users/pending');
+      setPending(res.data.data.users);
+    } catch (err) {
+      toast.error(apiError(err).message);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const decide = async (user, action) => {
+    setBusy(user.id);
+    try {
+      await api.post(`/users/${user.id}/${action}`);
+      toast.success(action === 'approve' ? 'Account approved.' : 'Registration rejected.');
+      setPending((list) => list.filter((u) => u.id !== user.id));
+    } catch (err) {
+      toast.error(apiError(err).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="card mb-4">
+      <div className="flex items-center justify-between">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+          <Users size={16} /> Account approvals
+        </h2>
+        <Link to="/users" className="text-xs font-medium text-brand-700 hover:underline">
+          Manage accounts
+        </Link>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center gap-2 py-4 text-sm text-slate-500">
+          <Spinner size={16} /> Loading…
+        </div>
+      ) : pending.length === 0 ? (
+        <p className="mt-2 text-sm text-slate-500">No pending registrations.</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-slate-100">
+          {pending.map((u) => (
+            <li key={u.id} className="flex items-center justify-between gap-3 py-3">
+              <div className="min-w-0">
+                <p className="truncate font-medium text-slate-800">{u.name}</p>
+                <p className="truncate text-xs text-slate-500">{u.email}</p>
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-slate-400">
+                  <Clock size={11} /> Requested {formatDateTime(u.createdAt)}
+                </p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  onClick={() => decide(u, 'approve')}
+                  disabled={busy === u.id}
+                  className="btn-primary px-3 py-1.5 text-xs"
+                >
+                  <CheckCircle2 size={14} /> Approve
+                </button>
+                <button
+                  onClick={() => decide(u, 'reject')}
+                  disabled={busy === u.id}
+                  className="btn-ghost px-3 py-1.5 text-xs text-red-600 hover:bg-red-50"
+                >
+                  <XCircle size={14} /> Reject
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user, changePassword } = useAuth();
+  const { online, pendingCount } = useSync();
   const toast = useToast();
   const [form, setForm] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [saving, setSaving] = useState(false);
@@ -78,7 +183,7 @@ export default function SettingsPage() {
             <dt className="text-xs uppercase text-slate-400">Role</dt>
             <dd className="mt-0.5">
               <span className="badge bg-brand-100 text-brand-700">
-                <ShieldCheck size={11} /> Standard user
+                <ShieldCheck size={11} /> {user?.isOwner ? 'Owner' : 'Standard user'}
               </span>
             </dd>
           </div>
@@ -89,6 +194,26 @@ export default function SettingsPage() {
             </dd>
           </div>
         </dl>
+      </div>
+
+      {user?.isOwner && <ApprovalsCard />}
+
+      <div className="card mb-4">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+          {online ? <CloudUpload size={16} /> : <WifiOff size={16} />} Offline &amp; sync
+        </h2>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-sm text-slate-500">
+            {online
+              ? pendingCount > 0
+                ? `${pendingCount} record(s) captured on this device are waiting to sync.`
+                : 'You are online. Records captured offline sync automatically.'
+              : 'You are offline. Records captured now are stored on this device.'}
+          </p>
+          <Link to="/sync" className="btn-secondary shrink-0">
+            View sync
+          </Link>
+        </div>
       </div>
 
       <div className="card mb-4">

@@ -315,3 +315,123 @@ test('exports CSV for all schools', async () => {
   assert.ok(res.text.includes('CSV School'));
   assert.ok(res.text.includes('Total Students'));
 });
+
+test('accepts "N/A" as a flexible trade value without counting it as zero', async () => {
+  const res = await auth(request(app).post('/api/schools')).send(
+    sampleSchool({
+      schoolName: 'NA School',
+      trades: { sod: 'N/A', nit: 10, csa: 5, acc: 0, other: 0 },
+    })
+  );
+  assert.equal(res.status, 201);
+  const school = res.body.data.school;
+  assert.equal(school.trades.sod, 'N/A');
+  assert.equal(school.totalStudents, 15);
+  // "N/A" is an explicit value, so the record is still complete.
+  assert.equal(school.isIncomplete, false);
+});
+
+test('accepts numeric strings for trade values', async () => {
+  const res = await auth(request(app).post('/api/schools')).send(
+    sampleSchool({
+      schoolName: 'Flex School',
+      trades: { sod: '40', nit: '20', csa: '10', acc: '5', other: '5' },
+    })
+  );
+  assert.equal(res.status, 201);
+  assert.equal(res.body.data.school.totalStudents, 80);
+  assert.equal(res.body.data.school.trades.sod, 40);
+});
+
+test('rejects a non-numeric, non-N/A trade value', async () => {
+  const res = await auth(request(app).post('/api/schools')).send(
+    sampleSchool({ schoolName: 'Bad Flex', trades: { sod: 'lots', nit: 0, csa: 0, acc: 0, other: 0 } })
+  );
+  assert.equal(res.status, 400);
+});
+
+test('registration creates a pending account that cannot sign in until approved', async () => {
+  const reg = await request(app).post('/api/auth/register').send({
+    name: 'New Person',
+    email: 'pending@test.local',
+    password: 'PendingPass123!',
+  });
+  assert.equal(reg.status, 201);
+  assert.equal(reg.body.data.user.approvalStatus, 'pending');
+
+  const blocked = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'pending@test.local', password: 'PendingPass123!' });
+  assert.equal(blocked.status, 403);
+
+  const pending = await auth(request(app).get('/api/users/pending'));
+  assert.equal(pending.status, 200);
+  const target = pending.body.data.users.find((u) => u.email === 'pending@test.local');
+  assert.ok(target);
+
+  const approve = await auth(request(app).post(`/api/users/${target.id}/approve`));
+  assert.equal(approve.status, 200);
+
+  const ok = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'pending@test.local', password: 'PendingPass123!' });
+  assert.equal(ok.status, 200);
+});
+
+test('non-owners cannot manage accounts', async () => {
+  const reg = await request(app).post('/api/auth/register').send({
+    name: 'Regular User',
+    email: 'regular@test.local',
+    password: 'RegularPass123!',
+  });
+  const target = reg.body.data.user;
+  // Approve via owner.
+  const pending = await auth(request(app).get('/api/users/pending'));
+  const id = pending.body.data.users.find((u) => u.email === 'regular@test.local').id;
+  await auth(request(app).post(`/api/users/${id}/approve`));
+
+  const login = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'regular@test.local', password: 'RegularPass123!' });
+  const userToken = login.body.data.token;
+
+  const forbidden = await request(app)
+    .get('/api/users')
+    .set('Authorization', `Bearer ${userToken}`);
+  assert.equal(forbidden.status, 403);
+  assert.equal(target.approvalStatus, 'pending');
+});
+
+test('each account only sees its own school data', async () => {
+  // Owner A (current test user) creates a school.
+  await auth(request(app).post('/api/schools')).send(sampleSchool({ schoolName: 'A Only School' }));
+
+  // Create and sign in as a second owner.
+  await auth(request(app).post('/api/users')).send({
+    name: 'Owner B',
+    email: 'ownerb@test.local',
+    password: 'OwnerBPass123!',
+  });
+  const loginB = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'ownerb@test.local', password: 'OwnerBPass123!' });
+  const tokenB = loginB.body.data.token;
+
+  const listB = await request(app)
+    .get('/api/schools')
+    .set('Authorization', `Bearer ${tokenB}`);
+  assert.equal(listB.body.data.schools.length, 0);
+
+  await request(app)
+    .post('/api/schools')
+    .set('Authorization', `Bearer ${tokenB}`)
+    .send(sampleSchool({ schoolName: 'B Only School' }));
+
+  const listA = await auth(request(app).get('/api/schools'));
+  assert.deepEqual(listA.body.data.schools.map((s) => s.schoolName), ['A Only School']);
+
+  const dashB = await request(app)
+    .get('/api/dashboard')
+    .set('Authorization', `Bearer ${tokenB}`);
+  assert.equal(dashB.body.data.totals.schools, 1);
+});

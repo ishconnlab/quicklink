@@ -34,4 +34,12 @@ export const requireAuth = asyncHandler(async (req, _res, next) => {
   next();
 });
 
+// Only account owners may manage other accounts / approvals.
+export const requireOwner = (req, _res, next) => {
+  if (!req.user || req.user.role !== 'owner') {
+    throw ApiError.forbidden('Only account owners can perform this action');
+  }
+  next();
+};
+
 export default requireAuth;

@@ -35,7 +35,9 @@ function formatDate(d) {
 
 function displayCount(v) {
   // Unknown values are shown explicitly, never silently treated as zero.
-  return v === null || v === undefined ? 'N/A' : String(v);
+  if (typeof v === 'number') return String(v);
+  if (v === 'N/A') return 'N/A';
+  return '—';
 }
 
 function drawHeader(report) {
@@ -238,9 +240,12 @@ function drawTotals(y, schools) {
   let teachers = 0;
   for (const s of schools) {
     students += s.totalStudents || 0;
-    laptops += s.laptops || 0;
-    teachers += s.teachers || 0;
-    for (const k of TRADE_KEYS) totals[k] += s.trades?.[k] || 0;
+    if (typeof s.laptops === 'number') laptops += s.laptops;
+    if (typeof s.teachers === 'number') teachers += s.teachers;
+    for (const k of TRADE_KEYS) {
+      const v = s.trades?.[k];
+      if (typeof v === 'number') totals[k] += v;
+    }
   }
 
   doc.save();

@@ -34,9 +34,10 @@ export function toInputDate(value) {
   return d.toISOString().slice(0, 10);
 }
 
-// Unknown values render as "N/A", never as zero.
+// Unknown (blank) values render as an em dash; an explicit "N/A" stays "N/A".
 export function displayCount(value) {
-  return value === null || value === undefined ? 'N/A' : String(value);
+  if (value === null || value === undefined) return '—';
+  return String(value);
 }
 
 export function formatNumber(value) {

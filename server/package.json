@@ -5,6 +5,9 @@
   "type": "module",
   "description": "QuickLink backend API",
   "main": "src/index.js",
+  "engines": {
+    "node": ">=18.17.0"
+  },
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",

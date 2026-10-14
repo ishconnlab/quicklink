@@ -11,16 +11,18 @@ async function resolveHolding(holdingInput, user) {
   const value = String(holdingInput || '').trim();
   if (!value) throw ApiError.badRequest('Holding / project is required');
 
-  // Accept either an ObjectId or a free-text holding name.
+  // Accept either an ObjectId or a free-text holding name, scoped to the owner
+  // so accounts can never reference each other's holdings.
   if (mongoose.isValidObjectId(value)) {
-    const byId = await Holding.findById(value);
+    const byId = await Holding.findOne({ _id: value, owner: user._id });
     if (byId) return byId;
   }
 
   const nameKey = value.toLowerCase().replace(/\s+/g, ' ');
-  let holding = await Holding.findOne({ nameKey });
+  let holding = await Holding.findOne({ owner: user._id, nameKey });
   if (!holding) {
     holding = await Holding.create({
+      owner: user._id,
       name: value,
       nameKey,
       createdBy: user?._id || null,
@@ -29,8 +31,8 @@ async function resolveHolding(holdingInput, user) {
   return holding;
 }
 
-async function findDuplicates({ holdingId, schoolNameKey, excludeId }) {
-  const query = { holding: holdingId, schoolNameKey };
+async function findDuplicates({ ownerId, holdingId, schoolNameKey, excludeId }) {
+  const query = { owner: ownerId, holding: holdingId, schoolNameKey };
   if (excludeId) query._id = { $ne: excludeId };
   return School.find(query);
 }
@@ -39,9 +41,10 @@ export const createSchool = asyncHandler(async (req, res) => {
   const body = req.body;
   const holding = await resolveHolding(body.holding, req.user);
 
-  // Idempotent offline sync: if this clientId was already saved, return it.
+  // Idempotent offline sync: if this clientId was already saved by this
+  // account, return the existing record.
   if (body.clientId) {
-    const existingSync = await School.findOne({ clientId: body.clientId });
+    const existingSync = await School.findOne({ owner: req.user._id, clientId: body.clientId });
     if (existingSync) {
       return res.status(200).json({
         success: true,
@@ -52,6 +55,7 @@ export const createSchool = asyncHandler(async (req, res) => {
 
   const schoolNameKey = body.schoolName.trim().toLowerCase().replace(/\s+/g, ' ');
   const duplicates = await findDuplicates({
+    ownerId: req.user._id,
     holdingId: holding._id,
     schoolNameKey,
   });
@@ -71,6 +75,7 @@ export const createSchool = asyncHandler(async (req, res) => {
   }
 
   const school = new School({
+    owner: req.user._id,
     holding: holding._id,
     holdingName: holding.name,
     schoolName: body.schoolName.trim(),
@@ -119,7 +124,7 @@ export const listSchools = asyncHandler(async (req, res) => {
     sort = '-dateOfCollection',
   } = req.query;
 
-  const query = {};
+  const query = { owner: req.user._id };
   if (status && status !== 'all') query.status = status;
 
   if (search) {
@@ -161,13 +166,19 @@ export const listSchools = asyncHandler(async (req, res) => {
   });
 });
 
-export const getSchool = asyncHandler(async (req, res) => {
-  const school = await School.findById(req.params.id);
+async function findOwnedSchool(req) {
+  const school = await School.findOne({ _id: req.params.id, owner: req.user._id });
   if (!school) throw ApiError.notFound('School record not found');
+  return school;
+}
+
+export const getSchool = asyncHandler(async (req, res) => {
+  const school = await findOwnedSchool(req);
   res.json({ success: true, data: { school: school.toClient() } });
 });
 
 export const getSchoolHistory = asyncHandler(async (req, res) => {
+  await findOwnedSchool(req);
   const logs = await AuditLog.find({ entity: 'School', entityId: req.params.id })
     .sort({ createdAt: -1 })
     .limit(100);
@@ -186,9 +197,7 @@ export const getSchoolHistory = asyncHandler(async (req, res) => {
 });
 
 export const updateSchool = asyncHandler(async (req, res) => {
-  const school = await School.findById(req.params.id);
-  if (!school) throw ApiError.notFound('School record not found');
-
+  const school = await findOwnedSchool(req);
   const body = req.body;
 
   if (body.holding !== undefined) {
@@ -200,6 +209,7 @@ export const updateSchool = asyncHandler(async (req, res) => {
   if (body.schoolName !== undefined) {
     const schoolNameKey = body.schoolName.trim().toLowerCase().replace(/\s+/g, ' ');
     const duplicates = await findDuplicates({
+      ownerId: req.user._id,
       holdingId: school.holding,
       schoolNameKey,
       excludeId: school._id,
@@ -243,8 +253,7 @@ export const updateSchool = asyncHandler(async (req, res) => {
 });
 
 export const archiveSchool = asyncHandler(async (req, res) => {
-  const school = await School.findById(req.params.id);
-  if (!school) throw ApiError.notFound('School record not found');
+  const school = await findOwnedSchool(req);
   if (school.status === 'archived') {
     throw ApiError.badRequest('School record is already archived');
   }
@@ -267,8 +276,7 @@ export const archiveSchool = asyncHandler(async (req, res) => {
 });
 
 export const restoreSchool = asyncHandler(async (req, res) => {
-  const school = await School.findById(req.params.id);
-  if (!school) throw ApiError.notFound('School record not found');
+  const school = await findOwnedSchool(req);
   if (school.status === 'active') {
     throw ApiError.badRequest('School record is already active');
   }
@@ -297,8 +305,11 @@ export const checkDuplicate = asyncHandler(async (req, res) => {
     throw ApiError.badRequest('schoolName and holding are required');
   }
   const holdingDoc = mongoose.isValidObjectId(holding)
-    ? await Holding.findById(holding)
-    : await Holding.findOne({ nameKey: String(holding).trim().toLowerCase() });
+    ? await Holding.findOne({ _id: holding, owner: req.user._id })
+    : await Holding.findOne({
+        owner: req.user._id,
+        nameKey: String(holding).trim().toLowerCase(),
+      });
 
   if (!holdingDoc) {
     return res.json({ success: true, data: { duplicates: [] } });
@@ -306,6 +317,7 @@ export const checkDuplicate = asyncHandler(async (req, res) => {
 
   const schoolNameKey = String(schoolName).trim().toLowerCase().replace(/\s+/g, ' ');
   const duplicates = await findDuplicates({
+    ownerId: req.user._id,
     holdingId: holdingDoc._id,
     schoolNameKey,
     excludeId,

@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
+import mongoose from 'mongoose';
 import config, { isAllowedOrigin } from './config/env.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
@@ -38,6 +39,27 @@ export function createApp() {
 
   app.get('/api/health', (_req, res) => {
     res.json({ success: true, data: { status: 'ok', time: new Date().toISOString() } });
+  });
+
+  // Liveness probe: the process is up and serving HTTP. Deliberately does NOT
+  // depend on the database so a DB outage never causes an infinite restart loop.
+  const isDbReady = () => mongoose.connection.readyState === 1;
+  app.get('/health', (_req, res) => {
+    res.status(200).json({
+      status: 'ok',
+      uptime: Math.round(process.uptime()),
+      timestamp: new Date().toISOString(),
+    });
+  });
+
+  // Readiness probe: distinguishes DB readiness from process liveness.
+  app.get('/health/ready', (_req, res) => {
+    const ready = isDbReady();
+    res.status(ready ? 200 : 503).json({
+      status: ready ? 'ready' : 'not-ready',
+      db: ready ? 'up' : 'down',
+      timestamp: new Date().toISOString(),
+    });
   });
 
   app.use('/api/auth', authRoutes);

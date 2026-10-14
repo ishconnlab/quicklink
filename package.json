@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "description": "QuickLink - school data collection platform",
+  "engines": {
+    "node": ">=18.17.0"
+  },
   "scripts": {
     "install:all": "npm install && npm --prefix server install && npm --prefix client install",
     "dev:server": "npm --prefix server run dev",

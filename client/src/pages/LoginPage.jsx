@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { apiError } from '../api/client.js';
@@ -97,8 +97,11 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="mt-4 text-xs text-slate-400">
-              Accounts are created by existing users. There is no public registration.
+            <p className="mt-4 text-center text-sm text-slate-500">
+              Don&apos;t have an account?{' '}
+              <Link to="/register" className="font-semibold text-brand-700 hover:underline">
+                Create one
+              </Link>
             </p>
           </div>
         </div>
