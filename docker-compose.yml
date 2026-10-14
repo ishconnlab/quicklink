@@ -1,0 +1,42 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    ports:
+      - '27017:27017'
+
+  server:
+    build: ./server
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      MONGODB_URI: mongodb://mongo:27017/quicklink
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_EXPIRES_IN: 12h
+      CORS_ORIGIN: http://localhost:8080
+      OWNER_NAME: ${OWNER_NAME:-QuickLink Owner}
+      OWNER_EMAIL: ${OWNER_EMAIL:-owner@quicklink.local}
+      OWNER_PASSWORD: ${OWNER_PASSWORD:-ChangeMe123!}
+      ORG_NAME: ${ORG_NAME:-QuickLink Education Trust}
+    ports:
+      - '4000:4000'
+
+  client:
+    build:
+      context: ./client
+      args:
+        # Browser calls the API on the same host; adjust for your domain.
+        VITE_API_URL: ${VITE_API_URL:-}
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - '8080:80'
+
+volumes:
+  mongo-data:

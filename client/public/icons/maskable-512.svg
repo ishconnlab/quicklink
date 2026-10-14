@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="QuickLink">
+  <rect width="512" height="512" fill="#15803d"/>
+  <path d="M176 176h140a26 26 0 0 1 26 26v30a26 26 0 0 1-26 26H250l-60 55v-55h-14a26 26 0 0 1-26-26v-30a26 26 0 0 1 26-26z" fill="#ffffff"/>
+  <circle cx="205" cy="340" r="22" fill="#ffffff"/>
+  <circle cx="270" cy="340" r="22" fill="#ffffff"/>
+  <circle cx="335" cy="340" r="22" fill="#ffffff"/>
+</svg>
