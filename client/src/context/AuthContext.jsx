@@ -50,13 +50,44 @@ export function AuthProvider({ children }) {
     return res.data.data;
   }, []);
 
+  // Parent onboarding via a school invitation: creates a parent account and
+  // signs them in immediately (the guardian link still needs school approval).
+  const registerParent = useCallback(async ({ token, name, email, password, relationship }) => {
+    const res = await api.post('/auth/register-parent', {
+      token,
+      name,
+      email,
+      password,
+      relationship,
+    });
+    setToken(res.data.data.token);
+    setUser(res.data.data.user);
+    return res.data.data;
+  }, []);
+
+  // An already signed-in user accepts an invitation.
+  const acceptInvitation = useCallback(async (token) => {
+    const res = await api.post('/guardians/invitations/accept', { token });
+    return res.data.data;
+  }, []);
+
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     await api.post('/auth/change-password', { currentPassword, newPassword });
   }, []);
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, login, register, logout, changePassword, refresh: loadUser }}
+      value={{
+        user,
+        loading,
+        login,
+        register,
+        registerParent,
+        acceptInvitation,
+        logout,
+        changePassword,
+        refresh: loadUser,
+      }}
     >
       {children}
     </AuthContext.Provider>

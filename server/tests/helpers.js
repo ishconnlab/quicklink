@@ -5,6 +5,12 @@ import { School } from '../src/models/School.js';
 import { Holding } from '../src/models/Holding.js';
 import { Notification } from '../src/models/Notification.js';
 import { Student } from '../src/models/Student.js';
+import { AdmissionPack } from '../src/models/AdmissionPack.js';
+import { AdmissionApplication } from '../src/models/AdmissionApplication.js';
+import { StudentRequirement } from '../src/models/StudentRequirement.js';
+import { GuardianInvitation, GuardianLink } from '../src/models/Guardian.js';
+import { AdmissionEvent, NotificationDelivery } from '../src/models/AdmissionEvent.js';
+import { Conversation, Message } from '../src/models/Conversation.js';
 
 let mongod = null;
 const TEST_DB = 'quicklink_test';
@@ -19,6 +25,15 @@ async function resetSchema() {
     Holding.syncIndexes(),
     Student.syncIndexes(),
     Notification.syncIndexes(),
+    AdmissionPack.syncIndexes(),
+    AdmissionApplication.syncIndexes(),
+    StudentRequirement.syncIndexes(),
+    GuardianInvitation.syncIndexes(),
+    GuardianLink.syncIndexes(),
+    AdmissionEvent.syncIndexes(),
+    NotificationDelivery.syncIndexes(),
+    Conversation.syncIndexes(),
+    Message.syncIndexes(),
   ]);
 }
 

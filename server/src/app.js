@@ -13,6 +13,13 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
+import admissionPackRoutes from './routes/admissionPackRoutes.js';
+import admissionApplicationRoutes from './routes/admissionApplicationRoutes.js';
+import admissionChecklistRoutes from './routes/admissionChecklistRoutes.js';
+import guardianRoutes from './routes/guardianRoutes.js';
+import onboardingRoutes from './routes/onboardingRoutes.js';
+import messageRoutes from './routes/messageRoutes.js';
+import parentRoutes from './routes/parentRoutes.js';
 
 export function createApp() {
   const app = express();
@@ -71,6 +78,13 @@ export function createApp() {
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/reports', reportRoutes);
   app.use('/api/notifications', notificationRoutes);
+  app.use('/api/admission-packs', admissionPackRoutes);
+  app.use('/api/admissions', admissionApplicationRoutes);
+  app.use('/api/admission-checklist', admissionChecklistRoutes);
+  app.use('/api/guardians', guardianRoutes);
+  app.use('/api/onboarding', onboardingRoutes);
+  app.use('/api/conversations', messageRoutes);
+  app.use('/api/parent', parentRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

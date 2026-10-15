@@ -1,8 +1,10 @@
 import { User } from '../models/User.js';
+import { GuardianInvitation, GuardianLink } from '../models/Guardian.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { signToken } from '../utils/token.js';
 import { notifyOwners } from '../services/notify.js';
+import { recordEvent } from '../services/admission.js';
 
 // Public self-registration. New accounts are created in 'pending' state and
 // cannot sign in until an account owner approves them.
@@ -48,6 +50,75 @@ export const register = asyncHandler(async (req, res) => {
       },
       message: 'Registration received. An account owner will review and approve your account.',
     },
+  });
+});
+
+// Parent self-registration via a school invitation. Possession of a valid
+// invitation authorises the account, but the guardian link still requires
+// school approval before any student data is visible.
+export const registerParent = asyncHandler(async (req, res) => {
+  const { token, name, email, password, relationship } = req.body;
+
+  const tokenHash = GuardianInvitation.hashToken(token);
+  const invitation = await GuardianInvitation.findOne({ tokenHash });
+  if (!invitation) throw ApiError.badRequest('This invitation is not valid');
+  if (invitation.status === 'revoked') throw ApiError.conflict('This invitation was revoked');
+  if (invitation.status === 'accepted') throw ApiError.conflict('This invitation was already used');
+  if (invitation.expiresAt && invitation.expiresAt < new Date()) {
+    invitation.status = 'expired';
+    await invitation.save();
+    throw ApiError.conflict('This invitation has expired');
+  }
+
+  const existing = await User.findOne({ email });
+  if (existing) {
+    throw ApiError.conflict(
+      'An account with this email already exists. Sign in and accept the invitation instead.'
+    );
+  }
+
+  const user = new User({ name, email, role: 'parent', approvalStatus: 'approved' });
+  await user.setPassword(password);
+  await user.save();
+
+  const link = new GuardianLink({
+    owner: invitation.owner,
+    school: invitation.school,
+    student: invitation.student,
+    user: user._id,
+    invitation: invitation._id,
+    relationship: relationship || invitation.contact?.relationship || '',
+    permissions: invitation.permissions,
+    status: 'pending',
+    createdBy: invitation.createdBy,
+  });
+  await link.save();
+
+  invitation.status = 'accepted';
+  invitation.acceptedAt = new Date();
+  invitation.acceptedBy = user._id;
+  await invitation.save();
+
+  await recordEvent({
+    owner: invitation.owner,
+    entityType: 'guardian',
+    entity: link._id,
+    action: 'parent_registered',
+    by: user._id,
+    meta: { student: invitation.student.toString() },
+  });
+
+  await notifyOwners({
+    type: 'guardian',
+    title: 'A guardian connected to a student',
+    message: `${user.name} (${user.email}) used an invitation and is awaiting your approval.`,
+    link: '/admissions',
+    meta: { linkId: link._id.toString() },
+  }).catch(() => {});
+
+  res.status(201).json({
+    success: true,
+    data: { token: signToken(user), user: user.toSafeJSON(), link: link.toClient() },
   });
 });
 
@@ -103,4 +174,4 @@ export const changePassword = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { message: 'Password updated successfully' } });
 });
 
-export default { register, login, me, changePassword };
+export default { register, registerParent, login, me, changePassword };

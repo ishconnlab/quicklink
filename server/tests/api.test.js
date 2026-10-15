@@ -14,6 +14,12 @@ import { Holding } from '../src/models/Holding.js';
 import { AuditLog } from '../src/models/AuditLog.js';
 import { Student } from '../src/models/Student.js';
 import { Notification } from '../src/models/Notification.js';
+import { AdmissionPack } from '../src/models/AdmissionPack.js';
+import { AdmissionApplication } from '../src/models/AdmissionApplication.js';
+import { StudentRequirement } from '../src/models/StudentRequirement.js';
+import { GuardianInvitation, GuardianLink } from '../src/models/Guardian.js';
+import { AdmissionEvent, NotificationDelivery } from '../src/models/AdmissionEvent.js';
+import { Conversation, Message } from '../src/models/Conversation.js';
 
 let app;
 let token;
@@ -47,6 +53,15 @@ beforeEach(async () => {
     AuditLog.deleteMany({}),
     Student.deleteMany({}),
     Notification.deleteMany({}),
+    AdmissionPack.deleteMany({}),
+    AdmissionApplication.deleteMany({}),
+    StudentRequirement.deleteMany({}),
+    GuardianInvitation.deleteMany({}),
+    GuardianLink.deleteMany({}),
+    AdmissionEvent.deleteMany({}),
+    NotificationDelivery.deleteMany({}),
+    Conversation.deleteMany({}),
+    Message.deleteMany({}),
   ]);
   const user = await createTestUser();
   const res = await request(app)
@@ -557,4 +572,403 @@ test('owners are notified when a new account registers', async () => {
 
   const after = await auth(request(app).get('/api/notifications'));
   assert.equal(after.body.data.unreadCount, 0);
+});
+
+// --- Admissions -----------------------------------------------------------
+
+const packRequirements = [
+  {
+    title: 'School uniform',
+    type: 'must_bring',
+    category: 'uniform',
+    appliesTo: { levels: ['Level 3'] },
+  },
+  { title: 'Birth certificate', type: 'required_document', category: 'document' },
+  {
+    title: 'Boarding kit',
+    type: 'must_bring',
+    category: 'boarding',
+    appliesTo: { levels: ['Level 5'] },
+  },
+];
+
+const createPublishedPack = async (school, overrides = {}) => {
+  const created = await auth(request(app).post('/api/admission-packs')).send({
+    school: school.id,
+    academicYear: '2026-2027',
+    title: 'Intake 2026',
+    levels: ['Level 3', 'Level 5'],
+    requirements: packRequirements,
+    ...overrides,
+  });
+  assert.equal(created.status, 201);
+  const id = created.body.data.pack.id;
+  const published = await auth(request(app).post(`/api/admission-packs/${id}/publish`));
+  assert.equal(published.status, 200);
+  return published.body.data.pack;
+};
+
+test('admission pack publishes a frozen version and rejects edits afterwards', async () => {
+  const school = await createSchool('Admissions School');
+  const pack = await createPublishedPack(school);
+  assert.equal(pack.status, 'published');
+  assert.equal(pack.version, 1);
+
+  const edit = await auth(request(app).patch(`/api/admission-packs/${pack.id}`)).send({
+    title: 'Renamed after publish',
+  });
+  assert.equal(edit.status, 409);
+
+  const clone = await auth(request(app).post(`/api/admission-packs/${pack.id}/new-version`));
+  assert.equal(clone.status, 201);
+  assert.equal(clone.body.data.pack.status, 'draft');
+  assert.equal(clone.body.data.pack.version, 1);
+  assert.equal(clone.body.data.pack.previousVersionOf, pack.id);
+
+  // The published original is unchanged.
+  const original = await auth(request(app).get(`/api/admission-packs/${pack.id}`));
+  assert.equal(original.body.data.pack.title, 'Intake 2026');
+});
+
+test('applications get references and detect likely duplicates', async () => {
+  const school = await createSchool('Dup Applications School');
+  const pack = await createPublishedPack(school);
+
+  const base = {
+    school: school.id,
+    admissionPack: pack.id,
+    academicYear: '2026-2027',
+    fullName: 'Mugisha Aline',
+    level: 'Level 3',
+    guardian: { name: 'Mukamana', phone: '0788000111' },
+    submit: true,
+  };
+
+  const first = await auth(request(app).post('/api/admissions')).send(base);
+  assert.equal(first.status, 201);
+  assert.match(first.body.data.application.reference, /^ADM-\d{4}-\d{5}$/);
+
+  const dup = await auth(request(app).post('/api/admissions')).send(base);
+  assert.equal(dup.status, 409);
+
+  const forced = await auth(request(app).post('/api/admissions')).send({
+    ...base,
+    confirmDuplicate: true,
+  });
+  assert.equal(forced.status, 201);
+
+  const list = await auth(request(app).get('/api/admissions'));
+  assert.equal(list.body.data.total, 2);
+});
+
+test('accepting and enrolling an application creates exactly one student and a checklist', async () => {
+  const school = await createSchool('Enroll School');
+  const pack = await createPublishedPack(school);
+
+  const created = await auth(request(app).post('/api/admissions')).send({
+    school: school.id,
+    admissionPack: pack.id,
+    academicYear: '2026-2027',
+    fullName: 'Uwase Keza',
+    level: 'Level 3',
+    trade: 'sod',
+    gender: 'female',
+    guardian: { name: 'Habimana', phone: '0788000222' },
+  });
+  const id = created.body.data.application.id;
+
+  const accepted = await auth(request(app).post(`/api/admissions/${id}/accept`));
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.body.data.application.status, 'accepted');
+
+  const enrolled = await auth(request(app).post(`/api/admissions/${id}/enroll`));
+  assert.equal(enrolled.status, 200);
+  const { student, application, checklist } = enrolled.body.data;
+  assert.match(student.indexNumber, /^QL-\d{4}-\d{5}$/);
+  assert.equal(application.status, 'enrolled');
+  assert.equal(application.student, student.id);
+
+  // Only requirements applicable to Level 3 are generated (uniform + document).
+  const titles = checklist.map((c) => c.title).sort();
+  assert.deepEqual(titles, ['Birth certificate', 'School uniform']);
+  const doc = checklist.find((c) => c.title === 'Birth certificate');
+  assert.equal(doc.requiresVerification, true);
+
+  // Exactly one student exists; re-enrolling is rejected.
+  const students = await auth(request(app).get('/api/students'));
+  assert.equal(students.body.data.total, 1);
+  const again = await auth(request(app).post(`/api/admissions/${id}/enroll`));
+  assert.equal(again.status, 409);
+});
+
+test('checklist items track parent readiness and staff verification', async () => {
+  const school = await createSchool('Checklist School');
+  const pack = await createPublishedPack(school);
+  const created = await auth(request(app).post('/api/admissions')).send({
+    school: school.id,
+    admissionPack: pack.id,
+    academicYear: '2026-2027',
+    fullName: 'Nkurunziza Eric',
+    level: 'Level 3',
+  });
+  const id = created.body.data.application.id;
+  await auth(request(app).post(`/api/admissions/${id}/accept`));
+  const enrolled = await auth(request(app).post(`/api/admissions/${id}/enroll`));
+  const studentId = enrolled.body.data.student.id;
+
+  const list = await auth(request(app).get(`/api/admission-checklist/student/${studentId}`));
+  assert.equal(list.status, 200);
+  assert.equal(list.body.data.summary.total, 2);
+
+  const uniform = list.body.data.requirements.find((r) => r.title === 'School uniform');
+  const marked = await auth(request(app).patch(`/api/admission-checklist/${uniform.id}`)).send({
+    parentStatus: 'ready',
+  });
+  assert.equal(marked.status, 200);
+  assert.equal(marked.body.data.requirement.complete, true);
+
+  const doc = list.body.data.requirements.find((r) => r.title === 'Birth certificate');
+  assert.equal(doc.complete, false);
+  const verified = await auth(request(app).patch(`/api/admission-checklist/${doc.id}`)).send({
+    schoolVerified: true,
+  });
+  assert.equal(verified.body.data.requirement.complete, true);
+
+  const summary = await auth(request(app).get(`/api/admission-checklist/student/${studentId}`));
+  assert.equal(summary.body.data.summary.complete, 2);
+  assert.equal(summary.body.data.summary.readiness, 100);
+});
+
+test('guardian invitations must be accepted and approved before access', async () => {
+  const school = await createSchool('Guardian School');
+  const student = (
+    await auth(request(app).post('/api/students')).send({
+      school: school.id,
+      fullName: 'Guardian Child',
+      trade: 'nit',
+      level: 'Level 4',
+    })
+  ).body.data.student;
+
+  const invited = await auth(request(app).post('/api/guardians/invitations')).send({
+    student: student.id,
+    name: 'Parent One',
+    relationship: 'mother',
+  });
+  assert.equal(invited.status, 201);
+  const rawToken = invited.body.data.token;
+  assert.ok(rawToken && rawToken.length >= 20);
+
+  // A second owner account accepts the invite.
+  await auth(request(app).post('/api/users')).send({
+    name: 'Parent User',
+    email: 'parent@test.local',
+    password: 'ParentPass123!',
+  });
+  const parentLogin = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'parent@test.local', password: 'ParentPass123!' });
+  const parentToken = parentLogin.body.data.token;
+
+  const accepted = await request(app)
+    .post('/api/guardians/invitations/accept')
+    .set('Authorization', `Bearer ${parentToken}`)
+    .send({ token: rawToken });
+  assert.equal(accepted.status, 200);
+  assert.equal(accepted.body.data.link.status, 'pending');
+
+  // Pending links do not yet grant access.
+  const before = await request(app)
+    .get('/api/guardians/links/me')
+    .set('Authorization', `Bearer ${parentToken}`);
+  assert.equal(before.body.data.children.length, 0);
+
+  const linkId = accepted.body.data.link.id;
+  const approved = await auth(request(app).post(`/api/guardians/links/${linkId}/approve`));
+  assert.equal(approved.status, 200);
+  assert.equal(approved.body.data.link.status, 'approved');
+
+  const after = await request(app)
+    .get('/api/guardians/links/me')
+    .set('Authorization', `Bearer ${parentToken}`);
+  assert.equal(after.body.data.children.length, 1);
+  assert.equal(after.body.data.children[0].student.fullName, 'Guardian Child');
+});
+
+test('onboarding dashboard summarises admissions', async () => {
+  const school = await createSchool('Onboarding School');
+  const pack = await createPublishedPack(school);
+  const created = await auth(request(app).post('/api/admissions')).send({
+    school: school.id,
+    admissionPack: pack.id,
+    academicYear: '2026-2027',
+    fullName: 'Dashboard Learner',
+    level: 'Level 3',
+  });
+  const id = created.body.data.application.id;
+  await auth(request(app).post(`/api/admissions/${id}/accept`));
+  await auth(request(app).post(`/api/admissions/${id}/enroll`));
+
+  const res = await auth(request(app).get('/api/onboarding'));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.data.packs.published, 1);
+  assert.equal(res.body.data.applications.enrolled, 1);
+  assert.equal(res.body.data.students, 1);
+  assert.ok(res.body.data.requirements.total >= 1);
+});
+
+test('admissions are isolated per account', async () => {
+  const school = await createSchool('Isolation Admissions School');
+  await createPublishedPack(school);
+
+  await auth(request(app).post('/api/users')).send({
+    name: 'Owner D',
+    email: 'ownerd@test.local',
+    password: 'OwnerDPass123!',
+  });
+  const loginD = await request(app)
+    .post('/api/auth/login')
+    .send({ email: 'ownerd@test.local', password: 'OwnerDPass123!' });
+  const tokenD = loginD.body.data.token;
+
+  const packsD = await request(app)
+    .get('/api/admission-packs')
+    .set('Authorization', `Bearer ${tokenD}`);
+  assert.equal(packsD.body.data.total, 0);
+
+  const appsD = await request(app)
+    .get('/api/admissions')
+    .set('Authorization', `Bearer ${tokenD}`);
+  assert.equal(appsD.body.data.total, 0);
+
+  const onboardD = await request(app)
+    .get('/api/onboarding')
+    .set('Authorization', `Bearer ${tokenD}`);
+  assert.equal(onboardD.body.data.packs.published, 0);
+});
+
+// --- Parent checklist & secure connection ---------------------------------
+
+// Enrols a learner through the full admissions flow and returns the student.
+const enrolLearner = async (schoolName, fullName) => {
+  const school = await createSchool(schoolName);
+  const pack = await createPublishedPack(school, { academicYear: '2026-2027' });
+  const created = await auth(request(app).post('/api/admissions')).send({
+    school: school.id,
+    admissionPack: pack.id,
+    academicYear: '2026-2027',
+    fullName,
+    level: 'Level 3',
+    guardian: { name: 'Guardian', phone: '0788000999' },
+  });
+  const id = created.body.data.application.id;
+  await auth(request(app).post(`/api/admissions/${id}/accept`));
+  const enrolled = await auth(request(app).post(`/api/admissions/${id}/enroll`));
+  return enrolled.body.data.student;
+};
+
+const connectParent = async (student, email = 'guardian@test.local') => {
+  const invited = await auth(request(app).post('/api/guardians/invitations')).send({
+    student: student.id,
+    name: 'Guardian Parent',
+    relationship: 'mother',
+  });
+  const rawToken = invited.body.data.token;
+
+  const reg = await request(app).post('/api/auth/register-parent').send({
+    token: rawToken,
+    name: 'Guardian Parent',
+    email,
+    password: 'GuardianPass123!',
+    relationship: 'mother',
+  });
+  assert.equal(reg.status, 201);
+  assert.equal(reg.body.data.user.role, 'parent');
+  const parentToken = reg.body.data.token;
+  const linkId = reg.body.data.link.id;
+
+  const approved = await auth(request(app).post(`/api/guardians/links/${linkId}/approve`));
+  assert.equal(approved.status, 200);
+  return parentToken;
+};
+
+test('each enrolled learner receives a checklist the parent can track', async () => {
+  const student = await enrolLearner('Parent Checklist School', 'Keza Parent Child');
+  const parentToken = await connectParent(student);
+
+  const children = await request(app)
+    .get('/api/parent/children')
+    .set('Authorization', `Bearer ${parentToken}`);
+  assert.equal(children.status, 200);
+  assert.equal(children.body.data.children.length, 1);
+  assert.equal(children.body.data.children[0].student.fullName, 'Keza Parent Child');
+  assert.equal(children.body.data.children[0].checklist.total, 2);
+
+  const checklist = await request(app)
+    .get(`/api/parent/children/${student.id}/checklist`)
+    .set('Authorization', `Bearer ${parentToken}`);
+  assert.equal(checklist.body.data.requirements.length, 2);
+
+  const uniform = checklist.body.data.requirements.find((r) => r.title === 'School uniform');
+  const marked = await request(app)
+    .patch(`/api/parent/checklist/${uniform.id}`)
+    .set('Authorization', `Bearer ${parentToken}`)
+    .send({ parentStatus: 'ready' });
+  assert.equal(marked.status, 200);
+  assert.equal(marked.body.data.requirement.complete, true);
+
+  // Parents cannot reach school administration data.
+  const forbidden = await request(app)
+    .get('/api/students')
+    .set('Authorization', `Bearer ${parentToken}`);
+  assert.equal(forbidden.status, 403);
+});
+
+test('a parent cannot access a learner they are not linked to', async () => {
+  const studentA = await enrolLearner('Linked School A', 'Child A');
+  const studentB = await enrolLearner('Unlinked School B', 'Child B');
+  const parentToken = await connectParent(studentA, 'linkedparent@test.local');
+
+  const res = await request(app)
+    .get(`/api/parent/children/${studentB.id}/checklist`)
+    .set('Authorization', `Bearer ${parentToken}`);
+  assert.equal(res.status, 403);
+});
+
+test('parents and school staff can message each other inside QuickLink', async () => {
+  const student = await enrolLearner('Messaging School', 'Chat Child');
+  const parentToken = await connectParent(student, 'chatparent@test.local');
+
+  const ensured = await auth(request(app).post('/api/conversations/ensure')).send({
+    student: student.id,
+    subject: 'Welcome',
+  });
+  assert.equal(ensured.status, 200);
+  const conversationId = ensured.body.data.conversation.id;
+
+  const staffMsg = await auth(
+    request(app).post(`/api/conversations/${conversationId}/messages`)
+  ).send({ body: 'Welcome to our school.' });
+  assert.equal(staffMsg.status, 201);
+
+  const parentList = await request(app)
+    .get('/api/parent/conversations')
+    .set('Authorization', `Bearer ${parentToken}`);
+  assert.equal(parentList.body.data.conversations.length, 1);
+  assert.equal(parentList.body.data.conversations[0].unread, 1);
+
+  const parentRead = await request(app)
+    .get(`/api/parent/conversations/${conversationId}/messages`)
+    .set('Authorization', `Bearer ${parentToken}`);
+  assert.equal(parentRead.body.data.messages.length, 1);
+
+  const reply = await request(app)
+    .post(`/api/parent/conversations/${conversationId}/messages`)
+    .set('Authorization', `Bearer ${parentToken}`)
+    .send({ body: 'Thank you!' });
+  assert.equal(reply.status, 201);
+
+  const staffView = await auth(request(app).get(`/api/conversations/${conversationId}/messages`));
+  assert.equal(staffView.body.data.messages.length, 2);
+  assert.equal(staffView.body.data.messages[1].senderRole, 'parent');
 });

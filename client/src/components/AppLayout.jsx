@@ -13,6 +13,10 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   GraduationCap,
+  ClipboardList,
+  Layers,
+  Compass,
+  MessageSquare,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useSync } from '../context/SyncContext.jsx';
@@ -21,19 +25,23 @@ import NotificationBell from './NotificationBell.jsx';
 
 const NAV = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/onboarding', label: 'Onboarding', icon: Compass },
   { to: '/schools', label: 'Schools', icon: School },
   { to: '/students', label: 'Students', icon: GraduationCap },
+  { to: '/admissions', label: 'Admissions', icon: ClipboardList },
+  { to: '/admission-packs', label: 'Admission packs', icon: Layers },
+  { to: '/messages', label: 'Messages', icon: MessageSquare },
   { to: '/reports', label: 'Reports', icon: FileText },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 const MOBILE_NAV = [
   { to: '/', label: 'Home', icon: LayoutDashboard, end: true },
-  { to: '/schools', label: 'Schools', icon: School },
   { to: '/students', label: 'Students', icon: GraduationCap },
-  { to: '/schools/new', label: 'Add', icon: Plus, primary: true },
+  { to: '/admissions', label: 'Admissions', icon: ClipboardList },
+  { to: '/admission-packs/new', label: 'Add', icon: Plus, primary: true },
+  { to: '/messages', label: 'Messages', icon: MessageSquare },
   { to: '/reports', label: 'Reports', icon: FileText },
-  { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
 function Brand() {
@@ -98,6 +106,17 @@ function AccountMenu({ openUp = false }) {
             <p className="truncate text-sm font-semibold text-slate-800">{user?.name}</p>
             <p className="truncate text-xs text-slate-400">{user?.email}</p>
           </div>
+          {user?.role !== 'parent' && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                navigate('/settings');
+              }}
+              className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+            >
+              <Settings size={15} /> Settings
+            </button>
+          )}
           <button
             onClick={() => {
               setOpen(false);

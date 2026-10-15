@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as schools from '../controllers/schoolController.js';
 import { validate } from '../middleware/validate.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireStaff } from '../middleware/auth.js';
 import {
   createSchoolSchema,
   updateSchoolSchema,
@@ -10,7 +10,7 @@ import {
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(requireStaff);
 
 router.get('/', schools.listSchools);
 router.get('/check-duplicate', schools.checkDuplicate);

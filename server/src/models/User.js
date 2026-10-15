@@ -13,8 +13,9 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     passwordHash: { type: String, required: true, select: false },
-    // Owners manage approvals; regular users only manage their own data.
-    role: { type: String, enum: ['owner', 'user'], default: 'user', index: true },
+    // Owners manage approvals; regular users only manage their own data;
+    // parents can only access the students linked to them via GuardianLink.
+    role: { type: String, enum: ['owner', 'user', 'parent'], default: 'user', index: true },
     // Accounts created via public registration start as 'pending' until an
     // owner approves them. 'rejected' accounts are kept for the audit trail.
     approvalStatus: {
@@ -53,6 +54,7 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     approvalStatus: this.approvalStatus,
     isActive: this.isActive,
     isOwner: this.role === 'owner',
+    isParent: this.role === 'parent',
     lastLoginAt: this.lastLoginAt,
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,

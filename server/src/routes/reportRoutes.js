@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import * as reports from '../controllers/reportController.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireStaff } from '../middleware/auth.js';
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(requireStaff);
 
 router.get('/meta', reports.meta);
 

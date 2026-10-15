@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import * as students from '../controllers/studentController.js';
 import { validate } from '../middleware/validate.js';
-import { requireAuth } from '../middleware/auth.js';
+import { requireStaff } from '../middleware/auth.js';
 import { createStudentSchema, updateStudentSchema, idParamSchema } from '../utils/validators.js';
 
 const router = Router();
 
-router.use(requireAuth);
+router.use(requireStaff);
 router.get('/stats', students.studentStats);
 router.get('/export', students.exportStudents);
 router.get('/', students.listStudents);
