@@ -253,6 +253,57 @@ export default function AdmissionDetailPage() {
         </div>
       </div>
 
+      {a.packSnapshot?.requirements?.length > 0 && (
+        <div className="card mt-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-800">
+              {t('pack.overview')}
+              {a.packSnapshot.title ? ` · ${a.packSnapshot.title}` : ''}
+            </h2>
+            <span className="text-xs text-slate-400">
+              {a.packSnapshot.academicYear}
+              {a.packVersion ? ` · v${a.packVersion}` : ''}
+            </span>
+          </div>
+
+          {a.packSnapshot.instructions && (
+            <p className="mb-3 whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              {a.packSnapshot.instructions}
+            </p>
+          )}
+
+          <ul className="divide-y divide-slate-100">
+            {a.packSnapshot.requirements.map((r) => (
+              <li key={r.key} className="flex items-start justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800">{r.title}</p>
+                  <p className="text-xs capitalize text-slate-400">
+                    {r.category}
+                    {r.quantity ? ` · ${r.quantity}${r.unit ? ` ${r.unit}` : ''}` : ''}
+                    {r.type ? ` · ${String(r.type).replace(/_/g, ' ')}` : ''}
+                  </p>
+                  {r.description && <p className="text-xs text-slate-500">{r.description}</p>}
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {a.packSnapshot.paymentInfo?.required && (
+            <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              <p className="font-medium">{t('pack.paymentRequired')}</p>
+              {a.packSnapshot.paymentInfo.channels?.length > 0 && (
+                <p className="text-xs">Channels: {a.packSnapshot.paymentInfo.channels.join(', ')}</p>
+              )}
+              {a.packSnapshot.paymentInfo.instructions && (
+                <p className="mt-1 whitespace-pre-wrap text-xs">
+                  {a.packSnapshot.paymentInfo.instructions}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {a.student && checklist && (
         <div className="card mt-4">
           <div className="mb-3 flex items-center justify-between">

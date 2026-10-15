@@ -35,11 +35,27 @@ function makeRandom(seed) {
 // tagged with stable markers (indexNumber `QL-SEED-*`, reference `ADM-SEED-*`,
 // a fixed pack title and the parent email) so re-seeding only replaces its own
 // records and never touches real data.
-async function seedAdmissions(actor, school) {
+async function seedAdmissions(actor, holding) {
   const owner = actor._id;
   const year = new Date().getFullYear();
   const academicYear = `${year}-${year + 1}`;
   const parentEmail = 'parent.seed@quicklink.local';
+  const packTitle = 'Admission requirements — S1 & S4 (Term 1)';
+
+  // A real school record so the seeded pack reflects an actual intake. The
+  // requirements below are taken from the school's published new-students flyer.
+  const school = await School.create({
+    owner,
+    holding: holding._id,
+    holdingName: holding.name,
+    schoolName: 'Ecole des Sciences Saint Louis de Montfort Nyanza',
+    district: 'Nyanza',
+    dateOfCollection: new Date(),
+    trades: { sod: null, nit: null, csa: null, acc: null, other: null },
+    teachers: 48,
+    recordedBy: owner,
+    recordedByName: actor.name,
+  });
 
   const seedStudentIds = (
     await Student.find({ owner, indexNumber: /^QL-SEED/ }).select('_id')
@@ -55,7 +71,7 @@ async function seedAdmissions(actor, school) {
     Message.deleteMany({ owner, conversation: { $in: seedConvIds } }),
     Conversation.deleteMany({ owner, student: { $in: seedStudentIds } }),
     AdmissionApplication.deleteMany({ owner, reference: /^ADM-SEED/ }),
-    AdmissionPack.deleteMany({ owner, title: 'Seed Admission Pack' }),
+    AdmissionPack.deleteMany({ owner, title: packTitle }),
     Student.deleteMany({ owner, indexNumber: /^QL-SEED/ }),
     User.deleteOne({ email: parentEmail }),
   ]);
@@ -64,72 +80,245 @@ async function seedAdmissions(actor, school) {
   const deadline = new Date();
   deadline.setDate(deadline.getDate() + 30);
 
+  // Requirements for new S1 & S4 students, Term 1, taken from the school flyer
+  // "Babyeyi ya S1 na S4 abanyeshuri bashya" (Ecole des Sciences Saint Louis
+  // de Montfort Nyanza).
+  const req = (sortOrder, key, fields) => ({ key, appliesTo: {}, sortOrder, ...fields });
   const requirements = [
-    {
-      key: 'birth-certificate',
+    req(0, 'proof-of-payment-fees', {
       type: 'required_document',
       category: 'document',
-      title: 'Birth certificate (copy)',
-      description: 'Certified copy of the learner’s birth certificate.',
-      appliesTo: {},
-      sortOrder: 0,
-    },
-    {
-      key: 'primary-certificate',
+      title: 'Proof of payment — school fees',
+      description: 'Bank deposit receipt for the school fees. Cash is not accepted.',
+    }),
+    req(1, 'proof-of-payment-uniform', {
       type: 'required_document',
       category: 'document',
-      title: 'Primary leaving certificate or equivalent',
-      description: 'Result slip or certificate from the previous school.',
-      appliesTo: {},
-      sortOrder: 1,
-    },
-    {
-      key: 'school-uniform',
-      type: 'must_bring',
-      category: 'uniform',
-      title: 'School uniform',
-      quantity: '2',
-      unit: 'sets',
-      appliesTo: {},
-      sortOrder: 2,
-    },
-    {
-      key: 'exercise-books',
-      type: 'must_bring',
-      category: 'stationery',
-      title: 'Exercise books',
-      quantity: '10',
-      unit: 'books',
-      appliesTo: {},
-      sortOrder: 3,
-    },
-    {
-      key: 'safety-boots',
-      type: 'school_provides',
-      category: 'tools',
-      title: 'Safety boots and overalls',
-      description: 'Provided by the school for practical workshops.',
-      appliesTo: { trades: ['csa', 'acc'] },
-      sortOrder: 4,
-    },
-    {
-      key: 'toiletries',
-      type: 'optional',
-      category: 'hygiene',
-      title: 'Personal toiletries',
-      appliesTo: {},
-      sortOrder: 5,
-    },
-    {
-      key: 'fees-term1',
+      title: 'Proof of payment — uniforms',
+      description: 'Deposit receipt for the uniform payment (separate account from school fees).',
+    }),
+    req(2, 'health-insurance', {
+      type: 'required_document',
+      category: 'document',
+      title: 'Health insurance card (Mutuelle / MMI / RAMA)',
+      description: 'Bring the learner’s health insurance card.',
+    }),
+    req(3, 'fees', {
       type: 'payment',
       category: 'payment',
-      title: 'Term 1 contribution',
-      description: 'Paid at the school bursar’s office.',
+      title: 'School fees — 138,000 RWF (includes insurance and T-shirt)',
+      description: 'Deposit into UMWALIMU SACCO account 900012650500.',
+      quantity: '138000',
+      unit: 'RWF',
       deadline,
-      appliesTo: {},
-      sortOrder: 6,
-    },
+    }),
+    req(4, 'uniforms', {
+      type: 'payment',
+      category: 'payment',
+      title: 'School uniforms — 24,000 RWF (2 shirts, 2 trousers/skirts)',
+      description: 'Deposit into Bank of Kigali account 000860696912343 (Nyanza Investment Group Ltd).',
+      quantity: '24000',
+      unit: 'RWF',
+      deadline,
+    }),
+    req(5, 'bedcover', {
+      type: 'must_bring',
+      category: 'boarding',
+      title: 'Bedcover — dark blue',
+      description: 'Dark blue only.',
+      quantity: '1',
+    }),
+    req(6, 'mosquito-nets', {
+      type: 'must_bring',
+      category: 'boarding',
+      title: 'Mosquito nets (supernet)',
+      quantity: '2',
+    }),
+    req(7, 'bedsheets', {
+      type: 'must_bring',
+      category: 'boarding',
+      title: 'Bedsheets',
+      quantity: '2',
+      unit: 'pairs',
+    }),
+    req(8, 'black-shoes', {
+      type: 'must_bring',
+      category: 'uniform',
+      title: 'Closed black shoes',
+      description: 'Plain black, no other colour. Only the school-designated black sandals are allowed otherwise.',
+      quantity: '1',
+      unit: 'pair',
+    }),
+    req(9, 'white-socks', {
+      type: 'must_bring',
+      category: 'uniform',
+      title: 'White socks',
+      quantity: '2',
+      unit: 'pairs',
+    }),
+    req(10, 'sport-kit-s1', {
+      type: 'must_bring',
+      category: 'uniform',
+      title: 'Sport kit — dark blue (S1)',
+      description: 'Training top and bottom, short-sleeve shirt and shorts, 2 pairs of black sport shoes. Arrive wearing the sport kit.',
+      appliesTo: { levels: ['S1'] },
+    }),
+    req(11, 'sport-kit-s4', {
+      type: 'must_bring',
+      category: 'uniform',
+      title: 'Sport kit — dark green (S4)',
+      description: 'Training top and bottom, short-sleeve shirt and shorts, 2 pairs of black sport shoes. Arrive wearing the sport kit.',
+      appliesTo: { levels: ['S4'] },
+    }),
+    req(12, 'black-sports-shoes', {
+      type: 'must_bring',
+      category: 'uniform',
+      title: 'Black sport shoes',
+      quantity: '2',
+      unit: 'pairs',
+    }),
+    req(13, 'black-sandals', {
+      type: 'must_bring',
+      category: 'uniform',
+      title: 'Designated black sandals',
+      description: 'Only the school-designated black sandals are allowed.',
+      quantity: '1',
+      unit: 'pair',
+    }),
+    req(14, 'exercise-books-200-s1', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Exercise books — 200 pages',
+      quantity: '15',
+      appliesTo: { levels: ['S1'] },
+    }),
+    req(15, 'exercise-books-200-s4', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Exercise books — 200 pages',
+      quantity: '7',
+      appliesTo: { levels: ['S4'] },
+    }),
+    req(16, 'exercise-books-96', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Exercise books — 96 pages',
+      quantity: '5',
+    }),
+    req(17, 'blue-pens', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Blue pens',
+      quantity: '7',
+    }),
+    req(18, 'red-black-pens', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Red / black pens',
+      quantity: '3',
+    }),
+    req(19, 'registers-s4', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Register books',
+      quantity: '4',
+      appliesTo: { levels: ['S4'] },
+    }),
+    req(20, 'math-box', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Mathematical set (mathematical box)',
+      quantity: '1',
+    }),
+    req(21, 'calculator', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Scientific calculator',
+      quantity: '1',
+    }),
+    req(22, 'periodic-table', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Periodic table',
+      quantity: '1',
+    }),
+    req(23, 'lab-coat-s4', {
+      type: 'must_bring',
+      category: 'uniform',
+      title: 'White lab coat',
+      quantity: '1',
+      appliesTo: { levels: ['S4'] },
+    }),
+    req(24, 'test-paper', {
+      type: 'must_bring',
+      category: 'stationery',
+      title: 'Test paper',
+      quantity: '1',
+      unit: 'ream',
+    }),
+    req(25, 'bible', {
+      type: 'must_bring',
+      category: 'student',
+      title: 'Bible',
+      quantity: '1',
+    }),
+    req(26, 'water-bottle', {
+      type: 'must_bring',
+      category: 'hygiene',
+      title: 'Water bottle (gourde)',
+      quantity: '1',
+    }),
+    req(27, 'buckets', {
+      type: 'must_bring',
+      category: 'hygiene',
+      title: 'Buckets',
+      quantity: '5',
+    }),
+    req(28, 'toilet-paper', {
+      type: 'must_bring',
+      category: 'hygiene',
+      title: 'Toilet paper',
+      quantity: '5',
+    }),
+    req(29, 'towel-oil', {
+      type: 'must_bring',
+      category: 'hygiene',
+      title: 'Towel and body oil',
+      quantity: '1',
+    }),
+    req(30, 'handkerchiefs', {
+      type: 'must_bring',
+      category: 'hygiene',
+      title: 'White handkerchiefs',
+      quantity: '3',
+    }),
+    req(31, 'washing-soap', {
+      type: 'must_bring',
+      category: 'hygiene',
+      title: 'Washing soap',
+      quantity: '4',
+      unit: 'bars',
+    }),
+    req(32, 'bathing-soap', {
+      type: 'must_bring',
+      category: 'hygiene',
+      title: 'Bathing soap',
+      quantity: '5',
+      unit: 'bars',
+    }),
+    req(33, 'combs', {
+      type: 'must_bring',
+      category: 'hygiene',
+      title: 'Combs',
+      quantity: '5',
+    }),
+    req(34, 'panties-cloth', {
+      type: 'must_bring',
+      category: 'hygiene',
+      title: 'Panties and cloth (girls)',
+      description: '5 pairs of panties and 1 piece of cloth for girls.',
+      quantity: '5',
+    }),
   ];
 
   const pack = new AdmissionPack({
@@ -137,18 +326,32 @@ async function seedAdmissions(actor, school) {
     school: school._id,
     schoolName: school.schoolName,
     academicYear,
-    title: 'Seed Admission Pack',
-    levels: ['S1', 'S2', 'S3'],
-    trades: ['sod', 'csa', 'acc'],
+    title: packTitle,
+    levels: ['S1', 'S4'],
+    trades: [],
     admissionPeriod: { opensAt: new Date(), closesAt: deadline },
     requirements,
     instructions:
-      'Report to the school office with all required documents on the reporting date.',
-    contact: { name: 'Admissions Office', phone: '+250 788 000 000', email: 'admissions@example.rw' },
+      'Report before 5:00 PM on the reporting day. Motorcycle taxis (bodaboda) are not allowed at school. '
+      + 'Only school uniforms and the sport kit are allowed — no other clothing or shoes. Proof of payment for '
+      + 'both school fees and uniforms must be brought; cash is not accepted. Learners may not leave for '
+      + 'ceremonies (weddings, holidays).',
+    contact: {
+      name: 'Fr. Egide NIYOMUGABO (Head Teacher)',
+      phone: '+250 791 489 490',
+      email: 'esclmnyanza@gmail.com',
+    },
     paymentInfo: {
       required: true,
-      channels: ['bank', 'mobile_money'],
-      instructions: 'Use the learner’s reference as the payment reference.',
+      channels: [
+        'UMWALIMU SACCO — account 900012650500 (school fees)',
+        'Bank of Kigali — account 000860696912343 (uniforms)',
+      ],
+      reference: 'Learner’s full name',
+      instructions:
+        'School fees 138,000 RWF (including insurance and T-shirt) are deposited into UMWALIMU SACCO account '
+        + '900012650500. Uniforms 24,000 RWF are deposited into Bank of Kigali account 000860696912343 '
+        + '(Nyanza Investment Group Ltd). Do not mix the two payments. Bring both receipts; cash is not accepted.',
     },
     status: 'draft',
     createdBy: owner,
@@ -164,7 +367,7 @@ async function seedAdmissions(actor, school) {
   pack.publishedAt = new Date();
   pack.publishedBy = owner;
   await pack.save();
-  console.log('[seed] Published admission pack (v1) with 7 requirements');
+  console.log(`[seed] Published admission pack "${packTitle}" (v1) with ${requirements.length} requirements`);
 
   const makeApplication = (overrides) =>
     new AdmissionApplication({
@@ -188,7 +391,7 @@ async function seedAdmissions(actor, school) {
     gender: 'female',
     dateOfBirth: new Date('2010-04-12'),
     level: 'S1',
-    trade: 'csa',
+    trade: null,
     previousSchool: 'Sunrise Primary School',
     guardian: { name: 'Seed Parent', relationship: 'mother', phone: '+250788111222' },
     status: 'submitted',
@@ -213,7 +416,7 @@ async function seedAdmissions(actor, school) {
       fullName,
       gender: 'male',
       level: 'S1',
-      trade: 'csa',
+      trade: null,
       guardian: { name: 'Seed Parent', relationship: 'mother', phone: '+250788111222' },
       status: 'accepted',
       submittedAt: new Date(),
@@ -233,7 +436,7 @@ async function seedAdmissions(actor, school) {
       fullName,
       indexNumber,
       gender: 'male',
-      trade: 'csa',
+      trade: null,
       level: 'S1',
       status: 'enrolled',
       enrolledAt: new Date(),
@@ -416,7 +619,7 @@ async function seed() {
   const total = created.reduce((a, s) => a + (s.totalStudents || 0), 0);
   console.log(`[seed] Total students across records: ${total}`);
 
-  await seedAdmissions(actor, created[0]);
+  await seedAdmissions(actor, holdings[0]);
 
   console.log('[seed] Done');
 

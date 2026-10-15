@@ -166,6 +166,7 @@ admissionApplicationSchema.methods.toClient = function toClient() {
     schoolName: this.schoolName,
     admissionPack: this.admissionPack?.toString?.() || null,
     packVersion: this.packVersion,
+    packSnapshot: this.packSnapshot,
     academicYear: this.academicYear,
     reference: this.reference,
     level: this.level,

@@ -33,13 +33,21 @@ const toArray = (s) =>
     .map((x) => x.trim())
     .filter(Boolean);
 
+const toDateInput = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+};
+
 const emptyRequirement = () => ({
   title: '',
   type: 'must_bring',
   category: 'other',
+  description: '',
   quantity: '',
   unit: '',
   levels: '',
+  trades: '',
 });
 
 export default function AdmissionPackFormPage() {
@@ -61,6 +69,12 @@ export default function AdmissionPackFormPage() {
     contactName: '',
     contactPhone: '',
     contactEmail: '',
+    admissionOpens: '',
+    admissionCloses: '',
+    paymentRequired: false,
+    paymentChannels: '',
+    paymentReference: '',
+    paymentInstructions: '',
     requirements: [emptyRequirement()],
   });
 
@@ -88,7 +102,7 @@ export default function AdmissionPackFormPage() {
           return;
         }
         setForm({
-          school: p.school.id,
+          school: p.school?.id || '',
           academicYear: p.academicYear,
           title: p.title,
           levels: (p.levels || []).join(', '),
@@ -97,15 +111,23 @@ export default function AdmissionPackFormPage() {
           contactName: p.contact?.name || '',
           contactPhone: p.contact?.phone || '',
           contactEmail: p.contact?.email || '',
+          admissionOpens: toDateInput(p.admissionPeriod?.opensAt),
+          admissionCloses: toDateInput(p.admissionPeriod?.closesAt),
+          paymentRequired: Boolean(p.paymentInfo?.required),
+          paymentChannels: (p.paymentInfo?.channels || []).join(', '),
+          paymentReference: p.paymentInfo?.reference || '',
+          paymentInstructions: p.paymentInfo?.instructions || '',
           requirements:
             (p.requirements || []).length > 0
               ? p.requirements.map((r) => ({
                   title: r.title,
                   type: r.type,
                   category: r.category,
+                  description: r.description || '',
                   quantity: r.quantity,
                   unit: r.unit,
                   levels: (r.appliesTo?.levels || []).join(', '),
+                  trades: (r.appliesTo?.trades || []).join(', '),
                 }))
               : [emptyRequirement()],
         });
@@ -142,9 +164,10 @@ export default function AdmissionPackFormPage() {
         title: r.title.trim(),
         type: r.type,
         category: r.category,
+        description: r.description.trim(),
         quantity: r.quantity,
         unit: r.unit,
-        appliesTo: { levels: toArray(r.levels) },
+        appliesTo: { levels: toArray(r.levels), trades: toArray(r.trades) },
       }));
     if (requirements.length === 0) return toast.error('Add at least one requirement.');
 
@@ -156,6 +179,16 @@ export default function AdmissionPackFormPage() {
       trades: toArray(form.trades),
       instructions: form.instructions,
       contact: { name: form.contactName, phone: form.contactPhone, email: form.contactEmail },
+      admissionPeriod: {
+        opensAt: form.admissionOpens || null,
+        closesAt: form.admissionCloses || null,
+      },
+      paymentInfo: {
+        required: form.paymentRequired,
+        channels: toArray(form.paymentChannels),
+        reference: form.paymentReference,
+        instructions: form.paymentInstructions,
+      },
       requirements,
     };
 
@@ -215,7 +248,7 @@ export default function AdmissionPackFormPage() {
                 value={form.title}
                 onChange={(e) => set('title', e.target.value)}
                 className="input"
-                placeholder="e.g. Senior 1 intake"
+                placeholder="e.g. Senior 1 & Senior 4 intake"
               />
             </label>
             <label className="block">
@@ -224,7 +257,7 @@ export default function AdmissionPackFormPage() {
                 value={form.levels}
                 onChange={(e) => set('levels', e.target.value)}
                 className="input"
-                placeholder="Level 3, Level 4"
+                placeholder="S1, S4"
               />
             </label>
             <label className="block">
@@ -234,6 +267,24 @@ export default function AdmissionPackFormPage() {
                 onChange={(e) => set('trades', e.target.value)}
                 className="input"
                 placeholder="sod, nit"
+              />
+            </label>
+            <label className="block">
+              <span className="label">Applications open</span>
+              <input
+                type="date"
+                value={form.admissionOpens}
+                onChange={(e) => set('admissionOpens', e.target.value)}
+                className="input"
+              />
+            </label>
+            <label className="block">
+              <span className="label">Applications close</span>
+              <input
+                type="date"
+                value={form.admissionCloses}
+                onChange={(e) => set('admissionCloses', e.target.value)}
+                className="input"
               />
             </label>
           </div>
@@ -297,12 +348,39 @@ export default function AdmissionPackFormPage() {
                     />
                   </label>
                   <label className="block">
+                    <span className="label">Unit</span>
+                    <input
+                      value={r.unit}
+                      onChange={(e) => setReq(index, 'unit', e.target.value)}
+                      className="input"
+                      placeholder="e.g. pairs, books, RWF"
+                    />
+                  </label>
+                  <label className="block">
                     <span className="label">Applies to levels (optional)</span>
                     <input
                       value={r.levels}
                       onChange={(e) => setReq(index, 'levels', e.target.value)}
                       className="input"
-                      placeholder="Level 3"
+                      placeholder="S1, S4"
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="label">Applies to trades (optional)</span>
+                    <input
+                      value={r.trades}
+                      onChange={(e) => setReq(index, 'trades', e.target.value)}
+                      className="input"
+                      placeholder="sod, nit"
+                    />
+                  </label>
+                  <label className="block sm:col-span-2">
+                    <span className="label">Description (optional)</span>
+                    <textarea
+                      value={r.description}
+                      onChange={(e) => setReq(index, 'description', e.target.value)}
+                      className="input min-h-[60px]"
+                      placeholder="Any details the family needs to know"
                     />
                   </label>
                 </div>
@@ -323,6 +401,50 @@ export default function AdmissionPackFormPage() {
         </div>
 
         <div className="card space-y-4">
+          <h2 className="text-sm font-semibold text-slate-800">Payments</h2>
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={form.paymentRequired}
+              onChange={(e) => set('paymentRequired', e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300"
+            />
+            A payment is required for admission
+          </label>
+          {form.paymentRequired && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="label">Channels (comma separated)</span>
+                <input
+                  value={form.paymentChannels}
+                  onChange={(e) => set('paymentChannels', e.target.value)}
+                  className="input"
+                  placeholder="bank, mobile_money"
+                />
+              </label>
+              <label className="block">
+                <span className="label">Payment reference</span>
+                <input
+                  value={form.paymentReference}
+                  onChange={(e) => set('paymentReference', e.target.value)}
+                  className="input"
+                  placeholder="e.g. learner name"
+                />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="label">Payment instructions</span>
+                <textarea
+                  value={form.paymentInstructions}
+                  onChange={(e) => set('paymentInstructions', e.target.value)}
+                  className="input min-h-[80px]"
+                  placeholder="Accounts, amounts and receipts policy"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+
+        <div className="card space-y-4">
           <h2 className="text-sm font-semibold text-slate-800">Notes &amp; contact</h2>
           <label className="block">
             <span className="label">Instructions for families</span>
@@ -330,7 +452,7 @@ export default function AdmissionPackFormPage() {
               value={form.instructions}
               onChange={(e) => set('instructions', e.target.value)}
               className="input min-h-[90px]"
-              placeholder="Reporting dates, payment details, contacts…"
+              placeholder="Reporting dates, rules, contacts…"
             />
           </label>
           <div className="grid gap-4 sm:grid-cols-3">
