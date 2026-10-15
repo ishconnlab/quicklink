@@ -69,7 +69,14 @@ export default function AdmissionFormPage() {
         const res = await api.get('/admission-packs', {
           params: { school: form.school, status: 'published', limit: 50 },
         });
-        setPacks(res.data.data.packs);
+        const list = res.data.data.packs;
+        setPacks(list);
+        // A pack from a previously selected school must never be submitted.
+        setForm((f) =>
+          f.admissionPack && !list.some((p) => p.id === f.admissionPack)
+            ? { ...f, admissionPack: '' }
+            : f
+        );
       } catch {
         setPacks([]);
       }
@@ -144,7 +151,14 @@ export default function AdmissionFormPage() {
           <div className="grid gap-4 sm:grid-cols-3">
             <label className="block">
               <span className="label">School</span>
-              <select value={form.school} onChange={(e) => set('school', e.target.value)} className="input">
+              <select
+                value={form.school}
+                onChange={(e) => {
+                  set('school', e.target.value);
+                  set('admissionPack', '');
+                }}
+                className="input"
+              >
                 <option value="">Select a school…</option>
                 {schools.map((s) => (
                   <option key={s.id} value={s.id}>
