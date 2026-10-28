@@ -3,6 +3,8 @@ import connectDB, { disconnectDB } from './config/db.js';
 import config from './config/env.js';
 import ensureOwnerAccount from './services/bootstrap.js';
 import { syncAllIndexes } from './models/syncIndexes.js';
+import { createServer } from 'node:http';
+import { initializeClassRealtime } from './services/classRealtime.js';
 
 async function start() {
   try {
@@ -22,7 +24,9 @@ async function start() {
     const app = createApp();
     // Bind explicitly to all interfaces and use the platform-provided PORT
     // (Render/Railway/etc.). Never hardcode the production port.
-    const server = app.listen(config.port, '0.0.0.0', () => {
+    const server = createServer(app);
+    initializeClassRealtime(server);
+    server.listen(config.port, '0.0.0.0', () => {
       console.log(`[server] QuickLink API listening on 0.0.0.0:${config.port} (${config.env})`);
     });
 

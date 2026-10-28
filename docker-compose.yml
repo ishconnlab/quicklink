@@ -22,7 +22,6 @@ services:
       OWNER_NAME: ${OWNER_NAME:-QuickLink Owner}
       OWNER_EMAIL: ${OWNER_EMAIL:-owner@quicklink.local}
       OWNER_PASSWORD: ${OWNER_PASSWORD:-ChangeMe123!}
-      ORG_NAME: ${ORG_NAME:-QuickLink Education Trust}
     ports:
       - '4000:4000'
 

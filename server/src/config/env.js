@@ -31,6 +31,12 @@ const corsOrigin = isProd
     ? configuredOrigins
     : DEFAULT_ORIGINS;
 
+const ALLOWED_LEARNING_FORMATS = ['pdf', 'doc', 'docx', 'txt', 'md', 'ppt', 'pptx', 'xls', 'xlsx'];
+const learningFormats = (process.env.LEARNING_SUPPORTED_FORMATS || ALLOWED_LEARNING_FORMATS.join(','))
+  .split(',').map((format) => format.trim().toLowerCase().replace(/^\./, ''))
+  .filter((format, index, formats) => ALLOWED_LEARNING_FORMATS.includes(format) && formats.indexOf(format) === index);
+const maxLearningFileBytes = Number.parseInt(process.env.LEARNING_MAX_FILE_BYTES || `${25 * 1024 * 1024}`, 10);
+
 export const config = {
   env,
   port: parseInt(process.env.PORT || '4000', 10),
@@ -47,6 +53,21 @@ export const config = {
   isTest,
   // Behind a reverse proxy (Render) unless explicitly disabled.
   trustProxy: toBool(process.env.TRUST_PROXY) || ON_RENDER,
+  livekit: {
+    url: process.env.LIVEKIT_URL || '',
+    apiKey: process.env.LIVEKIT_API_KEY || '',
+    apiSecret: process.env.LIVEKIT_API_SECRET || '',
+  },
+  mail: {
+    smtpUrl: process.env.SMTP_URL || '',
+    from: process.env.MAIL_FROM || '',
+    appUrl: process.env.APP_URL || '',
+  },
+  learning: {
+    supportedFormats: learningFormats.length ? learningFormats : ALLOWED_LEARNING_FORMATS,
+    maxFileBytes: Number.isInteger(maxLearningFileBytes) && maxLearningFileBytes > 0 ? Math.min(maxLearningFileBytes, 100 * 1024 * 1024) : 25 * 1024 * 1024,
+    booksDir: process.env.LEARNING_BOOKS_DIR || '',
+  },
 };
 
 if (config.jwtSecret === 'dev-only-insecure-secret' && config.isProd) {

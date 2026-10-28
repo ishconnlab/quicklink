@@ -1,47 +1,48 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { useAuth } from './context/AuthContext.jsx';
 import AppLayout from './components/AppLayout.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
-import DashboardPage from './pages/DashboardPage.jsx';
-import SchoolsPage from './pages/SchoolsPage.jsx';
-import SchoolFormPage from './pages/SchoolFormPage.jsx';
-import SchoolDetailPage from './pages/SchoolDetailPage.jsx';
-import StudentsPage from './pages/StudentsPage.jsx';
-import StudentFormPage from './pages/StudentFormPage.jsx';
+import LearningPage from './pages/LearningPage.jsx';
 import UsersPage from './pages/UsersPage.jsx';
-import ReportsPage from './pages/ReportsPage.jsx';
-import SyncPage from './pages/SyncPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
-import OnboardingPage from './pages/OnboardingPage.jsx';
-import AdmissionPacksPage from './pages/AdmissionPacksPage.jsx';
-import AdmissionPackFormPage from './pages/AdmissionPackFormPage.jsx';
-import AdmissionsPage from './pages/AdmissionsPage.jsx';
-import AdmissionFormPage from './pages/AdmissionFormPage.jsx';
-import AdmissionDetailPage from './pages/AdmissionDetailPage.jsx';
-import MessagesPage from './pages/MessagesPage.jsx';
-import ConnectPage from './pages/ConnectPage.jsx';
-import ParentPortalPage from './pages/ParentPortalPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import SplashScreen from './components/SplashScreen.jsx';
+import ClassesPage from './pages/ClassesPage.jsx';
+import ClassDetailPage from './pages/ClassDetailPage.jsx';
+import JoinClassPage from './pages/JoinClassPage.jsx';
+import ClassReportPage from './pages/ClassReportPage.jsx';
+import ClassInvitationPage from './pages/ClassInvitationPage.jsx';
+import CoursesPage from './pages/CoursesPage.jsx';
+import CourseDetailPage from './pages/CourseDetailPage.jsx';
+import StudentDashboard from './pages/StudentDashboard.jsx';
+import TeacherDashboard from './pages/TeacherDashboard.jsx';
+import CertificateVerifyPage from './pages/CertificateVerifyPage.jsx';
+
+const LiveSessionPage = lazy(() => import('./pages/LiveSessionPage.jsx'));
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <SplashScreen />;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
   return children;
 }
 
-function StaffOnly({ children }) {
+function Landing() {
   const { user } = useAuth();
-  if (user?.role === 'parent') return <Navigate to="/parent" replace />;
-  return children;
+  return <Navigate to={user?.role === 'owner' ? '/learning' : '/dashboard'} replace />;
 }
 
-function ParentOnly({ children }) {
+function OwnerOnly({ children }) {
   const { user } = useAuth();
-  if (user && user.role !== 'parent') return <Navigate to="/" replace />;
-  return children;
+  return user?.role === 'owner' ? children : <Navigate to="/learn" replace />;
+}
+
+function StudentLearning({ children }) {
+  const { user } = useAuth();
+  return user?.role === 'owner' ? <Navigate to="/learning" replace /> : children;
 }
 
 export default function App() {
@@ -50,48 +51,23 @@ export default function App() {
 
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
-      <Route path="/register" element={user ? <Navigate to="/" replace /> : <RegisterPage />} />
-      <Route path="/connect" element={<ConnectPage />} />
-      <Route
-        path="/parent"
-        element={
-          <Protected>
-            <ParentOnly>
-              <ParentPortalPage />
-            </ParentOnly>
-          </Protected>
-        }
-      />
-      <Route
-        element={
-          <Protected>
-            <StaffOnly>
-              <AppLayout />
-            </StaffOnly>
-          </Protected>
-        }
-      >
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route path="/schools" element={<SchoolsPage />} />
-        <Route path="/schools/new" element={<SchoolFormPage />} />
-        <Route path="/schools/:id" element={<SchoolDetailPage />} />
-        <Route path="/schools/:id/edit" element={<SchoolFormPage />} />
-        <Route path="/students" element={<StudentsPage />} />
-        <Route path="/students/new" element={<StudentFormPage />} />
-        <Route path="/students/:id/edit" element={<StudentFormPage />} />
-        <Route path="/admissions" element={<AdmissionsPage />} />
-        <Route path="/admissions/new" element={<AdmissionFormPage />} />
-        <Route path="/admissions/:id" element={<AdmissionDetailPage />} />
-        <Route path="/admission-packs" element={<AdmissionPacksPage />} />
-        <Route path="/admission-packs/new" element={<AdmissionPackFormPage />} />
-        <Route path="/admission-packs/:id/edit" element={<AdmissionPackFormPage />} />
-        <Route path="/messages" element={<MessagesPage />} />
-        <Route path="/messages/:id" element={<MessagesPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/sync" element={<SyncPage />} />
-        <Route path="/users" element={<UsersPage />} />
+      <Route path="/login" element={user ? <Landing /> : <LoginPage />} />
+      <Route path="/register" element={user ? <Landing /> : <RegisterPage />} />
+      <Route path="/verify/:code" element={<CertificateVerifyPage />} />
+      <Route element={<Protected><AppLayout /></Protected>}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/learn" element={<StudentLearning><LearningPage learner /></StudentLearning>} />
+        <Route path="/dashboard" element={<StudentLearning>{user?.role === 'teacher' ? <TeacherDashboard /> : <StudentDashboard />}</StudentLearning>} />
+        <Route path="/courses" element={<StudentLearning><CoursesPage /></StudentLearning>} />
+        <Route path="/courses/:id" element={<StudentLearning><CourseDetailPage /></StudentLearning>} />
+        <Route path="/learning" element={<OwnerOnly><LearningPage /></OwnerOnly>} />
+        <Route path="/classes" element={<ClassesPage />} />
+        <Route path="/classes/join/:sessionCode" element={<JoinClassPage />} />
+        <Route path="/classes/invitations/:token" element={<ClassInvitationPage />} />
+        <Route path="/classes/sessions/:sessionId/live" element={<Suspense fallback={<SplashScreen />}><LiveSessionPage /></Suspense>} />
+        <Route path="/classes/sessions/:sessionId/report" element={<ClassReportPage />} />
+        <Route path="/classes/:id" element={<ClassDetailPage />} />
+        <Route path="/users" element={<OwnerOnly><UsersPage /></OwnerOnly>} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

@@ -1,39 +1,31 @@
 import { User } from './User.js';
-import { School } from './School.js';
-import { Holding } from './Holding.js';
-import { AuditLog } from './AuditLog.js';
+import { LearningBook } from './LearningBook.js';
+import { LearningProgress } from './LearningProgress.js';
+import { LearningClass } from './LearningClass.js';
+import { LiveSession } from './LiveSession.js';
+import { ClassChatMessage } from './ClassChatMessage.js';
+import { ClassSessionNote } from './ClassSessionNote.js';
+import { ClassInvitation } from './ClassInvitation.js';
+import { Assignment } from './Assignment.js';
+import { AssignmentSubmission } from './AssignmentSubmission.js';
 import { Notification } from './Notification.js';
-import { Student } from './Student.js';
-import { AdmissionPack } from './AdmissionPack.js';
-import { AdmissionApplication } from './AdmissionApplication.js';
-import { StudentRequirement } from './StudentRequirement.js';
-import { GuardianInvitation, GuardianLink } from './Guardian.js';
-import { AdmissionEvent, NotificationDelivery } from './AdmissionEvent.js';
-import { Conversation, Message } from './Conversation.js';
+import { CourseCertificate } from './CourseCertificate.js';
 
-const models = [
-  User,
-  School,
-  Holding,
-  AuditLog,
-  Notification,
-  Student,
-  AdmissionPack,
-  AdmissionApplication,
-  StudentRequirement,
-  GuardianInvitation,
-  GuardianLink,
-  AdmissionEvent,
-  NotificationDelivery,
-  Conversation,
-  Message,
-];
-
-// Rebuild indexes from the current schema. This also removes indexes left over
-// from older schema versions (e.g. a stale unique index that would otherwise
-// reject valid writes). Best-effort: never block startup on index problems.
 export async function syncAllIndexes() {
-  await Promise.all(models.map((model) => model.syncIndexes()));
+  await Promise.all([
+    User.syncIndexes(),
+    LearningBook.syncIndexes(),
+    LearningProgress.syncIndexes(),
+    LearningClass.syncIndexes(),
+    LiveSession.syncIndexes(),
+    ClassChatMessage.syncIndexes(),
+    ClassSessionNote.syncIndexes(),
+    ClassInvitation.syncIndexes(),
+    Assignment.syncIndexes(),
+    AssignmentSubmission.syncIndexes(),
+    Notification.syncIndexes(),
+    CourseCertificate.syncIndexes(),
+  ]);
 }
 
 export default syncAllIndexes;

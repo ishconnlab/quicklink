@@ -3,9 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
-import { SyncProvider } from './context/SyncContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
-import { I18nProvider } from './context/I18nContext.jsx';
 import './index.css';
 
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
@@ -35,15 +33,11 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <BrowserRouter future={{ v7_relativeSplatPath: true }}>
       <ToastProvider>
-        <I18nProvider>
-          <AuthProvider>
-            <SyncProvider>
-              <App />
-            </SyncProvider>
-          </AuthProvider>
-        </I18nProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
       </ToastProvider>
     </BrowserRouter>
   </React.StrictMode>

@@ -45,7 +45,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl' };
+  const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', manage: 'max-w-3xl', reader: 'max-w-7xl' };
 
   return (
     <AnimatePresence>
@@ -63,7 +63,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
             transition={{ type: 'tween', duration: 0.2 }}
-            className={`relative z-10 w-full ${sizes[size]} rounded-t-2xl bg-white p-5 shadow-xl sm:rounded-2xl`}
+            className={`relative z-10 w-full ${sizes[size]} rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-5 ${size === 'reader' ? 'reader-modal-scroll max-h-[96dvh] overflow-y-auto' : size === 'manage' ? 'manage-modal-scroll max-h-[92dvh] overflow-y-auto' : ''}`}
           >
             <div className="mb-4 flex items-start justify-between gap-4">
               <h3 className="text-lg font-semibold text-slate-900">{title}</h3>

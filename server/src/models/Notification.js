@@ -1,43 +1,15 @@
 import mongoose from 'mongoose';
 
-// In-app notifications delivered to a single user (e.g. the owner is notified
-// when a new account registers and needs approval).
-const notificationSchema = new mongoose.Schema(
-  {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
-      required: true,
-      index: true,
-    },
-    type: {
-      type: String,
-      enum: ['registration', 'student', 'admission', 'guardian', 'info'],
-      default: 'info',
-    },
-    title: { type: String, required: true, trim: true, maxlength: 200 },
-    message: { type: String, default: '', trim: true, maxlength: 1000 },
-    // Optional in-app route the notification deep-links to.
-    link: { type: String, default: '', trim: true, maxlength: 300 },
-    meta: { type: mongoose.Schema.Types.Mixed, default: {} },
-    read: { type: Boolean, default: false },
-  },
-  { timestamps: true }
-);
+const notificationSchema = new mongoose.Schema({
+  recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  type: { type: String, enum: ['class', 'invitation', 'assignment', 'grade', 'announcement', 'account'], required: true },
+  title: { type: String, required: true, trim: true, maxlength: 180 },
+  message: { type: String, default: '', trim: true, maxlength: 1000 },
+  href: { type: String, default: '' },
+  readAt: { type: Date, default: null },
+}, { timestamps: true });
 
-notificationSchema.index({ user: 1, read: 1, createdAt: -1 });
-
-notificationSchema.methods.toClient = function toClient() {
-  return {
-    id: this._id.toString(),
-    type: this.type,
-    title: this.title,
-    message: this.message,
-    link: this.link,
-    read: this.read,
-    createdAt: this.createdAt,
-  };
-};
-
+notificationSchema.index({ recipient: 1, createdAt: -1 });
+notificationSchema.index({ recipient: 1, readAt: 1, createdAt: -1 });
 export const Notification = mongoose.model('Notification', notificationSchema);
 export default Notification;

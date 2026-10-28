@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { apiError } from '../api/client.js';
@@ -8,6 +9,7 @@ import { Spinner } from '../components/ui.jsx';
 export default function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -18,8 +20,9 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      await login(email.trim(), password);
-      navigate('/', { replace: true });
+      const account = await login(email.trim(), password);
+      const destination = location.state?.from;
+      navigate(destination ? `${destination.pathname}${destination.search || ''}` : account.role === 'owner' ? '/learning' : account.role === 'teacher' ? '/classes' : '/dashboard', { replace: true });
     } catch (err) {
       setError(apiError(err).message);
     } finally {
@@ -44,7 +47,7 @@ export default function LoginPage() {
           <div className="p-6 pt-9 sm:p-7 sm:pt-10">
             <h1 className="text-lg font-semibold text-slate-900">Sign in</h1>
             <p className="mt-1 text-sm text-slate-500">
-              School data collection &amp; reporting
+              Student learning library
             </p>
 
             {error && (
@@ -97,12 +100,7 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="mt-4 text-center text-sm text-slate-500">
-              Don&apos;t have an account?{' '}
-              <Link to="/register" className="font-semibold text-brand-700 hover:underline">
-                Create one
-              </Link>
-            </p>
+            <p className="mt-4 text-center text-sm text-slate-500">New to QuickLink? <Link to="/register" className="font-semibold text-brand-700 hover:underline">Create a student account</Link></p>
           </div>
         </div>
       </div>

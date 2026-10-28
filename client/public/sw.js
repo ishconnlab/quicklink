@@ -1,4 +1,4 @@
-/* QuickLink service worker: app-shell caching + offline support. */
+/* QuickLink service worker: app-shell caching. */
 const CACHE = 'quicklink-shell-v2';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon.svg'];
 
@@ -23,7 +23,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Never cache API traffic: school records and stats must always be live.
+  // Learning content and progress always come from the authenticated API.
   if (url.pathname.startsWith('/api')) return;
 
   // SPA navigations: network first, fall back to cached shell when offline.

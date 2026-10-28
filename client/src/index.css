@@ -15,6 +15,21 @@
   }
 }
 
+.reader-page-scroll,
+.reader-content-scroll,
+.reader-modal-scroll,
+.manage-modal-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.reader-page-scroll::-webkit-scrollbar,
+.reader-content-scroll::-webkit-scrollbar,
+.reader-modal-scroll::-webkit-scrollbar,
+.manage-modal-scroll::-webkit-scrollbar {
+  display: none;
+}
+
 @layer components {
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold

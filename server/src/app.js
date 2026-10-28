@@ -8,18 +8,11 @@ import config, { isAllowedOrigin } from './config/env.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
-import schoolRoutes from './routes/schoolRoutes.js';
-import dashboardRoutes from './routes/dashboardRoutes.js';
-import reportRoutes from './routes/reportRoutes.js';
-import notificationRoutes from './routes/notificationRoutes.js';
-import studentRoutes from './routes/studentRoutes.js';
-import admissionPackRoutes from './routes/admissionPackRoutes.js';
-import admissionApplicationRoutes from './routes/admissionApplicationRoutes.js';
-import admissionChecklistRoutes from './routes/admissionChecklistRoutes.js';
-import guardianRoutes from './routes/guardianRoutes.js';
-import onboardingRoutes from './routes/onboardingRoutes.js';
-import messageRoutes from './routes/messageRoutes.js';
-import parentRoutes from './routes/parentRoutes.js';
+import learningRoutes from './routes/learningRoutes.js';
+import classRoutes from './routes/classRoutes.js';
+import courseRoutes from './routes/courseRoutes.js';
+import assignmentRoutes from './routes/assignmentRoutes.js';
+import certificateRoutes from './routes/certificateRoutes.js';
 
 export function createApp() {
   const app = express();
@@ -73,18 +66,11 @@ export function createApp() {
 
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
-  app.use('/api/schools', schoolRoutes);
-  app.use('/api/students', studentRoutes);
-  app.use('/api/dashboard', dashboardRoutes);
-  app.use('/api/reports', reportRoutes);
-  app.use('/api/notifications', notificationRoutes);
-  app.use('/api/admission-packs', admissionPackRoutes);
-  app.use('/api/admissions', admissionApplicationRoutes);
-  app.use('/api/admission-checklist', admissionChecklistRoutes);
-  app.use('/api/guardians', guardianRoutes);
-  app.use('/api/onboarding', onboardingRoutes);
-  app.use('/api/conversations', messageRoutes);
-  app.use('/api/parent', parentRoutes);
+  app.use('/api/learning', learningRoutes);
+  app.use('/api/classes', classRoutes);
+  app.use('/api/courses', courseRoutes);
+  app.use('/api/assignments', assignmentRoutes);
+  app.use('/api/certificates', certificateRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

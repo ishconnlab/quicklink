@@ -1,316 +1,202 @@
 # QuickLink
 
-QuickLink is a production-oriented school data collection, monitoring and reporting
-platform. It lets a team capture school records (with per-trade student counts),
-monitor live statistics, manage accounts, and export professional PDF / CSV reports.
-It works as an installable PWA and can capture records offline, syncing them to the
-server when connectivity returns.
+QuickLink is a learning platform for reading course books and attending teacher led online classes. It keeps the QuickLink name and current application design.
 
-- **Frontend:** React 18, Vite, JavaScript, Tailwind CSS, Axios, Lucide React, Framer Motion
-- **Backend:** Express.js, MongoDB / Mongoose, JWT auth, bcrypt, Zod validation, PDFKit
-- **Data:** every school is an independent MongoDB record; records are never stored only in the browser
+## Learning library and reader
 
----
+- Books and documents are discovered under `server/src/books` and organized as `L3/<subject>/`, `L4/<subject>/`, or `L5/<subject>/`.
+- PDF, DOC, DOCX, TXT, Markdown, PPT, PPTX, XLS, and XLSX are supported. The server checks file signatures, Office package structures, UTF-8 text, and declared MIME types; the file extension alone is not accepted as proof of format.
+- Students can search and filter resources, read safe previews where supported, download documents, and save progress using page, slide, sheet, section, or document positions.
+- PDF pages render one at a time to a canvas with PDF.js, without the browser viewer sidebar. DOCX is converted to sanitized HTML; TXT/Markdown are rendered as text; PPTX displays extracted slide text; XLSX displays bounded worksheet previews. Legacy DOC, PPT, and XLS are offered as controlled downloads.
+- Admins can upload drafts, preview, edit metadata, publish/archive, restore, replace files of the same format, retry failed imports, and delete files. Catalog refreshes preserve admin metadata and availability.
+- Admins can add PNG, JPEG, or WebP book-cover images (maximum 3 MB) from **Manage learning document**. The server checks file signatures and MIME type, stores covers separately, and displays them on book cards.
+- Catalog validation errors are recorded on the affected document and do not stop the rest of the catalog or the learning summary from loading.
+- The reader provides page/slide/section/sheet navigation, progress, download, course return, fullscreen, zoom in/out, a direct zoom selector with 140%, and reset. PDF zoom changes the rendered canvas page; converted document content scales directly.
+- Progress is stored per student and document, restores when the document is reopened, and appears in summaries and course details. Known-length documents count as complete at 95% of their units; opening or downloading alone does not complete reading.
 
-## Contents
+Optional server settings:
 
-- [Architecture](#architecture)
-- [Features](#features)
-- [Project structure](#project-structure)
-- [Local development](#local-development)
-- [Environment variables](#environment-variables)
-- [Seed data](#seed-data)
-- [Testing](#testing)
-- [API reference](#api-reference)
-- [Reports](#reports)
-- [Offline & PWA](#offline--pwa)
-- [Deployment](#deployment)
-- [Security notes](#security-notes)
-
----
-
-## Architecture
-
-```
-Browser (React PWA)  ──HTTP/JSON──▶  Express API  ──Mongoose──▶  MongoDB
-        │                                  ▲
-        │  IndexedDB (drafts + sync queue) │
-        └────────── offline capture ───────┘  (syncs when back online)
+```env
+LEARNING_SUPPORTED_FORMATS=pdf,doc,docx,txt,md,ppt,pptx,xls,xlsx
+LEARNING_MAX_FILE_BYTES=26214400
+# Optional persistent storage location; defaults to server/src/books
+LEARNING_BOOKS_DIR=
+# Optional persistent storage locations (default directories are under server/)
+BOOK_COVER_DIR=
+COURSE_IMAGE_DIR=
+SUBMISSIONS_DIR=
 ```
 
-- The frontend never keeps school records as its only copy. Offline records are
-  staged in IndexedDB and pushed to the API; they are only marked **Synced** after
-  the server confirms the write to MongoDB.
-- Authentication uses a signed JWT. Passwords are hashed with bcrypt (12 rounds)
-  and are never returned by the API.
+The maximum upload size is capped at 100 MiB. For production uploads, set `LEARNING_BOOKS_DIR` to persistent storage and back it up with MongoDB. Keep the directory private to the API server.
 
-## Features
+## Classes and live teaching
 
-- **School records** — create, view, edit, search, filter, archive and restore.
-  Each record is a permanent MongoDB document linked to a holding/project and district.
-  Multiple schools can live under one holding; adding a school never overwrites another.
-- **Trade counts** — SOD, NIT, CSA, ACC and Other. All counts are non-negative
-  integers; the **total** is computed automatically as `SOD + NIT + CSA + ACC + Other`.
-  Unknown values are stored as `null`, flagged as **incomplete**, and are *not*
-  counted as zero.
-- **Duplicate detection** — the API flags a same-name school under the same holding
-  and the user explicitly confirms before saving.
-- **History** — create / update / archive / restore events are written to an audit log.
-- **Accounts (multi-user)** — public registration with **owner approval**. New sign-ups
-  start as *pending* and cannot sign in until an owner approves them. The first account
-  (the bootstrap owner) can create accounts directly and approve/reject registrations.
-  Each account's school data is fully isolated — accounts never see each other's records.
-  Includes secure login, password change and logout.
-- **Notifications** — owners get an in-app notification (bell with an unread badge)
-  whenever a new account registers and awaits approval.
-- **Student management** — enrol learners under a school with an auto-allocated
-  candidate **index number** (NESA / RTB style), trade, TVET level, sponsorship,
-  guardian contact and a status lifecycle (enrolled / graduated / transferred /
-  dropped). Includes learner insights (by trade, level, status and gender), a
-  **certification-readiness** indicator (eligible for national / TVET exams) and a
-  one-click CSV **student register** export.
-- **Dashboard** — live MongoDB aggregations: holdings, schools, students (by trade),
-  laptops, teachers, recent records, incomplete records, and groupings by holding and district.
-- **Reports** — individual, holding, district, complete and date-range reports with an
-  in-app preview and downloadable PDF (PDFKit) plus CSV export.
-- **PWA / mobile** — installable, responsive, mobile bottom navigation, offline capture,
-  IndexedDB drafts, and clear Pending Sync / Synced / Sync Failed states.
-- **Customisable sidebar** — the desktop sidebar can be hidden/shown; the choice is remembered.
+- Admins create, edit, archive, restore, and schedule classes; set course/program, level, timezone, duration, capacity, enrollment state, multiple active teachers, and student rosters.
+- Teachers see their assigned classes. Students see the classes they are enrolled in.
+- An assigned teacher or admin starts a live class. QuickLink creates a join link that can be copied and shared with enrolled students.
+- Teachers can email individual or bulk invitations to enrolled student accounts. Each message is private to one recipient and contains a single use, expiring link. Invitation delivery status is tracked; invitations fail clearly until SMTP is configured.
+- The live room uses LiveKit Cloud through LiveKit's WebRTC client and server SDKs. Server issued short lived tokens are restricted to authenticated class members. The QuickLink session uses an SFU; users stay on the QuickLink domain.
+- The pre-join device check explains camera and microphone access, previews available devices after the user grants permission, supports device selection, and allows joining with media off. The room supports audio/video, teacher screen sharing, participant and connection state, real-time persistent chat, message pin/removal/report, and saved shared notes with revision conflict checks.
+- Eight selectable layouts are provided: Auto, Grid, Speaker, Presentation Focus, Side-by-Side, Spotlight, Picture-in-Picture, and Compact Filmstrip. Layout choice is saved for the current session.
+- Attendance starts when an authorized participant joins the authenticated room and closes on leave/disconnect. Reconnects add separate intervals to the same student record; if the server restarts, an open interval is closed at the next join or session end. Late means first join is later than scheduled start plus the class late threshold. Early means time present is below the configured share of the session duration. Teachers can correct status with a required reason and an audit entry.
+- Teachers end a session to finalize attendance, including absences. They can review class history, export a session or class/date/student-filtered PDF report, or download CSV from a session report.
+- A join link requires the student to sign in and be enrolled in that class. Attendance is recorded when the authenticated member connects to the live room.
 
-## Project structure
+### Live class deployment notes
 
+Socket.IO handles chat and authenticated attendance events on the API server. The host must support WebSocket upgrades. If the frontend and API use different origins, add the frontend origin to `CORS_ORIGIN`.
+
+Set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` on the backend. Never put the API secret in Vite variables. The current product configuration uses LiveKit Cloud; the account's plan, limits, and regional availability apply. Browsers require HTTPS (localhost is allowed for local development) and user permission for the microphone, camera, or screen. Screen sharing support varies by browser and mobile operating system; unsupported devices show a fallback message. QuickLink does not record media. Live attendance presence is in memory during a process lifetime and persisted as join intervals in MongoDB; one API instance is recommended until a shared Socket.IO adapter/presence store is configured.
+
+For invitations configure `SMTP_URL`, `MAIL_FROM`, and the frontend `APP_URL` on the backend. Messages are individually addressed, never bulk-addressed. In tests without SMTP, invitation records report `failed` with a configuration error.
+
+## Accounts and access
+
+- **Admin:** the existing account owner role. From **People and accounts**, admins can create, search, edit, deactivate, and restore teacher and student accounts. Removing an account is a reversible deactivation that invalidates active sessions while preserving class and attendance history.
+- **Teacher:** an account created by an admin. Teachers can teach their assigned classes, share live session links, and generate attendance reports.
+- **Student:** students may register at `/register` or be created by an admin. They can browse published courses, enroll subject to capacity, read resources, submit practical work, track their progress, and join classes they are enrolled in.
+
+Admins assign active teachers and enroll active students through **Courses and classes** when creating or editing a class. Role changes are rejected while the person is assigned to a class roster. Account management is owner-only; an administrator cannot deactivate or remove their own account.
+
+## Courses, practical work, and certificates
+
+- Published courses reuse the existing class records and teacher/student rosters. Student pages support course search, L3/L4/L5, subject and trade filters, enrollment state, pagination, learning materials, and progress.
+- Admins manage course title, introduction, detailed description, subject/trade, level, learning materials, enrollment capacity, publication, completion rules, and an optional validated PNG/JPEG/WebP thumbnail (maximum 3 MB). Course images are stored in `COURSE_IMAGE_DIR`.
+- Assigned teachers and admins can publish practical assignments with objectives, materials, tasks, due dates, score limits, pass marks, and submission requirements. Students can save drafts, submit text, links, or supported files (PDF, PNG/JPEG, ZIP, and UTF-8 text/source; up to five files at 10 MB each), and resubmit when enabled. Student code is stored as a file and never executed by the application server.
+- Assigned teachers and admins can review and grade submissions, leave feedback, request a revision, or mark work passed/failed. Grading history is retained. Students cannot grade their own work.
+- Course completion requirements can include reading, theory quizzes, practical assignments, attendance, and a minimum score. A student can issue a certificate only after all configured requirements pass. Certificates are server-generated PDFs with unique IDs, a QR verification link at `/verify/:code`, and admin revocation.
+
+## Technology
+
+- **Client:** React 18, Vite, Tailwind CSS, Axios, React Router, Socket.IO Client, and LiveKit Client SDK
+- **Server:** Express, MongoDB/Mongoose, JWT authentication, Zod validation, Socket.IO, LiveKit Server SDK, Nodemailer, and PDFKit
+- **Live media:** LiveKit Cloud SFU with server-signed participant tokens
+- **Books and progress:** supported learning documents in `server/src/books` (or `LEARNING_BOOKS_DIR`) and account-scoped records in MongoDB
+
+## Run locally
+
+Requirements: Node.js 20.19 or newer and MongoDB.
+
+1. Install dependencies from the repository root:
+
+   ```bash
+   npm run install:all
+   ```
+
+2. Create `server/.env` from `server/.env.example`. Set a local MongoDB URI, the initial admin account, LiveKit credentials, and SMTP settings if invitation delivery is needed. Start the API:
+
+   ```bash
+   npm run dev:server
+   ```
+
+3. In another terminal, create `client/.env` from `client/.env.example` if needed, then start the web app:
+
+   ```bash
+   npm run dev:client
+   ```
+
+4. Sign in with the admin account configured in `server/.env`. Create teacher accounts under **People and accounts**, then create a class under **Classes**. Students can register themselves at `/register` or be created by an admin.
+
+The Vite development server proxies `/api` and `/socket.io` to the configured backend. Set `VITE_PROXY_TARGET` if the API is not at the default QuickLink server. Set `VITE_API_URL` in the client environment for a separately hosted API. Set `APP_URL` to the deployed QuickLink frontend origin so invitation links return to the application.
+
+## Account management API
+
+These routes require a valid bearer token and an admin role.
+
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/users` | Admin | List teacher, student, and owner accounts |
+| `POST` | `/api/users` | Admin | Create a teacher or student account |
+| `PATCH` | `/api/users/:id` | Admin | Update name, email, password, role, or active status |
+| `DELETE` | `/api/users/:id` | Admin | Deactivate an account and invalidate sessions; preserves class history |
+
+## Learning API
+
+Book catalog changes are restricted to admins; student progress is scoped to the authenticated student.
+
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/learning/books` | Signed-in user | List available books, grouped by level and subject |
+| `GET` | `/api/learning/books?manage=true` | Admin | Include archived books |
+| `GET` | `/api/learning/books/:id/file` | Signed-in user | Read or download an authorized document |
+| `GET` | `/api/learning/books/:id/preview` | Signed-in user | Get a safe format-aware preview |
+| `GET` | `/api/learning/summary` | Signed-in account | Read that account's progress summary |
+| `PUT` | `/api/learning/books/:id/progress` | Student | Save a format-aware position and completion status |
+| `PATCH` | `/api/learning/books/:id` | Admin | Edit book details or student availability |
+| `POST` | `/api/learning/books/upload` | Admin | Upload a validated draft document |
+| `POST` | `/api/learning/books/:id/file` | Admin | Replace a document with the same format |
+| `POST` | `/api/learning/books/:id/retry` | Admin | Revalidate and retry an import |
+| `DELETE` | `/api/learning/books/:id` | Admin | Delete a document and its saved progress |
+
+## Classes API
+
+Every route below requires authentication. Admin only routes are marked.
+
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/classes` | Signed-in user | List classes visible to the current user |
+| `GET` | `/api/classes/people/teachers` | Admin | List active teachers for assignment |
+| `GET` | `/api/classes/people/students` | Admin | List active students for enrollment |
+| `POST` | `/api/classes` | Admin | Create a class and assign its teacher and students |
+| `PATCH` | `/api/classes/:id` | Admin | Update class details and roster |
+| `DELETE` | `/api/classes/:id` | Admin | Archive a class while preserving history |
+| `GET` | `/api/classes/:id` | Class member or admin | View class details and live/recent session |
+| `GET` | `/api/classes/:id/sessions` | Class member or admin | List class session history |
+| `GET` | `/api/classes/:id/invitations` | Assigned teacher or admin | List invitation delivery statuses |
+| `POST` | `/api/classes/:id/invitations` | Assigned teacher or admin | Send private invitations to enrolled student IDs |
+| `POST` | `/api/classes/:id/invitations/:invitationId/resend` | Assigned teacher or admin | Rotate the expiring token and resend |
+| `DELETE` | `/api/classes/:id/invitations/:invitationId` | Assigned teacher or admin | Revoke an invitation |
+| `POST` | `/api/classes/invitations/:token/accept` | Signed-in invited student | Verify invitation identity and enrollment |
+| `POST` | `/api/classes/:id/sessions` | Assigned teacher or admin | Start a live session |
+| `GET` | `/api/classes/join/:sessionCode` | Enrolled member or admin | Resolve a live join link |
+| `GET` | `/api/classes/sessions/:sessionId` | Class member or admin | Get live session details |
+| `POST` | `/api/classes/sessions/:sessionId/livekit-token` | Enrolled member or admin | Create a short lived LiveKit token after authorization |
+| `GET` | `/api/classes/sessions/:sessionId/notes` | Class member or admin | Read saved session notes |
+| `PUT` | `/api/classes/sessions/:sessionId/notes` | Assigned teacher or admin | Save notes with revision conflict protection |
+| `POST` | `/api/classes/sessions/:sessionId/end` | Assigned teacher or admin | End class and generate attendance report |
+| `GET` | `/api/classes/sessions/:sessionId/report` | Assigned teacher or admin | Read the completed attendance report |
+| `PATCH` | `/api/classes/sessions/:sessionId/attendance/:studentId` | Assigned teacher or admin | Correct attendance with an audit reason |
+| `GET` | `/api/classes/:id/report.pdf` | Assigned teacher or admin | Generate a PDF filtered by date, student, session, or class |
+
+Socket.IO handles authenticated room membership, chat, and attendance presence. Live media flows through LiveKit and is not recorded by QuickLink. `server/scripts/classroom-smoke.js` exercises the admin, teacher, student, class, join, chat, attendance, and report API flow against the configured local MongoDB database.
+
+## Book catalog behavior
+
+The directory structure supplies the initial level and subject:
+
+```text
+server/src/books/
+  L3/<subject>/*.{pdf,doc,docx,txt,md,ppt,pptx,xls,xlsx}
+  L4/<subject>/*.{pdf,doc,docx,txt,md,ppt,pptx,xls,xlsx}
+  L5/<subject>/*.{pdf,doc,docx,txt,md,ppt,pptx,xls,xlsx}
 ```
-quicklink/
-├─ server/                  Express API
-│  ├─ src/
-│  │  ├─ config/            env + db connection
-│  │  ├─ controllers/       auth, users, schools, students, notifications, dashboard, reports
-│  │  ├─ middleware/        auth, validation, error handling
-│  │  ├─ models/            User, Holding, School, Student, Notification, AuditLog
-│  │  ├─ routes/            API route definitions
-│  │  ├─ services/          PDF builder, owner bootstrap
-│  │  ├─ scripts/seed.js    seed data
-│  │  ├─ utils/             ApiError, asyncHandler, token, validators
-│  │  ├─ app.js             express app
-│  │  └─ index.js           server entrypoint
-│  └─ tests/                node:test + supertest integration tests
-├─ client/                  React PWA
-│  ├─ public/               manifest, service worker, icons
-│  └─ src/
-│     ├─ api/               axios client
-│     ├─ components/        layout + UI components
-│     ├─ context/           auth, sync, toast providers
-│     ├─ lib/               indexeddb, sync engine, reports, formatting
-│     └─ pages/             dashboard, schools, students, reports, users, sync, settings
-├─ docker-compose.yml
-└─ .env.example
-```
 
-## Local development
+On refresh, the server validates supported files and creates or updates catalog entries. Admin-edited metadata, availability, and archive status are retained. Store source files on persistent server storage so the API can serve them to readers.
 
-### Prerequisites
+## Verification commands
 
-- Node.js 20+
-- A running MongoDB (local service or MongoDB Atlas connection string)
-
-### 1. Backend
+Run from the repository root:
 
 ```bash
-cd server
-cp .env.example .env        # then edit values
-npm install
-npm run seed                # optional: load demo holdings + schools
-npm run dev                 # starts the API locally (deployed: https://quicklink-3eng.onrender.com)
+npm --prefix server test
+npm run build
+npm --prefix server run smoke:learning
+npm --prefix server run smoke:courses
+npm --prefix server run smoke:library-lifecycle
+npm --prefix server run smoke:classroom
 ```
 
-On first boot the server creates the initial owner account from `OWNER_*` in `.env`.
-New users can self-register via the app; an owner approves them before first sign-in.
+The learning and course smoke commands use the running local API and configured MongoDB, and remove their temporary records. The library lifecycle command starts an isolated API against a unique temporary MongoDB database and document directory, then drops both. The classroom command exercises the API, Socket.IO, chat, notes, attendance, and reports. LiveKit token/media testing requires `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET`; without them, the smoke reports media as skipped. Separate lint and TypeScript scripts are not configured in this repository.
 
-### 2. Frontend
+## Deployment and storage
 
-```bash
-cd client
-cp .env.example .env
-npm install
-npm run dev                 # starts the Vite dev server (deployed: https://quicklink-zeta.vercel.app)
-```
+- Use MongoDB reachable by the API service. Mount persistent storage for `LEARNING_BOOKS_DIR`, `BOOK_COVER_DIR`, `COURSE_IMAGE_DIR`, and `SUBMISSIONS_DIR`; database records refer to those files. Back up the storage together with MongoDB.
+- Configure a strong `JWT_SECRET`, `CORS_ORIGIN`, and HTTPS. Keep LiveKit and SMTP credentials on the server. The API host must allow WebSocket upgrades for Socket.IO.
+- Configure `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` for live media. Set `SMTP_URL`, `MAIL_FROM`, and `APP_URL` to send class invitations. Without SMTP, invitation records show delivery failure.
+- Set client `VITE_API_URL` to the deployed API origin if no development proxy or same-origin deployment is used.
 
-The Vite dev server proxies `/api` to the API (defaults to the deployed
-`https://quicklink-3eng.onrender.com`, see `vite.config.js`),
-so `VITE_API_URL` can stay empty during development.
+## Known limitations
 
-### 3. Sign in
-
-Use the `OWNER_EMAIL` / `OWNER_PASSWORD` from `server/.env`
-(defaults: `owner@quicklink.local` / `ChangeMe123!` — change these).
-
-## Environment variables
-
-Backend (`server/.env`):
-
-| Variable | Description | Default |
-| --- | --- | --- |
-| `NODE_ENV` | `development` / `production` / `test` | `development` |
-| `PORT` | API port | `4000` |
-| `MONGODB_URI` | MongoDB connection string | `mongodb://127.0.0.1:27017/quicklink` |
-| `JWT_SECRET` | Token signing secret (required in production) | dev fallback |
-| `JWT_EXPIRES_IN` | Token lifetime | `12h` |
-| `CORS_ORIGIN` | Comma-separated allowed origins | `https://quicklink-zeta.vercel.app` |
-| `OWNER_NAME` / `OWNER_EMAIL` / `OWNER_PASSWORD` | Initial owner account | see example |
-| `ORG_NAME` / `ORG_SUBTITLE` | Report header text | QuickLink defaults |
-| `TRUST_PROXY` | Set `true` behind a reverse proxy | `false` |
-
-Frontend (`client/.env`):
-
-| Variable | Description |
-| --- | --- |
-| `VITE_API_URL` | Public API base URL. Empty = same origin / dev proxy |
-
-## Seed data
-
-`npm run seed` (in `server/`) clears schools and holdings, then creates three holdings,
-five districts and 36 school records (including intentionally incomplete ones) so the
-dashboard and reports have realistic data. It does not delete user accounts.
-
-## Testing
-
-Integration tests use `node:test`, `supertest` and (by default) an in-memory MongoDB
-that is downloaded on first run. If the in-memory server is unavailable, set
-`TEST_USE_MEMORY=false` to run against a local test database instead.
-
-```bash
-cd server
-npm test                     # in-memory MongoDB
-TEST_USE_MEMORY=false npm test   # use ${MONGODB_URI} test database
-```
-
-The suite covers: authentication, protected routes, school creation, automatic trade
-totals, negative/unknown value handling, independent record persistence, duplicate
-detection and confirmation, edit, archive/restore, history, search/filter, idempotent
-offline sync (`clientId`), dashboard aggregation, account creation, password change,
-owner notifications, student enrolment/update/removal, candidate index-number
-uniqueness, per-account student isolation, student register CSV export, multi-page PDF
-generation and CSV export.
-
-## API reference
-
-All routes are under `/api`. `GET /health` (liveness) and `GET /health/ready`
-(database readiness) live at the root. Except `/api/health`, `/api/auth/login` and
-`/api/auth/register`, every route requires `Authorization: Bearer <token>`.
-
-| Method | Path | Description |
-| --- | --- | --- |
-| `GET` | `/health` · `/health/ready` | Liveness / readiness probes |
-| `GET` | `/api/health` | API health check |
-| `POST` | `/auth/register` | Self-register (creates a *pending* account) |
-| `POST` | `/auth/login` | Sign in, returns JWT |
-| `GET` | `/auth/me` | Current user |
-| `POST` | `/auth/change-password` | Change own password |
-| `GET` | `/users` | List accounts (owner only) |
-| `GET` | `/users/pending` | List pending registrations (owner only) |
-| `POST` | `/users` | Create account (owner only) |
-| `POST` | `/users/:id/approve` · `/users/:id/reject` | Approve/reject a registration (owner only) |
-| `PATCH` | `/users/:id` | Update account (name, active, password) (owner only) |
-| `GET` | `/schools` | List/search/filter (`search, holding, district, status, incomplete, from, to, page, limit, sort`) |
-| `POST` | `/schools` | Create school (idempotent via `clientId`) |
-| `GET` | `/schools/check-duplicate` | Duplicate check (`schoolName`, `holding`) |
-| `GET` | `/schools/:id` | Get one school |
-| `PATCH` | `/schools/:id` | Update school |
-| `POST` | `/schools/:id/archive` | Archive |
-| `POST` | `/schools/:id/restore` | Restore |
-| `GET` | `/schools/:id/history` | Audit history |
-| `GET` | `/students` | List/search/filter (`search, school, trade, status, level, district, page, limit`) |
-| `POST` | `/students` | Enrol a student (auto index number if omitted) |
-| `GET` | `/students/stats` | Learner insights + certification readiness |
-| `GET` | `/students/export` | CSV student/candidate register |
-| `GET` | `/students/:id` | Get one student |
-| `PATCH` | `/students/:id` | Update student |
-| `DELETE` | `/students/:id` | Remove student |
-| `GET` | `/notifications` | List notifications + unread count |
-| `POST` | `/notifications/:id/read` | Mark one notification read |
-| `POST` | `/notifications/read-all` | Mark all notifications read |
-| `GET` | `/dashboard` | Aggregated statistics |
-| `GET` | `/reports/meta` | Report types + trade labels |
-| `GET` | `/reports/preview/:type` | JSON preview data |
-| `GET` | `/reports/pdf/:type` | Download PDF |
-| `GET` | `/reports/csv/:type` | Download CSV |
-| `GET` | `/reports/{pdf,csv,preview}/school/:id` | Individual school report |
-
-`:type` is one of `all`, `holding`, `district`, `range`.
-
-## Reports
-
-Reports are rendered server-side with **PDFKit** for reliable pagination. Each report
-includes the organization heading/logo, title, holding, district, reporting period, a
-school-by-school table with per-trade counts and totals, combined totals and trade
-breakdown, per-school feedback, missing-data notes, and a footer with generation date
-and page numbers. Table headers repeat across pages and long feedback wraps safely.
-The app also offers an HTML preview before export, plus CSV export for analysis.
-
-## Offline & PWA
-
-- `client/public/manifest.webmanifest` + `sw.js` make the app installable. The service
-  worker caches the app shell but **never caches `/api`** traffic.
-- New school records captured offline are stored in IndexedDB and shown on the **Sync**
-  page as **Pending Sync**. They are pushed to the server on reconnect or on demand.
-- Records only show **Synced** after MongoDB confirms the write. Failed syncs show
-  **Sync Failed** with the error and can be retried.
-- Each offline record carries a `clientId`; the API is idempotent on that id, so retries
-  and duplicate submissions are safe.
-
-## Deployment
-
-### Option A — Docker Compose (everything)
-
-```bash
-# from the project root
-export JWT_SECRET="a-long-random-secret"
-export OWNER_EMAIL="you@example.com"
-export OWNER_PASSWORD="a-strong-password"
-docker compose up --build
-# client: https://quicklink-zeta.vercel.app   api: https://quicklink-3eng.onrender.com
-```
-
-The client's nginx proxies `/api` to the `server` service and MongoDB data is persisted
-in the `mongo-data` volume.
-
-### Option B — Managed services
-
-**MongoDB** — create a free cluster on MongoDB Atlas, create a database user, allow your
-host IPs, and copy the connection string into `MONGODB_URI`.
-
-**Backend (Render)** — the live service is `quicklink-rwanda-school`
-(`https://quicklink-3eng.onrender.com`). Configure it as:
-
-| Setting | Value |
-| --- | --- |
-| Root Directory | `server` |
-| Build Command | `npm ci` |
-| Start Command | `npm start` |
-| Health Check Path | `/health` |
-
-Environment variables: `NODE_ENV=production`, `MONGODB_URI`, `JWT_SECRET`,
-`JWT_EXPIRES_IN=12h`, `CORS_ORIGIN=https://quicklink-zeta.vercel.app`,
-`OWNER_EMAIL`, `OWNER_PASSWORD`, `TRUST_PROXY=true`. (`PORT` is set by Render.)
-A matching `render.yaml` blueprint is included. **Note:** the build command must be
-`npm ci` (or `npm install`) — using `npm run dev` as the build command skips dependency
-installation and crashes with `Cannot find package 'express'`.
-
-**Frontend (Vercel)** — the live site is `https://quicklink-zeta.vercel.app`, project
-root `client`, framework **Vite**, output `dist`. Set `VITE_API_URL` to the backend URL
-(`https://quicklink-3eng.onrender.com`) in Vercel → Settings → Environment Variables for
-the Production environment (a built-in fallback exists in `src/api/client.js`). SPA
-routing is configured by `client/vercel.json`, which rewrites unknown paths to
-`index.html` so deep links like `/schools` load instead of returning 404.
-
-**Important:** serve over HTTPS so the service worker and install prompt work.
-
-## Security notes
-
-- Passwords are bcrypt-hashed and never serialized to clients.
-- Login is rate-limited; failures return a generic message that does not reveal whether
-  an email exists.
-- JWT tokens are invalidated when the password changes.
-- All school and user routes require authentication. There is no public registration.
-- Set a strong, unique `JWT_SECRET` and change the default owner password before
-  exposing the API publicly.
+- Legacy DOC/PPT/XLS files are validated and downloadable but do not have an embedded preview. PPTX preview extracts slide text, not visual slide layouts. XLSX preview is a bounded text/table preview.
+- Live media requires LiveKit Cloud credentials and browser device permissions. Those credentials were unavailable during this local verification, so a real LiveKit media connection was not verified.
+- Uploaded files use server filesystem storage. Ephemeral deployment disks lose uploaded documents and images after redeploy; configure a persistent mounted volume.

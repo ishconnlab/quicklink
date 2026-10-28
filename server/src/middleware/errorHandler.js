@@ -7,9 +7,25 @@ export const notFound = (req, _res, next) => {
 
 // eslint-disable-next-line no-unused-vars
 export const errorHandler = (err, _req, res, _next) => {
-  let statusCode = err.statusCode || 500;
+  let statusCode = err.statusCode || err.status || 500;
   let message = err.message || 'Internal server error';
   let details = err.details || null;
+
+  // Express/body-parser attach an HTTP status to malformed and oversized
+  // request bodies. Preserve those client errors instead of reporting 500.
+  if (err.type === 'entity.parse.failed') {
+    statusCode = 400;
+    message = 'Request body contains invalid JSON';
+    details = null;
+  } else if (err.type === 'entity.too.large') {
+    statusCode = 413;
+    message = 'Request body is too large';
+    details = null;
+  } else if (err.name === 'MulterError') {
+    statusCode = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+    message = err.code === 'LIMIT_FILE_SIZE' ? 'Uploaded file exceeds the configured size limit' : 'The uploaded file request is invalid';
+    details = null;
+  }
 
   if (err.name === 'ValidationError') {
     statusCode = 400;
@@ -32,6 +48,10 @@ export const errorHandler = (err, _req, res, _next) => {
     // Log server errors for diagnosis, never leak internals to the client in prod.
     console.error('[error]', err);
     if (config.isProd) message = 'Internal server error';
+  }
+
+  if (res.headersSent) {
+    return res.destroy(err);
   }
 
   res.status(statusCode).json({

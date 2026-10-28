@@ -1,7 +1,7 @@
 {
-  "name": "QuickLink School Data Collection",
+  "name": "QuickLink",
   "short_name": "QuickLink",
-  "description": "Collect, monitor and report school data online and offline.",
+  "description": "Read course books and track student learning progress.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -8,8 +8,10 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const logout = useCallback(() => {
+    const token = getToken();
     setToken(null);
     setUser(null);
+    if (token) api.post('/auth/logout', {}, { headers: { Authorization: `Bearer ${token}` } }).catch(() => {});
   }, []);
 
   const loadUser = useCallback(async () => {
@@ -43,36 +45,15 @@ export function AuthProvider({ children }) {
     return res.data.data.user;
   }, []);
 
-  // Public self-registration. The account starts pending until an owner
-  // approves it, so we do not sign the user in here.
-  const register = useCallback(async ({ name, email, password }) => {
-    const res = await api.post('/auth/register', { name, email, password });
-    return res.data.data;
-  }, []);
-
-  // Parent onboarding via a school invitation: creates a parent account and
-  // signs them in immediately (the guardian link still needs school approval).
-  const registerParent = useCallback(async ({ token, name, email, password, relationship }) => {
-    const res = await api.post('/auth/register-parent', {
-      token,
-      name,
-      email,
-      password,
-      relationship,
-    });
-    setToken(res.data.data.token);
-    setUser(res.data.data.user);
-    return res.data.data;
-  }, []);
-
-  // An already signed-in user accepts an invitation.
-  const acceptInvitation = useCallback(async (token) => {
-    const res = await api.post('/guardians/invitations/accept', { token });
-    return res.data.data;
+  const register = useCallback(async (name, email, password, educationLevel) => {
+    const res = await api.post('/auth/register', { name, email, password, educationLevel });
+    return res.data.data.user;
   }, []);
 
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     await api.post('/auth/change-password', { currentPassword, newPassword });
+    setToken(null);
+    setUser(null);
   }, []);
 
   return (
@@ -82,8 +63,6 @@ export function AuthProvider({ children }) {
         loading,
         login,
         register,
-        registerParent,
-        acceptInvitation,
         logout,
         changePassword,
         refresh: loadUser,

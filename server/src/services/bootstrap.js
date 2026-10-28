@@ -1,8 +1,7 @@
 import { User } from '../models/User.js';
 import config from '../config/env.js';
 
-// Ensure at least one owner account exists. The owner approves new
-// registrations and owns the initial (seeded) data set.
+// Ensure the initial QuickLink admin account exists.
 export async function ensureOwnerAccount() {
   const count = await User.countDocuments({});
   if (count > 0) return null;
@@ -14,7 +13,6 @@ export async function ensureOwnerAccount() {
     name: config.owner.name,
     email: config.owner.email,
     role: 'owner',
-    approvalStatus: 'approved',
   });
   await user.setPassword(config.owner.password);
   await user.save();

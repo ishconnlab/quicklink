@@ -3,7 +3,7 @@ import config from '../config/env.js';
 
 export function signToken(user) {
   return jwt.sign(
-    { sub: user._id.toString(), role: user.role },
+    { sub: user._id.toString(), role: user.role, ver: user.tokenVersion || 0 },
     config.jwtSecret,
     { expiresIn: config.jwtExpiresIn }
   );
