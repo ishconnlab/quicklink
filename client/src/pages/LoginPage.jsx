@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Link } from 'react-router-dom';
-import { LogIn, Mail, Lock, AlertCircle } from 'lucide-react';
+import { LogIn, Mail, Lock, AlertCircle, Wifi, WifiOff, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
-import { apiError } from '../api/client.js';
+import api, { apiError } from '../api/client.js';
 import { Spinner } from '../components/ui.jsx';
 
 export default function LoginPage() {
@@ -14,6 +14,34 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [serverStatus, setServerStatus] = useState('checking');
+
+  const checkServer = useCallback(async () => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setServerStatus('offline');
+      return;
+    }
+    setServerStatus('checking');
+    try {
+      await api.get('/health', { timeout: 60000 });
+      setServerStatus('online');
+    } catch (requestError) {
+      const failure = apiError(requestError);
+      setServerStatus(failure.timeout ? 'starting' : 'offline');
+    }
+  }, []);
+
+  useEffect(() => {
+    checkServer();
+    const onOnline = () => checkServer();
+    const onOffline = () => setServerStatus('offline');
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => {
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('offline', onOffline);
+    };
+  }, [checkServer]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -24,7 +52,10 @@ export default function LoginPage() {
       const destination = location.state?.from;
       navigate(destination ? `${destination.pathname}${destination.search || ''}` : account.role === 'owner' ? '/learning' : account.role === 'teacher' ? '/classes' : '/dashboard', { replace: true });
     } catch (err) {
-      setError(apiError(err).message);
+      const failure = apiError(err);
+      setError(failure.message);
+      if (failure.offline) setServerStatus('offline');
+      else if (failure.timeout) setServerStatus('starting');
     } finally {
       setLoading(false);
     }
@@ -49,6 +80,23 @@ export default function LoginPage() {
             <p className="mt-1 text-sm text-slate-500">
               Student learning library
             </p>
+
+            <div className={`mt-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${
+              serverStatus === 'online' ? 'bg-emerald-50 text-emerald-800'
+                : serverStatus === 'checking' || serverStatus === 'starting' ? 'bg-amber-50 text-amber-800'
+                  : 'bg-red-50 text-red-700'
+            }`} role="status" aria-live="polite">
+              {serverStatus === 'online' ? <Wifi size={15} />
+                : serverStatus === 'checking' || serverStatus === 'starting' ? <Spinner size={15} />
+                  : <WifiOff size={15} />}
+              <span className="flex-1">
+                {serverStatus === 'online' ? 'QuickLink server connected'
+                  : serverStatus === 'checking' ? 'Checking connection to QuickLink…'
+                    : serverStatus === 'starting' ? 'QuickLink server is starting up; this may take a moment.'
+                      : 'Cannot reach QuickLink. Check your connection, then retry.'}
+              </span>
+              {(serverStatus === 'offline' || serverStatus === 'starting') && <button type="button" onClick={checkServer} className="inline-flex items-center gap-1 font-semibold hover:underline"><RefreshCw size={13} />Retry</button>}
+            </div>
 
             {error && (
               <div className="mt-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">

@@ -39,7 +39,7 @@ export function AuthProvider({ children }) {
   }, [loadUser]);
 
   const login = useCallback(async (email, password) => {
-    const res = await api.post('/auth/login', { email, password });
+    const res = await api.post('/auth/login', { email, password }, { timeout: 60000 });
     setToken(res.data.data.token);
     setUser(res.data.data.user);
     return res.data.data.user;

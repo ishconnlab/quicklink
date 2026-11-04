@@ -13,7 +13,7 @@ export function setToken(token) {
 // Backend base URL. VITE_API_URL always wins; when it is not provided in a
 // production build we fall back to the deployed Render API so the frontend
 // still reaches the backend. In development an empty value uses the Vite proxy.
-const RAW_BASE = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '');
+const RAW_BASE = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '').replace(/\/api$/i, '');
 const API_BASE = RAW_BASE || (import.meta.env.PROD ? 'https://quicklink-3eng.onrender.com' : '');
 
 const api = axios.create({
@@ -44,10 +44,28 @@ api.interceptors.response.use(
 
 // Normalises backend errors into a predictable shape for the UI.
 export function apiError(error) {
-  if (error.code === 'ERR_NETWORK' || !error.response) {
+  if (error.code === 'ERR_NETWORK') {
     return {
-      message: 'You appear to be offline. The request could not reach the server.',
+      message: 'Could not connect to the QuickLink server. Check your connection or try again.',
       offline: true,
+      details: null,
+    };
+  }
+  if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+    return {
+      message: 'The QuickLink server is taking too long to respond. It may be starting up; please try again.',
+      offline: false,
+      timeout: true,
+      details: null,
+    };
+  }
+  if (error.code === 'ERR_CANCELED') {
+    return { message: 'The request was cancelled. Please try again.', offline: false, details: null };
+  }
+  if (!error.response) {
+    return {
+      message: error.message || 'The request could not be completed. Please try again.',
+      offline: false,
       details: null,
     };
   }
