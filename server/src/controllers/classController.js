@@ -10,7 +10,7 @@ import { LearningBook } from '../models/LearningBook.js';
 import { LearningProgress } from '../models/LearningProgress.js';
 import { LiveSession } from '../models/LiveSession.js';
 import { emitClassSessionEnded } from '../services/classRealtime.js';
-import { AccessToken } from 'livekit-server-sdk';
+import { AccessToken, TrackSource } from 'livekit-server-sdk';
 import config from '../config/env.js';
 
 const personFields = 'name email role isActive';
@@ -372,7 +372,16 @@ export const joinByCode = asyncHandler(async (req, res) => {
   });
   if (!session || session.status !== 'live') throw ApiError.notFound('This class link is no longer live.');
   await assertClassAccess(session.learningClass, req.user);
-  res.json({ success: true, data: { session: sessionJson(session), class: classJson(session.learningClass), mediaConfigured: Boolean(config.livekit.url && config.livekit.apiKey && config.livekit.apiSecret) } });
+  res.json({
+    success: true,
+    data: {
+      session: sessionJson(session),
+      class: classJson(session.learningClass),
+      mediaConfigured: Boolean(config.livekit.url && config.livekit.apiKey && config.livekit.apiSecret),
+      canShareScreen: req.user.role !== 'student'
+        || session.screenShareAllowed.some((studentId) => studentId.toString() === req.user._id.toString()),
+    },
+  });
 });
 
 export const getSession = asyncHandler(async (req, res) => {
@@ -381,7 +390,16 @@ export const getSession = asyncHandler(async (req, res) => {
   });
   if (!session) throw ApiError.notFound('Class session not found');
   await assertClassAccess(session.learningClass, req.user);
-  res.json({ success: true, data: { session: sessionJson(session), class: classJson(session.learningClass), mediaConfigured: Boolean(config.livekit.url && config.livekit.apiKey && config.livekit.apiSecret) } });
+  res.json({
+    success: true,
+    data: {
+      session: sessionJson(session),
+      class: classJson(session.learningClass),
+      mediaConfigured: Boolean(config.livekit.url && config.livekit.apiKey && config.livekit.apiSecret),
+      canShareScreen: req.user.role !== 'student'
+        || session.screenShareAllowed.some((studentId) => studentId.toString() === req.user._id.toString()),
+    },
+  });
 });
 
 export const createLiveKitToken = asyncHandler(async (req, res) => {
@@ -399,7 +417,18 @@ export const createLiveKitToken = asyncHandler(async (req, res) => {
     name: req.user.name,
     ttl: '2h',
   });
-  token.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
+  const canShareScreen = req.user.role !== 'student'
+    || session.screenShareAllowed.some((studentId) => studentId.toString() === req.user._id.toString());
+  token.addGrant({
+    roomJoin: true,
+    room,
+    canPublish: true,
+    canSubscribe: true,
+    canPublishData: true,
+    canPublishSources: canShareScreen
+      ? [TrackSource.MICROPHONE, TrackSource.CAMERA, TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO]
+      : [TrackSource.MICROPHONE, TrackSource.CAMERA],
+  });
   res.json({ success: true, data: { serverUrl: config.livekit.url, token: await token.toJwt(), room } });
 });
 

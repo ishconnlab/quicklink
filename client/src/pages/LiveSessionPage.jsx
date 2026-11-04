@@ -86,6 +86,8 @@ export default function LiveSessionPage() {
   const [micOn, setMicOn] = useState(true);
   const [cameraOn, setCameraOn] = useState(true);
   const [sharing, setSharing] = useState(false);
+  const [screenShareRequested, setScreenShareRequested] = useState(false);
+  const [requestingScreenShareId, setRequestingScreenShareId] = useState('');
   const [ending, setEnding] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const roomRef = useRef(null);
@@ -108,11 +110,16 @@ export default function LiveSessionPage() {
 
   useEffect(() => {
     let active = true;
-    api.get(`/classes/sessions/${sessionId}`).then((response) => { if (active) setData(response.data.data); })
+    api.get(`/classes/sessions/${sessionId}`).then((response) => {
+      if (active) {
+        setData(response.data.data);
+        setScreenShareRequested(user?.role === 'student' && Boolean(response.data.data.canShareScreen));
+      }
+    })
       .catch((error) => toast.error(apiError(error).message))
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [sessionId]);
+  }, [sessionId, user?.role]);
 
   useEffect(() => {
     if (!data?.session?.startedAt) return undefined;
@@ -256,6 +263,10 @@ export default function LiveSessionPage() {
       if (panelRef.current !== 'chat') setUnread((count) => count + 1);
     });
     socket.on('chat:updated', (message) => setMessages((current) => current.map((item) => item.id === message.id ? message : item)));
+    socket.on('screen-share:requested', ({ requestedBy } = {}) => {
+      setScreenShareRequested(true);
+      toast.info(`${requestedBy || 'Your teacher'} asked you to share your screen. Choose Share screen when ready.`);
+    });
     socket.on('session:ended', () => navigate(`/classes/sessions/${sessionId}/report`, { replace: true }));
   };
 
@@ -320,8 +331,21 @@ export default function LiveSessionPage() {
     catch (error) { toast.error(error.message || 'Could not change camera state.'); }
   };
   const toggleScreenShare = async () => {
+    if (!isTeacher && !screenShareRequested) {
+      toast.error('Your teacher or an admin must request screen sharing first.');
+      return;
+    }
     try { await roomRef.current?.localParticipant.setScreenShareEnabled(!sharing, { audio: false }); setSharing((value) => !value); }
     catch (error) { toast.info(error?.name === 'NotAllowedError' ? 'Screen sharing was cancelled.' : 'This browser or device does not support screen sharing.'); }
+  };
+  const requestParticipantScreenShare = (person) => {
+    if (!person?.userId || !socketRef.current?.connected || requestingScreenShareId) return;
+    setRequestingScreenShareId(person.userId);
+    socketRef.current.emit('screen-share:request', { studentId: person.userId }, (result) => {
+      setRequestingScreenShareId('');
+      if (result?.ok) toast.success(`Screen sharing requested from ${person.name}.`);
+      else toast.error(result?.message || 'Could not request screen sharing.');
+    });
   };
   const setActiveLayout = (next) => { setLayout(next); sessionStorage.setItem(`quicklink.layout.${sessionId}`, next); };
 
@@ -396,11 +420,12 @@ export default function LiveSessionPage() {
         {layout === 'pip' && <div className="relative min-h-[320px] overflow-hidden rounded-xl bg-slate-900"><div className="absolute inset-0"><MediaTile participant={activeSpeaker} local={isLocal(activeSpeaker)} speaking /></div><div className="absolute bottom-3 right-3 z-10 flex max-w-[70%] gap-2 overflow-x-auto">{secondary.map((person) => <div key={person.identity} className="w-32 shrink-0"><MediaTile participant={person} local={isLocal(person)} /></div>)}</div></div>}
         {layout === 'compact' && <div className="space-y-2"><div className="min-h-[300px]"><MediaTile participant={screenOwner || activeSpeaker} preferredSource={screenOwner ? Track.Source.ScreenShare : Track.Source.Camera} local={isLocal(screenOwner || activeSpeaker)} /></div><div className="flex gap-2 overflow-x-auto pb-2">{liveParticipants.filter((person) => person.identity !== (screenOwner || activeSpeaker)?.identity).map((person) => <div key={person.identity} className="w-36 shrink-0"><MediaTile participant={person} local={isLocal(person)} /></div>)}</div></div>}
         </>}
-        <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl bg-white p-3 shadow-sm">{connected && <><button onClick={toggleMic} className={micOn ? 'btn-secondary' : 'btn-danger'} title={micOn ? 'Mute microphone' : 'Turn microphone on'}>{micOn ? <Mic size={17} /> : <MicOff size={17} />}<span className="hidden sm:inline">{micOn ? 'Mute' : 'Unmute'}</span></button><button onClick={toggleCamera} className={cameraOn ? 'btn-secondary' : 'btn-danger'} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>{cameraOn ? <Camera size={17} /> : <CameraOff size={17} />}<span className="hidden sm:inline">{cameraOn ? 'Camera off' : 'Camera on'}</span></button>{isTeacher && <button onClick={toggleScreenShare} className={sharing ? 'btn-primary' : 'btn-secondary'}><MonitorUp size={17} />{sharing ? 'Stop sharing' : 'Share screen'}</button>}</>}<span className="flex items-center gap-1 px-2 text-xs text-slate-500"><Users size={15} />{chatOnly ? socketPeople.length : participants.length}</span>{isTeacher && <button onClick={() => { disconnectRoom(); navigate(`/classes/${data.class.id}`); }} className="btn-secondary"><PhoneOff size={17} />Leave room</button>}{isTeacher ? <button onClick={endSession} disabled={ending} className="btn-danger">{ending ? <Spinner size={16} /> : <PhoneOff size={17} />}End class</button> : <button onClick={() => { disconnectRoom(); navigate(`/classes/${data.class.id}`); }} className="btn-danger"><PhoneOff size={17} />Leave</button>}</div>
-        {isTeacher && <p className="text-center text-xs text-slate-400">Screen sharing is available to teachers. Students can share only when enabled by their teacher.</p>}
+        <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl bg-white p-3 shadow-sm">{connected && <><button onClick={toggleMic} className={micOn ? 'btn-secondary' : 'btn-danger'} title={micOn ? 'Mute microphone' : 'Turn microphone on'}>{micOn ? <Mic size={17} /> : <MicOff size={17} />}<span className="hidden sm:inline">{micOn ? 'Mute' : 'Unmute'}</span></button><button onClick={toggleCamera} className={cameraOn ? 'btn-secondary' : 'btn-danger'} title={cameraOn ? 'Turn camera off' : 'Turn camera on'}>{cameraOn ? <Camera size={17} /> : <CameraOff size={17} />}<span className="hidden sm:inline">{cameraOn ? 'Camera off' : 'Camera on'}</span></button>{(isTeacher || screenShareRequested) && <button onClick={toggleScreenShare} className={sharing ? 'btn-primary' : 'btn-secondary'}><MonitorUp size={17} />{sharing ? 'Stop sharing' : 'Share screen'}</button>}</>}<span className="flex items-center gap-1 px-2 text-xs text-slate-500"><Users size={15} />{chatOnly ? socketPeople.length : participants.length}</span>{isTeacher && <button onClick={() => { disconnectRoom(); navigate(`/classes/${data.class.id}`); }} className="btn-secondary"><PhoneOff size={17} />Leave room</button>}{isTeacher ? <button onClick={endSession} disabled={ending} className="btn-danger">{ending ? <Spinner size={16} /> : <PhoneOff size={17} />}End class</button> : <button onClick={() => { disconnectRoom(); navigate(`/classes/${data.class.id}`); }} className="btn-danger"><PhoneOff size={17} />Leave</button>}</div>
+        {isTeacher && <p className="text-center text-xs text-slate-400">Use the People panel to request a student's screen. The student chooses whether to share, and can stop sharing at any time.</p>}
+        {!isTeacher && screenShareRequested && <p role="status" className="text-center text-sm text-brand-700">Your teacher or an admin requested your screen. Choose Share screen when you are ready; you can stop at any time.</p>}
       </div>
       <aside className="flex min-h-[380px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-white lg:h-[calc(100vh-200px)]"><div className="flex border-b border-slate-100"><button className={`flex-1 px-2 py-3 text-sm ${panel === 'chat' ? 'border-b-2 border-brand-600 font-semibold text-brand-700' : 'text-slate-500'}`} onClick={() => { setPanel('chat'); setUnread(0); }}><MessageSquare size={15} className="mr-1 inline" />Chat{unread ? ` (${unread})` : ''}</button><button className={`flex-1 px-2 py-3 text-sm ${panel === 'notes' ? 'border-b-2 border-brand-600 font-semibold text-brand-700' : 'text-slate-500'}`} onClick={() => setPanel('notes')}>Notes</button><button className={`flex-1 px-2 py-3 text-sm ${panel === 'people' ? 'border-b-2 border-brand-600 font-semibold text-brand-700' : 'text-slate-500'}`} onClick={() => setPanel('people')}><Users size={15} className="mr-1 inline" />People ({participants.length})</button></div>
-        {panel === 'chat' ? <><div className="flex-1 space-y-3 overflow-y-auto p-3" onScroll={(event) => { const el = event.currentTarget; shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>{messages.map((message) => <div key={message.id} className={`rounded-lg p-2 text-sm ${message.pinned ? 'bg-amber-50' : ''}`}><div className="flex items-baseline justify-between gap-2"><span className="truncate font-medium text-slate-700">{message.userId === user?.id ? 'You' : message.name}{message.pinned ? ' · Pinned' : ''}</span><span className="shrink-0 text-[10px] text-slate-400">{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div><p className="mt-0.5 whitespace-pre-wrap break-words text-slate-600">{message.body}</p><div className="mt-1 flex gap-2">{isTeacher && !message.removed && <><button onClick={() => updateChat('chat:pin', message)} className="text-[11px] text-brand-700">{message.pinned ? 'Unpin' : 'Pin'}</button><button onClick={() => updateChat('chat:remove', message)} className="text-[11px] text-red-600">Remove</button></>}{user?.role === 'student' && message.userId !== user?.id && !message.removed && <button onClick={() => reportMessage(message)} className="text-[11px] text-slate-400">Report</button>}</div></div>)}<div ref={chatEndRef} /></div><form onSubmit={sendChat} className="flex gap-2 border-t border-slate-100 p-3"><input className="input min-h-10" value={chat} onChange={(event) => setChat(event.target.value)} maxLength={2000} placeholder="Share a message…" disabled={!connected} /><button className="btn-primary min-h-10 px-3" disabled={!chat.trim() || !connected} aria-label="Send message"><Send size={16} /></button></form></> : panel === 'notes' ? <div className="flex flex-1 flex-col gap-3 p-3"><p className="text-xs leading-5 text-slate-500">Notes are saved with this class session. Teacher changes use revision checks to prevent overwriting a newer version.</p><textarea value={notes} onChange={(event) => setNotes(event.target.value)} readOnly={!isTeacher} maxLength={20000} className="input min-h-48 flex-1 resize-y" placeholder={isTeacher ? 'Add lesson points, links, and summary…' : 'No shared notes yet.'} />{isTeacher && <button onClick={saveNotes} disabled={notesSaving} className="btn-primary self-end">{notesSaving ? <Spinner size={16} /> : <Check size={16} />}Save notes</button>}</div> : <div className="flex-1 space-y-2 overflow-y-auto p-3">{participants.map((person) => <div key={person.identity} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2"><span className="min-w-0 truncate text-sm text-slate-700">{person.name || person.identity}{person.identity === user?.id ? ' (you)' : ''}</span><span className="text-xs text-slate-400">{person.connectionQuality === ConnectionQuality.Poor ? 'Poor connection' : person.isSpeaking ? 'Speaking' : 'Joined'}</span></div>)}</div>}
+        {panel === 'chat' ? <><div className="flex-1 space-y-3 overflow-y-auto p-3" onScroll={(event) => { const el = event.currentTarget; shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>{messages.map((message) => <div key={message.id} className={`rounded-lg p-2 text-sm ${message.pinned ? 'bg-amber-50' : ''}`}><div className="flex items-baseline justify-between gap-2"><span className="truncate font-medium text-slate-700">{message.userId === user?.id ? 'You' : message.name}{message.pinned ? ' · Pinned' : ''}</span><span className="shrink-0 text-[10px] text-slate-400">{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div><p className="mt-0.5 whitespace-pre-wrap break-words text-slate-600">{message.body}</p><div className="mt-1 flex gap-2">{isTeacher && !message.removed && <><button onClick={() => updateChat('chat:pin', message)} className="text-[11px] text-brand-700">{message.pinned ? 'Unpin' : 'Pin'}</button><button onClick={() => updateChat('chat:remove', message)} className="text-[11px] text-red-600">Remove</button></>}{user?.role === 'student' && message.userId !== user?.id && !message.removed && <button onClick={() => reportMessage(message)} className="text-[11px] text-slate-400">Report</button>}</div></div>)}<div ref={chatEndRef} /></div><form onSubmit={sendChat} className="flex gap-2 border-t border-slate-100 p-3"><input className="input min-h-10" value={chat} onChange={(event) => setChat(event.target.value)} maxLength={2000} placeholder="Share a message…" disabled={!connected} /><button className="btn-primary min-h-10 px-3" disabled={!chat.trim() || !connected} aria-label="Send message"><Send size={16} /></button></form></> : panel === 'notes' ? <div className="flex flex-1 flex-col gap-3 p-3"><p className="text-xs leading-5 text-slate-500">Notes are saved with this class session. Teacher changes use revision checks to prevent overwriting a newer version.</p><textarea value={notes} onChange={(event) => setNotes(event.target.value)} readOnly={!isTeacher} maxLength={20000} className="input min-h-48 flex-1 resize-y" placeholder={isTeacher ? 'Add lesson points, links, and summary…' : 'No shared notes yet.'} />{isTeacher && <button onClick={saveNotes} disabled={notesSaving} className="btn-primary self-end">{notesSaving ? <Spinner size={16} /> : <Check size={16} />}Save notes</button>}</div> : <div className="flex-1 space-y-2 overflow-y-auto p-3">{socketPeople.map((person) => <div key={person.socketId} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2"><span className="min-w-0 truncate text-sm text-slate-700">{person.name || person.userId}{person.userId === user?.id ? ' (you)' : ''}</span><div className="flex items-center gap-2"><span className="text-xs text-slate-400">{person.role === 'student' ? 'Student' : 'Teacher'} · {person.userId === user?.id ? 'You' : 'Joined'}</span>{isTeacher && person.role === 'student' && person.userId !== user?.id && <button className="btn-secondary min-h-8 px-2 py-1 text-xs" onClick={() => requestParticipantScreenShare(person)} disabled={requestingScreenShareId === person.userId || chatOnly}>{requestingScreenShareId === person.userId ? <Spinner size={13} /> : <MonitorUp size={13} />}Request screen</button>}</div></div>)}</div>}
       </aside>
     </div>
   </div>;

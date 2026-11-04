@@ -17,6 +17,7 @@ export default function ClassDetailPage() {
   const [item, setItem] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [waitingError, setWaitingError] = useState('');
   const [starting, setStarting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -42,6 +43,26 @@ export default function ClassDetailPage() {
     finally { setLoading(false); }
   }, [id]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (!item || item.liveSession) return undefined;
+    let active = true;
+    const refreshLiveStatus = async () => {
+      try {
+        const response = await api.get(`/classes/${id}`);
+        if (active) {
+          setItem(response.data.data.class);
+          setWaitingError('');
+        }
+      } catch (error) {
+        if (active) setWaitingError(apiError(error).message);
+      }
+    };
+    const timer = window.setInterval(refreshLiveStatus, 10000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [id, item?.id, item?.liveSession?.id]);
 
   const canTeach = user?.role === 'owner' || (user?.role === 'teacher' && (item?.teacher.id === user.id || item?.teachers?.some((teacher) => teacher.id === user.id)));
   const sessionLink = item?.liveSession ? `${window.location.origin}/classes/join/${item.liveSession.sessionCode}` : '';
@@ -151,7 +172,7 @@ export default function ClassDetailPage() {
 
     {item.liveSession ? <section className="card mb-4 border-red-200 bg-red-50/40">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><Badge color="red"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />Live</Badge><span className="text-xs text-slate-500">Started {formatDateTime(item.liveSession.startedAt)}</span></div><h2 className="mt-2 font-semibold text-slate-900">{item.liveSession.title}</h2><p className="mt-1 break-all text-xs text-slate-500">{sessionLink}</p></div><div className="flex shrink-0 gap-2"><button className="btn-secondary" onClick={copyLink}><Copy size={16} />{copied ? 'Copied' : 'Copy link'}</button><Link to={`/classes/sessions/${item.liveSession.id}/live`} className="btn-primary"><Radio size={17} />Join class</Link></div></div>
-    </section> : item.recentSession?.status === 'ended' && <section className="card mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><Badge color="green">Previous class</Badge><span className="text-xs text-slate-500">{formatDateTime(item.recentSession.endedAt)}</span></div><p className="mt-2 text-sm text-slate-600">Attendance report is ready for this session.</p></div>{canTeach && <Link to={`/classes/sessions/${item.recentSession.id}/report`} className="btn-secondary"><FileText size={16} />View report</Link>}</section>}
+    </section> : item.recentSession?.status === 'ended' ? <section className="card mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><Badge color="slate">Not live</Badge><span className="text-xs text-slate-500">Previous session ended {formatDateTime(item.recentSession.endedAt)}</span></div><p className="mt-2 text-sm text-slate-600">Wait here. The join button will appear automatically when your teacher or an admin starts the next live session.</p>{item.startsAt && <p className="mt-1 text-xs text-slate-500">Scheduled start: {formatDateTime(item.startsAt)}</p>}{waitingError && <p role="status" className="mt-2 text-xs text-amber-700">Live status could not refresh: {waitingError}</p>}</div>{canTeach && <Link to={`/classes/sessions/${item.recentSession.id}/report`} className="btn-secondary"><FileText size={16} />View report</Link>}</section> : <section className="card mb-4 border-slate-200 bg-slate-50"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2"><Badge color="slate">Not live</Badge>{item.startsAt && <span className="text-xs text-slate-500">Scheduled start: {formatDateTime(item.startsAt)}</span>}</div><p className="mt-2 text-sm text-slate-700">Wait here until your teacher or an admin starts the live session. This page checks for the session automatically.</p>{waitingError && <p role="status" className="mt-2 text-xs text-amber-700">Live status could not refresh: {waitingError}</p>}</div></div></section>}
 
     <div className="grid gap-4 lg:grid-cols-3">
       <section className="card lg:col-span-1"><h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800"><Users size={17} />Class people</h2><p className="mb-3 text-sm text-slate-600">Teacher: <span className="font-medium text-slate-800">{item.teacher.name}</span></p><div className="space-y-2">{item.students.map((student) => <div key={student.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">{student.name.slice(0, 1).toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-sm font-medium text-slate-700">{student.name}</span><span className="block truncate text-xs text-slate-400">{student.email}</span></span></div>)}{item.students.length === 0 && <p className="text-sm text-slate-400">No students have been enrolled yet.</p>}</div></section>

@@ -4,7 +4,8 @@ import { LearningClass } from '../models/LearningClass.js';
 import { LiveSession } from '../models/LiveSession.js';
 import { ClassChatMessage } from '../models/ClassChatMessage.js';
 import { verifyToken } from '../utils/token.js';
-import { isAllowedOrigin } from '../config/env.js';
+import config, { isAllowedOrigin } from '../config/env.js';
+import { RoomServiceClient, TrackSource } from 'livekit-server-sdk';
 
 let ioInstance;
 const presenceCounts = new Map();
@@ -153,6 +154,56 @@ export function initializeClassRealtime(httpServer) {
       const recipient = io.sockets.sockets.get(target);
       if (!recipient || !recipient.rooms.has(roomName(sessionId))) return;
       recipient.emit('rtc:signal', { from: socket.id, signal: payload.signal });
+    });
+
+    socket.on('screen-share:request', async ({ studentId } = {}, acknowledge = () => {}) => {
+      const sessionId = socket.data.sessionId;
+      if (!sessionId || !/^[0-9a-fA-F]{24}$/.test(String(studentId || ''))) {
+        return acknowledge({ ok: false, message: 'Select a valid student in this live class.' });
+      }
+      try {
+        const session = await LiveSession.findOne({ _id: sessionId, status: 'live' });
+        const classItem = await assertSessionAccess(session, user);
+        const teacherIds = [classItem.teacher, ...(classItem.teachers || [])].map(String);
+        if (user.role !== 'owner' && !teacherIds.includes(user._id)) {
+          return acknowledge({ ok: false, message: 'Only the assigned teacher or an admin can request student screen sharing.' });
+        }
+        if (!classItem.students.some((id) => id.toString() === studentId)) {
+          return acknowledge({ ok: false, message: 'That participant is not an enrolled student in this class.' });
+        }
+        if (!config.livekit.url || !config.livekit.apiKey || !config.livekit.apiSecret) {
+          return acknowledge({ ok: false, message: 'LiveKit is not configured, so screen sharing is unavailable.' });
+        }
+        const room = roomName(sessionId);
+        const peers = await io.in(room).fetchSockets();
+        const studentSockets = peers.filter((peer) => peer.data.user?._id === studentId);
+        if (!studentSockets.length) {
+          return acknowledge({ ok: false, message: 'The student must join the live class before screen sharing can be requested.' });
+        }
+        const allowed = await LiveSession.updateOne(
+          { _id: sessionId, status: 'live' },
+          { $addToSet: { screenShareAllowed: studentId } },
+        );
+        if (!allowed.matchedCount) return acknowledge({ ok: false, message: 'This class has ended.' });
+        try {
+          const roomService = new RoomServiceClient(config.livekit.url, config.livekit.apiKey, config.livekit.apiSecret);
+          await roomService.updateParticipant(`quicklink-${sessionId}`, studentId, {
+            permission: {
+              canPublish: true,
+              canPublishSources: [TrackSource.MICROPHONE, TrackSource.CAMERA, TrackSource.SCREEN_SHARE, TrackSource.SCREEN_SHARE_AUDIO],
+            },
+          });
+        } catch (error) {
+          await LiveSession.updateOne({ _id: sessionId }, { $pull: { screenShareAllowed: studentId } });
+          throw error;
+        }
+        for (const studentSocket of studentSockets) {
+          studentSocket.emit('screen-share:requested', { requestedBy: user.name });
+        }
+        acknowledge({ ok: true, studentId });
+      } catch (error) {
+        acknowledge({ ok: false, message: error.message || 'Could not request screen sharing.' });
+      }
     });
 
     socket.on('chat:send', async ({ body } = {}, acknowledge = () => {}) => {

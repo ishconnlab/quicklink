@@ -41,6 +41,7 @@ const liveSessionSchema = new mongoose.Schema({
   startedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   startedAt: { type: Date, required: true, default: Date.now },
   endedAt: { type: Date, default: null },
+  screenShareAllowed: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   attendance: { type: [attendanceSchema], default: [] },
   report: {
     generatedAt: { type: Date, default: null },
