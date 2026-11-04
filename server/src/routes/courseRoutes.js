@@ -9,8 +9,9 @@ import * as certificates from '../controllers/certificateController.js';
 const router = Router();
 const uploadThumbnail = multer({ storage: multer.memoryStorage(), limits: { fileSize: 3 * 1024 * 1024, files: 1, fields: 0 } });
 const idParams = z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/) });
+const optionalLevel = z.preprocess((value) => value === '' ? undefined : value, z.enum(['L3', 'L4', 'L5']).optional());
 const listQuery = z.object({
-  level: z.enum(['L3', 'L4', 'L5']).optional(),
+  level: optionalLevel,
   subject: z.string().trim().max(120).optional(),
   trade: z.string().trim().max(120).optional(),
   search: z.string().trim().max(120).optional(),

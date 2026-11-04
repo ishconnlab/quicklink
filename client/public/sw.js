@@ -1,5 +1,5 @@
 /* QuickLink service worker: app-shell caching. */
-const CACHE = 'quicklink-shell-v2';
+const CACHE = 'quicklink-shell-v3';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -31,11 +31,13 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE).then((cache) => cache.put('/index.html', copy));
+          if (response.ok) {
+            const copy = response.clone();
+            event.waitUntil(caches.open(CACHE).then((cache) => cache.put('/index.html', copy)).catch(() => {}));
+          }
           return response;
         })
-        .catch(() => caches.match('/index.html'))
+        .catch(async () => (await caches.match('/index.html')) || Response.error())
     );
     return;
   }
@@ -48,11 +50,11 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           if (response.ok && url.origin === self.location.origin) {
             const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
+            event.waitUntil(caches.open(CACHE).then((cache) => cache.put(request, copy)).catch(() => {}));
           }
           return response;
         })
-        .catch(() => cached);
+        .catch(() => cached || Response.error());
     })
   );
 });

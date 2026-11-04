@@ -33,7 +33,8 @@ export default function CoursesPage() {
   const load = useCallback(async (page = 1) => {
     setLoading(true);
     try {
-      const response = await api.get('/courses', { params: { ...filters, page, limit: 12 } });
+      const query = Object.fromEntries(Object.entries(filters).filter(([, value]) => value !== ''));
+      const response = await api.get('/courses', { params: { ...query, page, limit: 12 } });
       setResult(response.data.data);
     } catch (error) { toast.error(apiError(error).message); }
     finally { setLoading(false); }

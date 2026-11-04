@@ -31,7 +31,7 @@ const progressJson = (progress) => progress ? {
 const bookJson = (book, progress) => ({
   id: book._id.toString(), title: book.title, description: book.description, category: book.category, level: book.level,
   fileName: book.fileName, format: book.format, mimeType: book.mimeType, size: book.size, active: book.active,
-  coverUrl: book.coverFile ? `/api/learning/books/${book._id}/cover` : '',
+  coverUrl: book.coverFile ? `/learning/books/${book._id}/cover` : '',
   processingStatus: book.processingStatus, processingError: book.processingError,
   progress: progressJson(progress),
 });
@@ -217,7 +217,7 @@ export const uploadBookCover = asyncHandler(async (req, res) => {
   try { await book.save(); }
   catch (error) { await fs.unlink(coverPath).catch(() => {}); throw error; }
   if (previous && /^[0-9a-f-]{36}\.(png|jpg|webp)$/.test(previous)) await fs.unlink(path.join(COVER_ROOT, previous)).catch(() => {});
-  res.json({ success: true, data: { book: bookJson(book), coverUrl: `/api/learning/books/${book._id}/cover` } });
+  res.json({ success: true, data: { book: bookJson(book), coverUrl: `/learning/books/${book._id}/cover` } });
 });
 
 export const streamBookCover = asyncHandler(async (req, res) => {

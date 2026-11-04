@@ -133,6 +133,10 @@ export default function LearningPage({ learner = false }) {
   const shownBooks = books.filter((book) => availability === 'All availability' || (availability === 'Available' ? book.active : !book.active));
 
   const openBook = async (book) => {
+    if (!/^[0-9a-f]{24}$/i.test(book?.id || '')) {
+      toast.error('This learning resource has an invalid ID. Refresh the library and try again.');
+      return;
+    }
     const requestId = ++openRequest.current;
     setSelected(book);
     setPreview(null);
@@ -177,7 +181,7 @@ export default function LearningPage({ learner = false }) {
   };
 
   const saveProgress = async (completed = false, silent = false) => {
-    if (!selected || !canTrack) return;
+    if (!selected?.id || !canTrack) return;
     setSavingProgress(true);
     const kind = progressKind(selected.format);
     const index = kind === 'page' ? page : kind === 'slide' ? activeSlide + 1 : kind === 'sheet' ? activeSheet + 1 : section;
