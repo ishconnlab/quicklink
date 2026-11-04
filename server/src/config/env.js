@@ -1,4 +1,4 @@
-import dotenv from 'dotenv';
+﻿import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -63,11 +63,20 @@ export const config = {
     from: process.env.MAIL_FROM || '',
     appUrl: process.env.APP_URL || '',
   },
+  publicApiUrl: process.env.PUBLIC_API_URL || '',
+  cloudinary: {
+    cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
+    apiKey: process.env.CLOUDINARY_API_KEY || '',
+    apiSecret: process.env.CLOUDINARY_API_SECRET || '',
+    enabled: Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET),
+    folderPrefix: process.env.CLOUDINARY_FOLDER_PREFIX || 'quicklink',
+  },
   learning: {
     supportedFormats: learningFormats.length ? learningFormats : ALLOWED_LEARNING_FORMATS,
     maxFileBytes: Number.isInteger(maxLearningFileBytes) && maxLearningFileBytes > 0 ? Math.min(maxLearningFileBytes, 100 * 1024 * 1024) : 25 * 1024 * 1024,
     booksDir: process.env.LEARNING_BOOKS_DIR || '',
   },
+  registrationImageDir: process.env.REGISTRATION_IMAGE_DIR || '',
 };
 
 if (config.jwtSecret === 'dev-only-insecure-secret' && config.isProd) {

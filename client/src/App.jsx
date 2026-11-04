@@ -19,6 +19,8 @@ import CourseDetailPage from './pages/CourseDetailPage.jsx';
 import StudentDashboard from './pages/StudentDashboard.jsx';
 import TeacherDashboard from './pages/TeacherDashboard.jsx';
 import CertificateVerifyPage from './pages/CertificateVerifyPage.jsx';
+import PublicTrainingRegistrationPage from './pages/PublicTrainingRegistrationPage.jsx';
+import TrainingRegistrationsPage from './pages/TrainingRegistrationsPage.jsx';
 
 const LiveSessionPage = lazy(() => import('./pages/LiveSessionPage.jsx'));
 
@@ -53,6 +55,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={user ? <Landing /> : <LoginPage />} />
       <Route path="/register" element={user ? <Landing /> : <RegisterPage />} />
+      <Route path="/training-registration/:slug" element={<PublicTrainingRegistrationPage />} />
       <Route path="/verify/:code" element={<CertificateVerifyPage />} />
       <Route element={<Protected><AppLayout /></Protected>}>
         <Route path="/" element={<Landing />} />
@@ -68,6 +71,7 @@ export default function App() {
         <Route path="/classes/sessions/:sessionId/report" element={<ClassReportPage />} />
         <Route path="/classes/:id" element={<ClassDetailPage />} />
         <Route path="/users" element={<OwnerOnly><UsersPage /></OwnerOnly>} />
+        <Route path="/registrations" element={<OwnerOnly><TrainingRegistrationsPage /></OwnerOnly>} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

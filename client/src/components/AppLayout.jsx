@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
-import { BookOpen, ChevronDown, GraduationCap, LogOut, PanelLeftClose, PanelLeftOpen, Settings, Users, Video, LayoutDashboard } from 'lucide-react';
+import { BookOpen, ChevronDown, ClipboardList, GraduationCap, LogOut, PanelLeftClose, PanelLeftOpen, Settings, Users, Video, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { classNames } from '../lib/format.js';
 
@@ -38,6 +38,7 @@ export default function AppLayout() {
     ...(user?.role === 'student' ? [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }, { to: '/courses', label: 'Courses', icon: GraduationCap }] : user?.role === 'teacher' ? [{ to: '/dashboard', label: 'Teacher dashboard', icon: LayoutDashboard }] : []),
     { to: user?.role === 'owner' ? '/learning' : '/learn', label: 'Learning library', icon: BookOpen },
     { to: '/classes', label: 'Classes', icon: Video },
+    ...(user?.role === 'owner' ? [{ to: '/registrations', label: 'Registrations', icon: ClipboardList }] : []),
     ...(user?.role === 'owner' ? [{ to: '/users', label: 'People and accounts', icon: Users }] : []),
     { to: '/settings', label: 'Settings', icon: Settings },
   ];

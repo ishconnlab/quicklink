@@ -5,9 +5,11 @@ import ensureOwnerAccount from './services/bootstrap.js';
 import { syncAllIndexes } from './models/syncIndexes.js';
 import { createServer } from 'node:http';
 import { initializeClassRealtime } from './services/classRealtime.js';
+import { validateCloudinaryConfig } from './services/cloudinary.js';
 
 async function start() {
   try {
+    validateCloudinaryConfig();
     await connectDB();
     console.log(`[db] Connected to MongoDB (${config.env})`);
 
@@ -35,7 +37,7 @@ async function start() {
     server.headersTimeout = 66000;
 
     const shutdown = (signal) => {
-      console.log(`[server] ${signal} received — shutting down gracefully`);
+      console.log(`[server] ${signal} received â€” shutting down gracefully`);
       server.close(async () => {
         try {
           await disconnectDB();
@@ -67,3 +69,4 @@ process.on('uncaughtException', (err) => {
 });
 
 start();
+

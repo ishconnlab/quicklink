@@ -12,9 +12,19 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     const completion = await fetch(`${root}/api/courses/0123456789abcdef01234567/completion`);
     const issue = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificate`, { method: 'POST' });
     const download = await fetch(`${root}/api/certificates/verify/not-a-valid-code`);
+    const candidates = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificate-candidates`);
+    const bulkIssue = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificates/issue`, { method: 'POST' });
+    const share = await fetch(`${root}/api/certificates/share/not-a-valid-code`);
+    const registrationAdmin = await fetch(`${root}/api/registrations`);
+    const invalidRegistrationForm = await fetch(`${root}/api/registrations/public/invalid`);
     assert.equal(completion.status, 401);
     assert.equal(issue.status, 401);
     assert.equal(download.status, 400);
+    assert.equal(candidates.status, 401);
+    assert.equal(bulkIssue.status, 401);
+    assert.equal(share.status, 400);
+    assert.equal(registrationAdmin.status, 401);
+    assert.equal(invalidRegistrationForm.status, 400);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

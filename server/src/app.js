@@ -13,6 +13,7 @@ import classRoutes from './routes/classRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
 import assignmentRoutes from './routes/assignmentRoutes.js';
 import certificateRoutes from './routes/certificateRoutes.js';
+import registrationRoutes from './routes/registrationRoutes.js';
 
 export function createApp() {
   const app = express();
@@ -71,6 +72,7 @@ export function createApp() {
   app.use('/api/courses', courseRoutes);
   app.use('/api/assignments', assignmentRoutes);
   app.use('/api/certificates', certificateRoutes);
+  app.use('/api/registrations', registrationRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

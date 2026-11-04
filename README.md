@@ -64,12 +64,13 @@ Admins assign active teachers and enroll active students through **Courses and c
 - Admins manage course title, introduction, detailed description, subject/trade, level, learning materials, enrollment capacity, publication, completion rules, and an optional validated PNG/JPEG/WebP thumbnail (maximum 3 MB). Course images are stored in `COURSE_IMAGE_DIR`.
 - Assigned teachers and admins can publish practical assignments with objectives, materials, tasks, due dates, score limits, pass marks, and submission requirements. Students can save drafts, submit text, links, or supported files (PDF, PNG/JPEG, ZIP, and UTF-8 text/source; up to five files at 10 MB each), and resubmit when enabled. Student code is stored as a file and never executed by the application server.
 - Assigned teachers and admins can review and grade submissions, leave feedback, request a revision, or mark work passed/failed. Grading history is retained. Students cannot grade their own work.
-- Course completion requirements can include reading, theory quizzes, practical assignments, attendance, and a minimum score. A student can issue a certificate only after all configured requirements pass. Certificates are server-generated PDFs with unique IDs, a QR verification link at `/verify/:code`, and admin revocation.
+- Course completion requirements can include reading, theory quizzes, practical assignments, attendance, and a minimum score. A student can issue a certificate only after all configured requirements pass. Admins can review enrolled students and issue certificates individually or in batches from a course page; the same completion checks apply. Certificates use the IshConnect completion template, retain its printed signature without adding it a second time, and overlay the corporate seal beside the signature. Server-generated PDFs have unique IDs and a QR verification link at `/verify/:code`. Students can download and share issued certificates from their account; the public share link includes social preview metadata, and admins can revoke certificates.
+- The certificate template, seal, Noto Sans fonts (licensed under SIL OFL), and their license are bundled under `server/assets/certificates` so PDF generation works when the backend is deployed with `server` as its root directory and supports accented names. The template's signature is retained, with the seal and verification QR beside it. Set `APP_URL` to the public frontend origin and `PUBLIC_API_URL` to the public backend origin for share previews; verification links use `APP_URL`.
 
 ## Technology
 
 - **Client:** React 18, Vite, Tailwind CSS, Axios, React Router, Socket.IO Client, and LiveKit Client SDK
-- **Server:** Express, MongoDB/Mongoose, JWT authentication, Zod validation, Socket.IO, LiveKit Server SDK, Nodemailer, and PDFKit
+- **Server:** Express, MongoDB/Mongoose, JWT authentication, Zod validation, Socket.IO, LiveKit Server SDK, Nodemailer, pdf-lib, and PDFKit
 - **Live media:** LiveKit Cloud SFU with server-signed participant tokens
 - **Books and progress:** supported learning documents in `server/src/books` (or `LEARNING_BOOKS_DIR`) and account-scoped records in MongoDB
 
@@ -159,6 +160,21 @@ Every route below requires authentication. Admin only routes are marked.
 | `GET` | `/api/classes/:id/report.pdf` | Assigned teacher or admin | Generate a PDF filtered by date, student, session, or class |
 
 Socket.IO handles authenticated room membership, chat, and attendance presence. Live media flows through LiveKit and is not recorded by QuickLink. `server/scripts/classroom-smoke.js` exercises the admin, teacher, student, class, join, chat, attendance, and report API flow against the configured local MongoDB database.
+
+## Training registration forms
+
+Admins can create one public registration form for each active class/training from **Registrations**. Forms support a description, custom placeholders, up to 10 optional or required text fields, and an optional PNG/JPEG/WebP header image (maximum 3 MB). The public URL can be shared directly. Registrations are stored as contact records only; they do not create accounts or enroll students. Admins can view the submitted contact details, start the training's live class, send a class link by configured email, or open a prefilled WhatsApp message.
+
+Email invitations require `SMTP_URL`, `MAIL_FROM`, and `APP_URL`. WhatsApp invitations open WhatsApp for the admin to send manually. Live-class join links continue to require an existing enrolled student account; collecting a registration does not grant class access. Uploaded registration images use the server filesystem; configure persistent storage with `REGISTRATION_IMAGE_DIR`.
+
+| Method | Endpoint | Access | Description |
+| --- | --- | --- | --- |
+| `GET` | `/api/registrations/public/:slug` | Public | Load an active training registration form |
+| `POST` | `/api/registrations/public/:slug` | Public, rate-limited | Submit a registration |
+| `GET` | `/api/registrations` | Admin | List forms and registration counts |
+| `POST` | `/api/registrations` | Admin | Create a form for an active class |
+| `GET` | `/api/registrations/:formId/entries` | Admin | View the form's registrations |
+| `POST` | `/api/registrations/:formId/entries/:registrationId/email` | Admin | Email the active live-class join link |
 
 ## Book catalog behavior
 
