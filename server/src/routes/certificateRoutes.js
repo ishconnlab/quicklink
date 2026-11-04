@@ -11,5 +11,6 @@ router.get('/share/:code', validate(z.object({ code: z.string().regex(/^[A-Za-z0
 router.use(requireAuth);
 router.get('/mine', certificates.listMyCertificates);
 router.get('/:id.pdf', validate(z.object({ id: objectId }), 'params'), certificates.downloadCertificate);
+router.patch('/:id/name', requireOwner, validate(z.object({ id: objectId }), 'params'), validate(z.object({ studentName: z.string().trim().min(2).max(120) })), certificates.updateCertificateName);
 router.patch('/:id/revoke', requireOwner, validate(z.object({ id: objectId }), 'params'), validate(z.object({ reason: z.string().trim().min(3).max(1000) })), certificates.revokeCertificate);
 export default router;

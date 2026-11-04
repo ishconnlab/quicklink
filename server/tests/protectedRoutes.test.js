@@ -14,6 +14,7 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     const download = await fetch(`${root}/api/certificates/verify/not-a-valid-code`);
     const candidates = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificate-candidates`);
     const bulkIssue = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificates/issue`, { method: 'POST' });
+    const editName = await fetch(`${root}/api/certificates/0123456789abcdef01234567/name`, { method: 'PATCH' });
     const share = await fetch(`${root}/api/certificates/share/not-a-valid-code`);
     const registrationAdmin = await fetch(`${root}/api/registrations`);
     const invalidRegistrationForm = await fetch(`${root}/api/registrations/public/invalid`);
@@ -23,16 +24,25 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ answers: [] }),
     });
+    const certificationSettings = await fetch(`${root}/api/courses/0123456789abcdef01234567/certification-assessment/settings`);
+    const saveCertificationSettings = await fetch(`${root}/api/courses/0123456789abcdef01234567/certification-assessment/settings`, { method: 'PUT' });
+    const certificationAssessment = await fetch(`${root}/api/courses/0123456789abcdef01234567/certification-assessment`);
+    const submitCertificationAssessment = await fetch(`${root}/api/courses/0123456789abcdef01234567/certification-assessment`, { method: 'POST' });
     assert.equal(completion.status, 401);
     assert.equal(issue.status, 401);
     assert.equal(download.status, 400);
     assert.equal(candidates.status, 401);
     assert.equal(bulkIssue.status, 401);
+    assert.equal(editName.status, 401);
     assert.equal(share.status, 400);
     assert.equal(registrationAdmin.status, 401);
     assert.equal(invalidRegistrationForm.status, 400);
     assert.equal(assessmentStatus.status, 401);
     assert.equal(assessmentSubmit.status, 401);
+    assert.equal(certificationSettings.status, 401);
+    assert.equal(saveCertificationSettings.status, 401);
+    assert.equal(certificationAssessment.status, 401);
+    assert.equal(submitCertificationAssessment.status, 401);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

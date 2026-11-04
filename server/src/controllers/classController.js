@@ -133,7 +133,8 @@ export const listClasses = asyncHandler(async (req, res) => {
     if (!recentByClass.has(key)) recentByClass.set(key, session);
     if (session.status === 'live' && !liveByClass.has(key)) liveByClass.set(key, session);
   }
-  res.json({ success: true, data: { classes: classes.map((item) => classJson(item, liveByClass.get(item.id), recentByClass.get(item.id))), page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
+  const canViewHistory = req.user.role !== 'student';
+  res.json({ success: true, data: { classes: classes.map((item) => classJson(item, liveByClass.get(item.id), canViewHistory ? recentByClass.get(item.id) : null)), page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
 });
 
 function courseJson(item, user, progressByBook = new Map()) {
@@ -338,13 +339,13 @@ export const getClass = asyncHandler(async (req, res) => {
     LiveSession.findOne({ learningClass: item._id, status: 'live' }).sort({ startedAt: -1 }),
     LiveSession.findOne({ learningClass: item._id }).sort({ startedAt: -1 }),
   ]);
-  res.json({ success: true, data: { class: classJson(item, liveSession, recentSession) } });
+  res.json({ success: true, data: { class: classJson(item, liveSession, req.user.role === 'student' ? null : recentSession) } });
 });
 
 export const listClassSessions = asyncHandler(async (req, res) => {
   const item = await LearningClass.findById(req.params.id);
   await assertClassAccess(item, req.user);
-  const sessions = await LiveSession.find({ learningClass: item._id }).sort({ startedAt: -1 }).limit(100).lean();
+  const sessions = await LiveSession.find({ learningClass: item._id, ...(req.user.role === 'student' ? { status: 'live' } : {}) }).sort({ startedAt: -1 }).limit(100).lean();
   res.json({ success: true, data: { sessions: sessions.map((session) => sessionJson(session)) } });
 });
 

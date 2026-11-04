@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ConnectionQuality, createLocalTracks, Room, RoomEvent, Track } from 'livekit-client';
-import { ArrowLeft, Camera, CameraOff, Check, Copy, LayoutGrid, MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Send, Users, Video, X } from 'lucide-react';
+import { ArrowLeft, Camera, CameraOff, Check, Copy, LayoutGrid, MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Send, Users, Video } from 'lucide-react';
 import { io } from 'socket.io-client';
 import api, { apiError, getToken } from '../api/client.js';
 import { Badge, PageHeader } from '../components/layout.jsx';
@@ -21,11 +21,13 @@ function publicationFor(participant, source) {
   return participant?.getTrackPublication?.(source) || [...(participant?.trackPublications?.values?.() || [])].find((publication) => publication.source === source);
 }
 
-function MediaTile({ participant, preferredSource, local = false, speaking = false, selected = false }) {
+function MediaTile({ participant, preferredSource, local = false, speaking = false, selected = false, stage = false }) {
   const videoRef = useRef(null);
-  const publication = publicationFor(participant, preferredSource)
-    || publicationFor(participant, Track.Source.Camera)
-    || publicationFor(participant, Track.Source.ScreenShare);
+  const sourceOrder = preferredSource === Track.Source.ScreenShare
+    ? [Track.Source.ScreenShare, Track.Source.Camera]
+    : [Track.Source.ScreenShare, preferredSource, Track.Source.Camera].filter(Boolean);
+  const publications = sourceOrder.map((source) => publicationFor(participant, source)).filter(Boolean);
+  const publication = publications.find((candidate) => candidate.track?.kind === Track.Kind.Video) || publications[0];
   const track = publication?.track;
   useEffect(() => {
     if (!videoRef.current || !track || track.kind === Track.Kind.Audio) return undefined;
@@ -35,8 +37,8 @@ function MediaTile({ participant, preferredSource, local = false, speaking = fal
   const name = participant?.name || participant?.identity || 'Participant';
   const isScreen = publication?.source === Track.Source.ScreenShare;
   const isCameraMuted = !isScreen && !publication?.isSubscribed && !publication?.track;
-  return <div className={`relative flex aspect-video min-h-32 items-center justify-center overflow-hidden rounded-xl bg-slate-900 ${speaking ? 'ring-2 ring-emerald-400' : ''} ${selected ? 'ring-2 ring-brand-500' : ''}`}>
-    {track && track.kind !== Track.Kind.Audio ? <video ref={videoRef} autoPlay playsInline muted={local} className="absolute inset-0 h-full w-full object-contain" /> : <div className="flex flex-col items-center gap-2 text-slate-300"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-700 text-xl font-semibold">{name.slice(0, 1).toUpperCase()}</span><span className="text-xs">{isCameraMuted ? 'Camera off' : 'Connecting media'}</span></div>}
+  return <div className={`relative flex aspect-video ${stage ? 'min-h-[280px] sm:min-h-[360px] lg:min-h-[min(65vh,680px)]' : 'min-h-32'} items-center justify-center overflow-hidden rounded-xl bg-slate-900 ${speaking ? 'ring-2 ring-emerald-400' : ''} ${selected ? 'ring-2 ring-brand-500' : ''}`}>
+    {track && track.kind !== Track.Kind.Audio ? <video ref={videoRef} autoPlay playsInline muted={local} className={`absolute inset-0 h-full w-full ${isScreen ? 'object-contain' : 'object-cover'}`} /> : <div className="flex flex-col items-center gap-2 text-slate-300"><span className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-700 text-xl font-semibold">{name.slice(0, 1).toUpperCase()}</span><span className="text-xs">{isCameraMuted ? 'Camera off' : 'Connecting media'}</span></div>}
     <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-black/80 to-transparent px-3 pb-2 pt-8"><span className="truncate text-xs font-medium text-white">{name}{local ? ' (you)' : ''}{isScreen ? ' · sharing screen' : ''}</span>{speaking && <span className="rounded bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-semibold text-white">Speaking</span>}</div>
   </div>;
 }
@@ -230,8 +232,9 @@ export default function LiveSessionPage() {
   const closePreJoin = () => {
     previewTracksRef.current.forEach((track) => track.stop());
     previewTracksRef.current = [];
-    window.close();
-    if (!window.closed) navigate(`/classes/${data.class.id}`, { replace: true });
+    setPreviewTracks([]);
+    setPreviewStream(null);
+    navigate(`/classes/${data.class.id}`, { replace: true });
   };
 
   const joinAttendanceRoom = () => {
@@ -335,8 +338,16 @@ export default function LiveSessionPage() {
       toast.error('Your teacher or an admin must request screen sharing first.');
       return;
     }
-    try { await roomRef.current?.localParticipant.setScreenShareEnabled(!sharing, { audio: false }); setSharing((value) => !value); }
-    catch (error) { toast.info(error?.name === 'NotAllowedError' ? 'Screen sharing was cancelled.' : 'This browser or device does not support screen sharing.'); }
+    const room = roomRef.current;
+    if (!room || !connected) {
+      toast.error('You are not connected to the live class. Rejoin before sharing your screen.');
+      return;
+    }
+    try { await room.localParticipant.setScreenShareEnabled(!sharing, { audio: false }); }
+    catch (error) {
+      if (error?.name === 'NotAllowedError') toast.info('Screen sharing was cancelled.');
+      else toast.error(error?.message || 'Could not start screen sharing. Check your browser permissions and try again.');
+    }
   };
   const requestParticipantScreenShare = (person) => {
     if (!person?.userId || !socketRef.current?.connected || requestingScreenShareId) return;
@@ -397,7 +408,7 @@ export default function LiveSessionPage() {
         {deviceList.audioinput.length > 0 && <label className="block text-sm"><span className="label">Microphone</span><select className="input" value={selectedDevices.audioinput} onChange={(event) => changePreviewDevice(Track.Kind.Audio, event.target.value)}>{deviceList.audioinput.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}</select></label>}</>}
         {mediaWarning && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{mediaWarning}</p>}{roomError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{roomError}</p>}
         <button onClick={joinClass} disabled={joining} className="btn-primary w-full">{joining ? <Spinner size={17} /> : data.mediaConfigured === false ? <MessageSquare size={17} /> : <Video size={17} />}{data.mediaConfigured === false ? 'Join class chat and notes' : 'Join class'}</button>
-        <button onClick={closePreJoin} className="btn-secondary w-full"><X size={16} />Close this tab</button>
+        <button onClick={closePreJoin} className="btn-secondary w-full"><ArrowLeft size={16} />Back to class</button>
       </div>
     </section>
   </div>;
@@ -410,7 +421,17 @@ export default function LiveSessionPage() {
       <div className="min-w-0 space-y-3">
         {participants.map((person) => <ParticipantAudio key={`audio-${person.identity}`} participant={person} />)}
         {chatOnly ? <section className="flex min-h-[300px] flex-col items-center justify-center rounded-xl border border-amber-200 bg-amber-50 p-6 text-center"><Video size={34} className="text-amber-700" /><h2 className="mt-3 font-semibold text-amber-950">Class chat is available; live media is offline</h2><p className="mt-2 max-w-lg text-sm leading-6 text-amber-900">Your class membership is verified. Chat, shared notes, and attendance work through QuickLink. Ask an admin to configure LiveKit to enable camera, microphone, and screen sharing.</p></section> : <>
-        {layout === 'auto' && <div className={`grid gap-3 ${liveParticipants.length <= 2 ? 'sm:grid-cols-2' : liveParticipants.length <= 6 ? 'sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'}`}>{liveParticipants.map((person) => <div key={person.identity}><MediaTile participant={person} local={isLocal(person)} speaking={speakers.includes(person.identity)} /></div>)}</div>}
+        {layout === 'auto' && screenOwner && <section className="space-y-3">
+          <div className="flex items-center gap-2 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-sm text-brand-900">
+            <MonitorUp size={16} className="shrink-0" />
+            <span className="font-medium">{screenOwner.name || screenOwner.identity} is sharing their screen</span>
+          </div>
+          <MediaTile participant={screenOwner} preferredSource={Track.Source.ScreenShare} local={isLocal(screenOwner)} stage />
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {liveParticipants.filter((person) => person.identity !== screenOwner.identity).map((person) => <div key={person.identity} className="w-40 shrink-0 sm:w-48"><MediaTile participant={person} local={isLocal(person)} speaking={speakers.includes(person.identity)} /></div>)}
+          </div>
+        </section>}
+        {layout === 'auto' && !screenOwner && <div className={`grid gap-3 ${liveParticipants.length <= 2 ? 'sm:grid-cols-2' : liveParticipants.length <= 6 ? 'sm:grid-cols-2 xl:grid-cols-3' : 'grid-cols-2 md:grid-cols-3 xl:grid-cols-4'}`}>{liveParticipants.map((person) => <div key={person.identity}><MediaTile participant={person} local={isLocal(person)} speaking={speakers.includes(person.identity)} /></div>)}</div>}
         {layout === 'grid' && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">{liveParticipants.map((person) => <div key={person.identity}><MediaTile participant={person} local={isLocal(person)} speaking={speakers.includes(person.identity)} /></div>)}</div>}
         {layout === 'speaker' && <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_220px]"><MediaTile participant={activeSpeaker} local={isLocal(activeSpeaker)} speaking />{secondary.map((person) => <MediaTile key={person.identity} participant={person} local={isLocal(person)} />)}</div>}
         {layout === 'presentation' && screenOwner && <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_200px]"><MediaTile participant={screenOwner} preferredSource={Track.Source.ScreenShare} local={isLocal(screenOwner)} />{secondary.map((person) => <MediaTile key={person.identity} participant={person} local={isLocal(person)} />)}</div>}

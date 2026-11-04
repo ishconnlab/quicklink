@@ -14,6 +14,19 @@ const learningClassSchema = new mongoose.Schema({
     requireAttendance: { type: Boolean, default: false },
     minimumScore: { type: Number, default: 0, min: 0, max: 100 },
   },
+  certificationAssessmentEnabled: { type: Boolean, default: false },
+  certificationQuestions: {
+    type: [{
+      prompt: { type: String, required: true, trim: true, maxlength: 1200 },
+      options: {
+        type: [{ type: String, required: true, trim: true, maxlength: 500 }],
+        validate: { validator: (options) => options.length === 4, message: 'Each certification question must have four answer options.' },
+      },
+      correctOption: { type: Number, required: true, min: 0, max: 3 },
+    }],
+    default: [],
+    validate: { validator: (questions) => questions.length === 0 || questions.length === 10, message: 'A certification assessment must contain exactly 10 questions.' },
+  },
   course: { type: String, default: '', trim: true, maxlength: 160 },
   level: { type: String, required: true, enum: ['L3', 'L4', 'L5'], index: true },
   description: { type: String, default: '', trim: true, maxlength: 12000 },

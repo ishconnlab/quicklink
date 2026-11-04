@@ -28,12 +28,31 @@ const candidateQuery = z.object({
 const issueCertificatesBody = z.object({
   studentIds: z.array(z.string().regex(/^[0-9a-fA-F]{24}$/)).min(1).max(100),
 });
+const certificationQuestion = z.object({
+  prompt: z.string().trim().min(1).max(1200),
+  options: z.array(z.string().trim().min(1).max(500)).length(4),
+  correctOption: z.number().int().min(0).max(3),
+});
+const certificationSettings = z.object({
+  enabled: z.boolean(),
+  questions: z.array(certificationQuestion).length(10).or(z.array(certificationQuestion).length(0)),
+}).refine((value) => !value.enabled || value.questions.length === 10, { message: 'An enabled certification assessment must contain exactly 10 questions.' });
+const certificationAnswers = z.object({
+  answers: z.array(z.object({
+    questionIndex: z.number().int().min(0).max(9),
+    optionIndex: z.number().int().min(0).max(3),
+  })).length(10).refine((answers) => new Set(answers.map((answer) => answer.questionIndex)).size === 10),
+});
 
 router.get('/:id/thumbnail', validate(idParams, 'params'), courses.getCourseThumbnail);
 router.use(requireAuth);
 router.get('/', validate(listQuery, 'query'), courses.listCourses);
 router.post('/:id/thumbnail', validate(idParams, 'params'), uploadThumbnail.single('thumbnail'), courses.updateCourseThumbnail);
 router.get('/:id/completion', validate(idParams, 'params'), certificates.getCourseCompletion);
+router.get('/:id/certification-assessment/settings', requireOwner, validate(idParams, 'params'), certificates.getCertificationAssessmentSettings);
+router.put('/:id/certification-assessment/settings', requireOwner, validate(idParams, 'params'), validate(certificationSettings), certificates.saveCertificationAssessmentSettings);
+router.get('/:id/certification-assessment', validate(idParams, 'params'), certificates.getCertificationAssessment);
+router.post('/:id/certification-assessment', validate(idParams, 'params'), validate(certificationAnswers), certificates.submitCertificationAssessment);
 router.get('/:id/certificates', validate(idParams, 'params'), certificates.listCourseCertificates);
 router.get('/:id/certificate-candidates', requireOwner, validate(idParams, 'params'), validate(candidateQuery, 'query'), certificates.listCertificateCandidates);
 router.post('/:id/certificates/issue', requireOwner, validate(idParams, 'params'), validate(issueCertificatesBody), certificates.issueCertificates);

@@ -7,7 +7,7 @@ import { useToast } from '../context/ToastContext.jsx';
 
 const blankAssignment = () => ({ title: '', instructions: '', objectives: '', toolsAndMaterials: '', tasks: '', dueAt: '', maxPoints: 100, passMark: 50, published: false });
 
-export default function CourseAssignments({ course, user }) {
+export default function CourseAssignments({ course, user, onCompletionChange }) {
   const toast = useToast();
   const teacher = user?.role === 'owner' || (user?.role === 'teacher' && (course.teacher?.id === user.id || course.teachers?.some((item) => item.id === user.id)));
   const [items, setItems] = useState([]);
@@ -48,6 +48,7 @@ export default function CourseAssignments({ course, user }) {
     try {
       await api.post(`/assignments/${assignment.id}/${draft ? 'draft' : 'submit'}`, formData);
       toast.success(draft ? 'Draft saved.' : 'Work submitted to your teacher.'); await load();
+      if (!draft) await onCompletionChange?.();
     } catch (error) { toast.error(apiError(error).message); }
     finally { setSubmitting(false); }
   };

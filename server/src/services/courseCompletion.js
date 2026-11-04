@@ -3,13 +3,26 @@ import { AssignmentSubmission } from '../models/AssignmentSubmission.js';
 import { LearningBook } from '../models/LearningBook.js';
 import { LearningProgress } from '../models/LearningProgress.js';
 import { LearningAssessmentAttempt } from '../models/LearningAssessmentAttempt.js';
+import { CertificationAssessmentAttempt } from '../models/CertificationAssessmentAttempt.js';
 import { LiveSession } from '../models/LiveSession.js';
 
 export async function evaluateCourseCompletion(course, studentId) {
   const enrolled = (course.students || []).some((student) => (student._id || student).toString() === studentId.toString());
   const rules = course.completionRequirements || {};
-  const requirementsConfigured = Boolean(rules.requireReading || rules.requireTheory || rules.requirePractical || rules.requireAttendance || rules.minimumScore > 0);
+  const certificationAssessmentEnabled = Boolean(course.certificationAssessmentEnabled);
+  const requirementsConfigured = Boolean(rules.requireReading || rules.requireTheory || rules.requirePractical || rules.requireAttendance || rules.minimumScore > 0 || certificationAssessmentEnabled);
   const checks = [];
+
+  if (certificationAssessmentEnabled) {
+    const configured = course.certificationQuestions?.length === 10;
+    const passed = configured && await CertificationAssessmentAttempt.exists({ student: studentId, course: course._id, passed: true });
+    checks.push({
+      key: 'certificationAssessment',
+      label: 'Pass the certification assessment',
+      complete: Boolean(passed),
+      detail: configured ? (passed ? 'Passed (80% required)' : 'Not passed yet (80% required)') : 'The administrator must configure all 10 questions',
+    });
+  }
 
   if (rules.requireReading) {
     const ids = (course.learningMaterials || []).map((book) => book._id || book);

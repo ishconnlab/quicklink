@@ -4,12 +4,12 @@ import { useEffect } from 'react';
 
 export function PageHeader({ title, subtitle, actions }) {
   return (
-    <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">{title}</h1>
-        {subtitle && <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>}
+    <div className="mb-5 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <h1 className="break-words text-xl font-bold leading-tight text-slate-900 sm:text-2xl">{title}</h1>
+        {subtitle && <p className="mt-1 break-words text-sm leading-5 text-slate-500 sm:mt-0.5">{subtitle}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">{actions}</div>}
     </div>
   );
 }
@@ -30,7 +30,7 @@ export function StatCard({ label, value, icon: Icon, hint, accent = 'brand' }) {
         </div>
       )}
       <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
+        <p className="break-words text-xs font-medium uppercase tracking-wide text-slate-400">{label}</p>
         <p className="mt-0.5 text-2xl font-bold text-slate-900">{value}</p>
         {hint && <p className="mt-0.5 text-xs text-slate-400">{hint}</p>}
       </div>
@@ -63,16 +63,16 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
             transition={{ type: 'tween', duration: 0.2 }}
-            className={`relative z-10 w-full ${sizes[size]} rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-5 ${size === 'reader' ? 'reader-modal-scroll max-h-[96dvh] overflow-y-auto' : size === 'manage' ? 'manage-modal-scroll max-h-[92dvh] overflow-y-auto' : ''}`}
+            className={`relative z-10 w-full ${sizes[size]} rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-5 ${size === 'reader' ? 'reader-modal-scroll max-h-[96dvh] overflow-y-auto' : size === 'manage' || size === 'lg' ? 'manage-modal-scroll max-h-[92dvh] overflow-y-auto' : ''}`}
           >
             <div className="mb-4 flex items-start justify-between gap-4">
-              <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+              <h3 className="min-w-0 break-words text-lg font-semibold text-slate-900">{title}</h3>
               <button onClick={onClose} className="btn-ghost p-1.5" aria-label="Close">
                 <X size={18} />
               </button>
             </div>
             <div>{children}</div>
-            {footer && <div className="mt-5 flex justify-end gap-2">{footer}</div>}
+            {footer && <div className="mt-5 flex flex-wrap justify-end gap-2">{footer}</div>}
           </motion.div>
         </div>
       )}
