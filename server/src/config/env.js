@@ -13,12 +13,12 @@ const env = explicitNodeEnv || (ON_RENDER ? 'production' : 'development');
 const isProd = env === 'production';
 const isTest = env === 'test';
 
-const DEFAULT_ORIGINS = ['https://quicklink-zeta.vercel.app'];
+const DEFAULT_ORIGINS = ['https://quicklink.ishconnect.rw'];
 // Known deployed frontend origins. Always allowed in production so the API
 // keeps working even if CORS_ORIGIN is unset; CORS_ORIGIN can additionally add
 // custom domains. In development, localhost origins are also allowed via
 // isAllowedOrigin() below.
-const PROD_ORIGINS = ['https://quicklink-zeta.vercel.app'];
+const PROD_ORIGINS = ['https://quicklink.ishconnect.rw'];
 
 const configuredOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')

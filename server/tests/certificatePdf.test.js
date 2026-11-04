@@ -11,7 +11,7 @@ test('certificate PDF uses the IshConnect template and embeds certificate detail
     level: 'L3',
     issuedAt: new Date('2026-01-15T00:00:00.000Z'),
   };
-  const pdf = await createCertificatePdf(certificate, 'https://quicklink-zeta.vercel.app/verify/example');
+  const pdf = await createCertificatePdf(certificate, 'https://quicklink.ishconnect.rw/verify/example');
   const document = await PDFDocument.load(pdf);
   const [page] = document.getPages();
   const { width, height } = page.getSize();

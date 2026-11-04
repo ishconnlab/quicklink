@@ -51,7 +51,7 @@ Live audio/video requires an active LiveKit Cloud project. In its project settin
 
 On the class page, participants see a **Not live** waiting status (including the scheduled start when configured). The page checks for a teacher/admin-started session every ten seconds and shows the join link automatically when it becomes live.
 
-For invitations configure `SMTP_URL`, `MAIL_FROM`, and the frontend `APP_URL` on the backend. Messages are individually addressed, never bulk-addressed. In tests without SMTP, invitation records report `failed` with a configuration error.
+For invitations configure `SMTP_URL`, `MAIL_FROM`, and the frontend `APP_URL` (`https://quicklink.ishconnect.rw`) on the backend. Messages are individually addressed, never bulk-addressed. In tests without SMTP, invitation records report `failed` with a configuration error.
 
 ## Accounts and access
 
@@ -101,7 +101,7 @@ Requirements: Node.js 20.19 or newer and MongoDB.
 
 4. Sign in with the admin account configured in `server/.env`. Create teacher accounts under **People and accounts**, then create a class under **Classes**. Students can register themselves at `/register` or be created by an admin.
 
-The Vite development server proxies `/api` and `/socket.io` to the configured backend. Set `VITE_PROXY_TARGET` if the API is not at the default QuickLink server. Set `VITE_API_URL` in the client environment for a separately hosted API. Set `APP_URL` to the deployed QuickLink frontend origin so invitation links return to the application.
+The Vite development server proxies `/api` and `/socket.io` to the configured backend. Set `VITE_PROXY_TARGET` if the API is not at the default QuickLink server. Set `VITE_API_URL` in the client environment for a separately hosted API. Set `APP_URL=https://quicklink.ishconnect.rw` on the backend so invitation links return to the application.
 
 ## Account management API
 

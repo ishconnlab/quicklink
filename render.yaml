@@ -28,9 +28,11 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 12h
-      # Comma-separated allowed browser origins (the Vercel frontend URL).
+      # Public QuickLink frontend origin.
       - key: CORS_ORIGIN
-        sync: false
+        value: https://quicklink.ishconnect.rw
+      - key: APP_URL
+        value: https://quicklink.ishconnect.rw
       - key: OWNER_NAME
         value: QuickLink Owner
       - key: OWNER_EMAIL
