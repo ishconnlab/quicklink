@@ -381,7 +381,7 @@ export const getSession = asyncHandler(async (req, res) => {
   });
   if (!session) throw ApiError.notFound('Class session not found');
   await assertClassAccess(session.learningClass, req.user);
-  res.json({ success: true, data: { session: sessionJson(session), class: classJson(session.learningClass) } });
+  res.json({ success: true, data: { session: sessionJson(session), class: classJson(session.learningClass), mediaConfigured: Boolean(config.livekit.url && config.livekit.apiKey && config.livekit.apiSecret) } });
 });
 
 export const createLiveKitToken = asyncHandler(async (req, res) => {

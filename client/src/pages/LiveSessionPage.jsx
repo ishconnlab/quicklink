@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ConnectionQuality, createLocalTracks, Room, RoomEvent, Track } from 'livekit-client';
-import { ArrowLeft, Camera, CameraOff, Check, Copy, LayoutGrid, MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Send, Users, Video } from 'lucide-react';
+import { ArrowLeft, Camera, CameraOff, Check, Copy, LayoutGrid, MessageSquare, Mic, MicOff, MonitorUp, PhoneOff, Send, Users, Video, X } from 'lucide-react';
 import { io } from 'socket.io-client';
 import api, { apiError, getToken } from '../api/client.js';
 import { Badge, PageHeader } from '../components/layout.jsx';
@@ -220,6 +220,13 @@ export default function LiveSessionPage() {
     } finally { setJoining(false); }
   };
 
+  const closePreJoin = () => {
+    previewTracksRef.current.forEach((track) => track.stop());
+    previewTracksRef.current = [];
+    window.close();
+    if (!window.closed) navigate(`/classes/${data.class.id}`, { replace: true });
+  };
+
   const joinAttendanceRoom = () => {
     if (joinedRef.current || !socketRef.current?.connected) return;
     joinedRef.current = true;
@@ -366,6 +373,7 @@ export default function LiveSessionPage() {
         {deviceList.audioinput.length > 0 && <label className="block text-sm"><span className="label">Microphone</span><select className="input" value={selectedDevices.audioinput} onChange={(event) => changePreviewDevice(Track.Kind.Audio, event.target.value)}>{deviceList.audioinput.map((device, index) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${index + 1}`}</option>)}</select></label>}</>}
         {mediaWarning && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{mediaWarning}</p>}{roomError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{roomError}</p>}
         <button onClick={joinClass} disabled={joining} className="btn-primary w-full">{joining ? <Spinner size={17} /> : data.mediaConfigured === false ? <MessageSquare size={17} /> : <Video size={17} />}{data.mediaConfigured === false ? 'Join class chat and notes' : 'Join class'}</button>
+        <button onClick={closePreJoin} className="btn-secondary w-full"><X size={16} />Close this tab</button>
       </div>
     </section>
   </div>;

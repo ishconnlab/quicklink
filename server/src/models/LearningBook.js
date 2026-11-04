@@ -1,5 +1,14 @@
 import mongoose from 'mongoose';
 
+const assessmentQuestionSchema = new mongoose.Schema({
+  prompt: { type: String, required: true, trim: true, maxlength: 1200 },
+  options: {
+    type: [{ type: String, required: true, trim: true, maxlength: 500 }],
+    validate: { validator: (options) => options.length === 4, message: 'Each question must have four answer options.' },
+  },
+  correctOption: { type: Number, required: true, min: 0, max: 3 },
+}, { _id: false });
+
 const learningBookSchema = new mongoose.Schema({
   sourceKey: { type: String, required: true, unique: true, index: true },
   title: { type: String, required: true, trim: true, maxlength: 240 },
@@ -8,6 +17,11 @@ const learningBookSchema = new mongoose.Schema({
   level: { type: String, required: true, enum: ['L3', 'L4', 'L5'], index: true },
   fileName: { type: String, required: true },
   coverFile: { type: String, default: '', maxlength: 80 },
+  assessmentQuestions: {
+    type: [assessmentQuestionSchema],
+    default: [],
+    validate: { validator: (questions) => questions.length === 0 || questions.length === 20, message: 'A final assessment must contain exactly 20 questions.' },
+  },
   format: { type: String, enum: ['pdf', 'doc', 'docx', 'txt', 'md', 'ppt', 'pptx', 'xls', 'xlsx'], default: 'pdf', index: true },
   mimeType: { type: String, default: 'application/pdf' },
   size: { type: Number, required: true, min: 0 },

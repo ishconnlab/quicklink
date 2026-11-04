@@ -88,10 +88,22 @@ export default function LearningPage({ learner = false }) {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadForm, setUploadForm] = useState({ level: 'L3', category: '', file: null });
   const [downloading, setDownloading] = useState(false);
+  const [assessmentEnabled, setAssessmentEnabled] = useState(false);
+  const [assessmentQuestions, setAssessmentQuestions] = useState([]);
+  const [assessmentAttempts, setAssessmentAttempts] = useState([]);
+  const [assessmentDirty, setAssessmentDirty] = useState(false);
+  const [loadingAssessmentSettings, setLoadingAssessmentSettings] = useState(false);
+  const [finalAssessment, setFinalAssessment] = useState(null);
+  const [assessmentAnswers, setAssessmentAnswers] = useState({});
+  const [assessmentResult, setAssessmentResult] = useState(null);
+  const [assessmentPendingViolation, setAssessmentPendingViolation] = useState('');
+  const [assessmentActive, setAssessmentActive] = useState(false);
+  const [assessmentSubmitting, setAssessmentSubmitting] = useState(false);
   const openRequest = useRef(0);
   const openedFromLink = useRef('');
   const readerRef = useRef(null);
   const elapsedSinceSave = useRef(0);
+  const assessmentSubmitLock = useRef(false);
   useEffect(() => { if (editing) setEditStep(0); }, [editing?.id]);
   const updatePdfPageCount = useCallback((count, validPage) => {
     setTotalPages((current) => current === count ? current : count);
@@ -132,6 +144,128 @@ export default function LearningPage({ learner = false }) {
   const categories = useMemo(() => ['All subjects', ...categoryOptions], [categoryOptions]);
   const shownBooks = books.filter((book) => availability === 'All availability' || (availability === 'Available' ? book.active : !book.active));
 
+  const openBookEditor = async (book) => {
+    setLoadingAssessmentSettings(true);
+    try {
+      const [assessment, attempts] = await Promise.all([
+        api.get(`/learning/books/${book.id}/assessment`),
+        api.get(`/learning/books/${book.id}/assessment-attempts`),
+      ]);
+      const savedQuestions = assessment.data.data.questions || [];
+      setAssessmentEnabled(savedQuestions.length === 20);
+      setAssessmentQuestions(Array.from({ length: 20 }, (_, index) => savedQuestions[index] || { prompt: '', options: ['', '', '', ''], correctOption: 0 }));
+      setAssessmentAttempts(attempts.data.data.attempts || []);
+      setAssessmentDirty(false);
+      setEditing({ ...book });
+    } catch (error) {
+      toast.error(apiError(error).message);
+    } finally {
+      setLoadingAssessmentSettings(false);
+    }
+  };
+
+  const updateAssessmentQuestion = (questionIndex, update) => {
+    setAssessmentQuestions((questions) => questions.map((question, index) => index === questionIndex ? { ...question, ...update } : question));
+    setAssessmentDirty(true);
+  };
+
+  const startFinalAssessment = async () => {
+    if (!finalAssessment?.required || !finalAssessment.readingCompleted || !finalAssessment.configured
+      || finalAssessment.passed || assessmentResult?.passed || finalAssessment.attemptsRemaining < 1) return;
+    if (!readerRef.current?.requestFullscreen) {
+      toast.error('This browser does not support fullscreen assessments.');
+      return;
+    }
+    try {
+      await readerRef.current.requestFullscreen();
+      if (!document.fullscreenElement) throw new Error('Fullscreen was not granted');
+      setAssessmentAnswers({});
+      setAssessmentResult(null);
+      setAssessmentPendingViolation('');
+      assessmentSubmitLock.current = false;
+      setAssessmentActive(true);
+    } catch {
+      toast.error('Allow fullscreen to begin the final assessment.');
+    }
+  };
+
+  const submitFinalAssessment = async (violation = '') => {
+    if (!selected?.id || assessmentSubmitLock.current) return;
+    const answers = Object.entries(assessmentAnswers).map(([questionIndex, optionIndex]) => ({
+      questionIndex: Number(questionIndex),
+      optionIndex: Number(optionIndex),
+    }));
+    if (!violation && answers.length !== 20) {
+      toast.error('Answer all 20 questions before submitting.');
+      return;
+    }
+    assessmentSubmitLock.current = true;
+    setAssessmentSubmitting(true);
+    if (violation) {
+      setAssessmentActive(false);
+      setAssessmentPendingViolation(violation);
+      await saveProgressRef.current(false, true);
+    }
+    try {
+      const response = await api.post(`/learning/books/${selected.id}/final-assessment`, {
+        answers,
+        ...(violation ? { violation } : {}),
+      });
+      setAssessmentResult(response.data.data);
+      setAssessmentPendingViolation('');
+      setAssessmentActive(false);
+      if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      try {
+        const status = await api.get(`/learning/books/${selected.id}/final-assessment`);
+        setFinalAssessment(status.data.data);
+      } catch (error) {
+        toast.error(`Assessment submitted, but its latest status could not be refreshed: ${apiError(error).message}`);
+      }
+    } catch (error) {
+      if (violation) {
+        setAssessmentResult({ submissionError: apiError(error).message });
+        if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+      } else {
+        toast.error(apiError(error).message);
+      }
+    } finally {
+      assessmentSubmitLock.current = false;
+      setAssessmentSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!assessmentActive) return undefined;
+    const reportViolation = (reason) => { void submitFinalAssessment(reason); };
+    const onVisibilityChange = () => { if (document.visibilityState === 'hidden') reportViolation('tab_hidden'); };
+    const onFullscreenChange = () => { if (!document.fullscreenElement) reportViolation('fullscreen_exit'); };
+    const onCopy = (event) => { event.preventDefault(); reportViolation('copy'); };
+    const onKeyDown = (event) => {
+      const key = event.key.toLowerCase();
+      if (event.key === 'PrintScreen') reportViolation('screenshot_shortcut');
+      else if ((event.ctrlKey || event.metaKey) && ['c', 'p', 's'].includes(key)) {
+        event.preventDefault();
+        reportViolation(key === 'c' ? 'copy' : 'screenshot_shortcut');
+      }
+    };
+    const onContextMenu = (event) => event.preventDefault();
+    const onBlur = () => reportViolation('window_blur');
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('copy', onCopy);
+    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener('contextmenu', onContextMenu);
+    window.addEventListener('blur', onBlur);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('copy', onCopy);
+      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener('contextmenu', onContextMenu);
+      window.removeEventListener('blur', onBlur);
+    };
+  }, [assessmentActive, assessmentAnswers, selected?.id]);
+
   const openBook = async (book) => {
     if (!/^[0-9a-f]{24}$/i.test(book?.id || '')) {
       toast.error('This learning resource has an invalid ID. Refresh the library and try again.');
@@ -140,6 +274,9 @@ export default function LearningPage({ learner = false }) {
     const requestId = ++openRequest.current;
     setSelected(book);
     setPreview(null);
+    setFinalAssessment(null);
+    setAssessmentResult(null);
+    setAssessmentPendingViolation('');
     setPage(book.progress?.positionType === 'page' ? book.progress.positionIndex : book.progress?.currentPage || 1);
     setTotalPages(book.progress?.totalPages || 0);
     setTotalUnits(book.progress?.totalUnits || book.progress?.totalPages || 0);
@@ -166,6 +303,8 @@ export default function LearningPage({ learner = false }) {
         const saved = await api.put(`/learning/books/${book.id}/progress`, body);
         setBooks((current) => current.map((item) => item.id === book.id ? { ...item, progress: saved.data.data.progress } : item));
         setSelected((current) => current?.id === book.id ? { ...current, progress: saved.data.data.progress } : current);
+        const assessment = await api.get(`/learning/books/${book.id}/final-assessment`);
+        if (requestId === openRequest.current) setFinalAssessment(assessment.data.data);
       }
     } catch (err) {
       if (requestId === openRequest.current) { setSelected(null); toast.error(apiError(err).message); }
@@ -173,11 +312,22 @@ export default function LearningPage({ learner = false }) {
   };
 
   const closeBook = () => {
+    if (assessmentSubmitting) return;
+    if (assessmentPendingViolation) {
+      void submitFinalAssessment(assessmentPendingViolation);
+      return;
+    }
+    if (assessmentActive) {
+      void submitFinalAssessment('fullscreen_exit');
+      return;
+    }
     saveProgressRef.current(false, true);
     openRequest.current += 1;
     setSelected(null);
     setPreview(null);
     setBookUrl('');
+    setFinalAssessment(null);
+    setAssessmentActive(false);
   };
 
   const saveProgress = async (completed = false, silent = false) => {
@@ -196,6 +346,10 @@ export default function LearningPage({ learner = false }) {
       setSelected((current) => ({ ...current, progress: next }));
       if (!silent && completed) toast.success(next.completed ? 'Reading completion recorded.' : 'Keep reading to reach the final portion before completion.');
       else if (!silent) toast.success('Learning progress saved.');
+      if (next.completed && !selected.progress?.completed) {
+        const status = await api.get(`/learning/books/${selected.id}/final-assessment`);
+        setFinalAssessment(status.data.data);
+      }
       if (completed && next.completed) {
         const stats = await api.get('/learning/summary');
         setSummary(stats.data.data);
@@ -244,6 +398,11 @@ export default function LearningPage({ learner = false }) {
     setSavingEdit(true);
     try {
       await api.patch(`/learning/books/${editing.id}`, { title: editing.title, description: editing.description, category: editing.category, level: editing.level, active: editing.active });
+      if (assessmentDirty) {
+        await api.put(`/learning/books/${editing.id}/assessment`, {
+          questions: assessmentEnabled ? assessmentQuestions : [],
+        });
+      }
       toast.success('Document details updated.');
       setEditing(null);
       await load();
@@ -361,21 +520,21 @@ export default function LearningPage({ learner = false }) {
       if (!group.length) return null;
       return <section key={item} className="mb-6"><div className="mb-3 flex items-center gap-2"><h2 className="text-base font-bold text-slate-800">{item}</h2><Badge color="brand">{group.length} resources</Badge></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {group.map((book) => <article key={book.id} className={`card flex flex-col ${!book.active ? 'opacity-75' : ''}`}>
-          <div className="flex items-start gap-3"><BookCover src={book.coverUrl} alt={`Cover for ${book.title}`} className="h-16 w-14 shrink-0 rounded-lg object-cover" /><div className="min-w-0 flex-1"><h3 className="line-clamp-2 font-semibold text-slate-900">{book.title}</h3><p className="mt-1 text-xs text-slate-500">{book.category} · {FORMAT_NAMES[book.format] || book.format?.toUpperCase()} · {fmtSize(book.size)}</p>{book.description && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{book.description}</p>}</div>{isAdmin && <button onClick={() => setEditing({ ...book })} className="btn-ghost min-h-9 p-2" title="Edit document"><Settings2 size={16} /></button>}</div>
+          <div className="flex items-start gap-3"><BookCover src={book.coverUrl} alt={`Cover for ${book.title}`} className="h-16 w-14 shrink-0 rounded-lg object-cover" /><div className="min-w-0 flex-1"><h3 className="line-clamp-2 font-semibold text-slate-900">{book.title}</h3><p className="mt-1 text-xs text-slate-500">{book.category} · {FORMAT_NAMES[book.format] || book.format?.toUpperCase()} · {fmtSize(book.size)}</p>{book.description && <p className="mt-1 line-clamp-2 text-xs text-slate-500">{book.description}</p>}</div>{isAdmin && <button onClick={() => openBookEditor(book)} disabled={loadingAssessmentSettings} className="btn-ghost min-h-9 p-2" title="Edit document and assessment"><Settings2 size={16} /></button>}</div>
           {book.progress && <div className="mt-3 flex items-center justify-between text-xs"><span className="text-slate-500">{book.progress.completed ? 'Completed' : `Last opened · ${book.progress.positionType} ${book.progress.positionIndex}${book.progress.positionLabel ? ` · ${book.progress.positionLabel}` : ''}`}</span>{book.progress.completed && <CheckCircle2 size={14} className="text-emerald-600" />}</div>}
           {isAdmin && book.processingStatus === 'error' && <div className="mt-3 rounded-lg bg-red-50 p-2 text-xs text-red-700"><p>{book.processingError || 'This file could not be processed.'}</p><button onClick={() => retryImport(book)} className="mt-1 inline-flex items-center gap-1 font-semibold"><RotateCw size={13} />Retry import</button></div>}
           {isAdmin && <p className="mt-2 text-xs text-slate-500">{book.active ? 'Available to students' : 'Draft or archived'}</p>}
-          <div className="mt-auto grid gap-2 pt-4"><button disabled={book.processingStatus === 'error' || book.processingStatus === 'missing'} onClick={() => openBook(book)} className="btn-secondary w-full">Preview <BookOpen size={16} /></button>{isAdmin && <div className="flex gap-2"><button className="btn-secondary flex-1" onClick={() => { const next = { ...book, active: !book.active }; setEditing(next); }}> {book.active ? 'Archive' : 'Restore'} </button><button className="btn-ghost text-red-600" onClick={() => deleteBook(book)} aria-label={`Delete ${book.title}`}><Trash2 size={16} /></button></div>}</div>
+          <div className="mt-auto grid gap-2 pt-4"><button disabled={book.processingStatus === 'error' || book.processingStatus === 'missing'} onClick={() => openBook(book)} className="btn-secondary w-full">Preview <BookOpen size={16} /></button>{isAdmin && <div className="flex gap-2"><button className="btn-secondary flex-1" onClick={() => openBookEditor({ ...book, active: !book.active })} disabled={loadingAssessmentSettings}> {book.active ? 'Archive' : 'Restore'} </button><button className="btn-ghost text-red-600" onClick={() => deleteBook(book)} aria-label={`Delete ${book.title}`}><Trash2 size={16} /></button></div>}</div>
         </article>)}
       </div></section>;
     })}
 
-    <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title="Manage learning document" size="manage" footer={editing && <><button className="btn-secondary" onClick={() => setEditing(null)}>Cancel</button>{editStep > 0 && <button className="btn-secondary" onClick={() => setEditStep((step) => step - 1)}>Back</button>}{editStep < 2 ? <button className="btn-primary" onClick={() => { if (editStep === 0 && !document.getElementById('edit-learning-book')?.reportValidity()) return; setEditStep((step) => step + 1); }}>{editStep === 1 ? 'Next: book cover' : 'Next: file settings'}<ChevronRight size={16} /></button> : <button form="edit-learning-book" className="btn-primary" disabled={savingEdit}>{savingEdit && <Spinner size={16} />}Save changes</button>}</>}>
+    <Modal open={Boolean(editing)} onClose={() => setEditing(null)} title="Manage learning document" size="manage" footer={editing && <><button className="btn-secondary" onClick={() => setEditing(null)}>Cancel</button>{editStep > 0 && <button className="btn-secondary" onClick={() => setEditStep((step) => step - 1)}>Back</button>}{editStep < 3 ? <button className="btn-primary" onClick={() => { if (editStep === 0 && !document.getElementById('edit-learning-book')?.reportValidity()) return; setEditStep((step) => step + 1); }}>{['Next: file settings', 'Next: book cover', 'Next: assessment'][editStep]}<ChevronRight size={16} /></button> : <button form="edit-learning-book" className="btn-primary" disabled={savingEdit || loadingAssessmentSettings}>{savingEdit && <Spinner size={16} />}Save changes</button>}</>}>
       {editing && <div className="space-y-4">
-        <nav aria-label="Document settings steps" className="grid grid-cols-3 gap-2">
-          {[['Details', 'Title, subject and level'], ['File settings', 'Availability and replacement'], ['Book cover', 'Card image']].map(([label, hint], index) => <div key={label} aria-current={editStep === index ? 'step' : undefined} className={`min-w-0 rounded-lg border px-2 py-2 ${editStep === index ? 'border-brand-300 bg-brand-50' : 'border-slate-200 bg-white'}`}><p className={`text-xs font-semibold ${editStep === index ? 'text-brand-800' : 'text-slate-500'}`}>{index + 1}. {label}</p><p className="mt-0.5 hidden truncate text-[11px] text-slate-500 sm:block">{hint}</p></div>)}
+        <nav aria-label="Document settings steps" className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {[['Details', 'Title, subject and level'], ['File settings', 'Availability and replacement'], ['Book cover', 'Card image'], ['Assessment', 'Questions and student attempts']].map(([label, hint], index) => <div key={label} aria-current={editStep === index ? 'step' : undefined} className={`min-w-0 rounded-lg border px-2 py-2 ${editStep === index ? 'border-brand-300 bg-brand-50' : 'border-slate-200 bg-white'}`}><p className={`text-xs font-semibold ${editStep === index ? 'text-brand-800' : 'text-slate-500'}`}>{index + 1}. {label}</p><p className="mt-0.5 hidden truncate text-[11px] text-slate-500 sm:block">{hint}</p></div>)}
         </nav>
-        <form id="edit-learning-book" onSubmit={(event) => { if (editStep < 2) { event.preventDefault(); if (editStep === 0 && !event.currentTarget.reportValidity()) return; setEditStep((step) => step + 1); return; } saveBook(event); }} className="min-h-[15rem]">
+        <form id="edit-learning-book" onSubmit={(event) => { if (editStep < 3) { event.preventDefault(); if (editStep === 0 && !event.currentTarget.reportValidity()) return; setEditStep((step) => step + 1); return; } saveBook(event); }} className="min-h-[15rem]">
           {editStep === 0 && <div className="grid gap-3 sm:grid-cols-2 sm:gap-4">
             <div><label className="label" htmlFor="learning-title">Title</label><input id="learning-title" className="input" maxLength={240} required value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></div>
             <div><label className="label" htmlFor="learning-description">Description</label><textarea id="learning-description" className="input min-h-20" maxLength={2000} value={editing.description || ''} onChange={(event) => setEditing({ ...editing, description: event.target.value })} /></div>
@@ -386,6 +545,36 @@ export default function LearningPage({ learner = false }) {
             <div className="rounded-lg border border-slate-200 p-3 sm:p-4"><p className="break-all text-xs text-slate-500">Current file: {editing.fileName} · {FORMAT_NAMES[editing.format]} · {fmtSize(editing.size)}</p><div className="mt-4"><label className="label" htmlFor="learning-replacement">Replace file (same format)</label><input id="learning-replacement" className="input" type="file" accept={`.${editing.format}`} onChange={(event) => replaceFile(editing, event.target.files?.[0])} /><p className="mt-2 text-xs leading-5 text-slate-500">Replacement keeps this resource’s metadata and availability.</p></div></div>
           </div>}
           {editStep === 2 && <section className="grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center sm:p-4" aria-labelledby="book-cover-heading"><BookCover src={editing.coverUrl} alt={`Cover for ${editing.title}`} className="mx-auto h-36 w-28 rounded-lg border border-slate-200 object-cover shadow-sm sm:mx-0" /><div className="min-w-0"><h4 id="book-cover-heading" className="text-sm font-semibold text-slate-800">Book cover image</h4><p className="mt-1 text-xs text-slate-500">Shown on the student book card.</p><input className="mt-3 block w-full min-w-0 text-xs file:mr-2 file:rounded-lg file:border-0 file:bg-brand-50 file:px-2 file:py-2 file:font-medium file:text-brand-700" type="file" accept="image/png,image/jpeg,image/webp" disabled={uploadingCover} onChange={(event) => uploadBookCover(event.target.files?.[0])} /><p className="mt-2 text-xs leading-5 text-slate-500">PNG, JPEG, or WebP · up to 3 MB.</p>{uploadingCover && <p role="status" className="mt-2 text-sm text-brand-700">Uploading cover…</p>}</div></section>}
+          {editStep === 3 && <div className="space-y-4">
+            <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-3 text-sm text-slate-700">
+              <input type="checkbox" className="mt-1" checked={assessmentEnabled} disabled={assessmentAttempts.length > 0} onChange={(event) => { setAssessmentEnabled(event.target.checked); setAssessmentDirty(true); }} />
+              <span><span className="font-semibold">Require a final assessment for required course reading</span><span className="mt-1 block text-xs text-slate-500">Students must complete the reading, then pass 20 multiple-choice questions with at least 80%. They get up to three attempts.</span></span>
+            </label>
+            {assessmentAttempts.length > 0 && <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Questions are locked because students have already submitted attempts. You may still update document details.</div>}
+            {assessmentEnabled && <div className="max-h-[55vh] space-y-3 overflow-y-auto pr-1">
+              {assessmentQuestions.map((question, questionIndex) => <fieldset key={questionIndex} disabled={assessmentAttempts.length > 0} className="rounded-xl border border-slate-200 p-3">
+                <legend className="px-1 text-sm font-semibold text-slate-800">Question {questionIndex + 1}</legend>
+                <label className="label" htmlFor={`assessment-prompt-${questionIndex}`}>Question</label>
+                <textarea id={`assessment-prompt-${questionIndex}`} className="input min-h-16" maxLength={1200} required value={question.prompt} onChange={(event) => updateAssessmentQuestion(questionIndex, { prompt: event.target.value })} />
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {question.options.map((option, optionIndex) => <div key={optionIndex} className="flex items-center gap-2">
+                    <input type="radio" name={`correct-option-${questionIndex}`} aria-label={`Mark option ${optionIndex + 1} correct for question ${questionIndex + 1}`} checked={question.correctOption === optionIndex} onChange={() => updateAssessmentQuestion(questionIndex, { correctOption: optionIndex })} />
+                    <input className="input" aria-label={`Option ${optionIndex + 1} for question ${questionIndex + 1}`} maxLength={500} required value={option} onChange={(event) => updateAssessmentQuestion(questionIndex, { options: question.options.map((value, index) => index === optionIndex ? event.target.value : value) })} />
+                  </div>)}
+                </div>
+              </fieldset>)}
+            </div>}
+            <section aria-labelledby="assessment-attempts-heading" className="space-y-2">
+              <h4 id="assessment-attempts-heading" className="text-sm font-semibold text-slate-800">Student attempts and integrity reports</h4>
+              {assessmentAttempts.length === 0 ? <p className="text-xs text-slate-500">No student attempts have been recorded.</p> : <ul className="max-h-48 divide-y divide-slate-100 overflow-y-auto rounded-lg border border-slate-200 px-3">
+                {assessmentAttempts.map((attempt) => <li key={attempt.id} className="py-2 text-xs">
+                  <p className="font-medium text-slate-800">{attempt.studentName} · {attempt.studentEmail || 'No email'} · Attempt {attempt.attemptNumber} · {attempt.score}% · {attempt.passed ? 'Passed' : 'Not passed'}</p>
+                  {attempt.violation && <p className="mt-1 text-amber-800">Integrity report: {attempt.violation.replaceAll('_', ' ')}</p>}
+                  <p className="mt-1 text-slate-500">{new Date(attempt.submittedAt).toLocaleString()}</p>
+                </li>)}
+              </ul>}
+            </section>
+          </div>}
         </form>
       </div>}
     </Modal>
@@ -398,8 +587,9 @@ export default function LearningPage({ learner = false }) {
       </form>
     </Modal>
 
-    <Modal open={Boolean(selected)} onClose={closeBook} title={selected?.title || 'Document preview'} size="reader" footer={selected && <><button className="btn-secondary mr-auto" onClick={downloadBook} disabled={downloading}>{downloading ? <Spinner size={16} /> : <Download size={16} />}Download</button><button className="btn-secondary" onClick={closeBook}>Close</button></>}>
-      {selected && <div ref={readerRef} className={`min-w-0 space-y-3 ${fullscreenFallback ? 'fixed inset-0 z-[100] overflow-y-auto bg-white p-3 sm:p-6' : ''}`}><div className="flex flex-wrap items-center gap-2"><Badge color="brand">{selected.level}</Badge><Badge>{selected.category}</Badge><Badge>{FORMAT_NAMES[selected.format] || selected.format?.toUpperCase()}</Badge>{selected.progress?.completed && <Badge color="green">Reading complete</Badge>}</div>
+    <Modal open={Boolean(selected)} onClose={closeBook} title={selected?.title || 'Document preview'} size="reader" footer={selected && !assessmentActive && <><button className="btn-secondary mr-auto" onClick={downloadBook} disabled={downloading}>{downloading ? <Spinner size={16} /> : <Download size={16} />}Download</button><button className="btn-secondary" onClick={closeBook}>Close</button></>}>
+      {selected && <div ref={readerRef} className={`min-w-0 space-y-3 ${assessmentActive ? 'min-h-screen bg-white p-4 sm:p-8' : fullscreenFallback ? 'fixed inset-0 z-[100] overflow-y-auto bg-white p-3 sm:p-6' : ''}`}><div className="flex flex-wrap items-center gap-2"><Badge color="brand">{selected.level}</Badge><Badge>{selected.category}</Badge><Badge>{FORMAT_NAMES[selected.format] || selected.format?.toUpperCase()}</Badge>{selected.progress?.completed && <Badge color="green">Reading complete</Badge>}</div>
+        {!assessmentActive && <>
         <div role="toolbar" aria-label="Document reader controls" className="sticky top-0 z-10 flex flex-wrap items-center gap-1 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-sm backdrop-blur">
           <button className="btn-ghost min-h-10 px-2" title="Zoom out" aria-label="Zoom out" onClick={() => setZoom((value) => Math.max(25, value - 10))}><ZoomOut size={17} /></button>
           <label className="sr-only" htmlFor="reader-zoom">Document zoom</label><select id="reader-zoom" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} className="h-9 w-[4.5rem] rounded-md border border-slate-200 bg-white px-1 text-center text-xs tabular-nums" aria-label={`Document zoom, ${zoom} percent`}>{[50, 75, 90, 100, 110, 120, 130, 140, 150, 175, 200, 250, 300].map((value) => <option key={value} value={value}>{value}%</option>)}</select>
@@ -423,6 +613,29 @@ export default function LearningPage({ learner = false }) {
                     : <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{preview.message}<p className="mt-2 text-xs">Document content is downloaded as a file and is not executed in the browser.</p></div>}
         {canTrack && positionControls}
         {canTrack && <button onClick={() => saveProgress(true)} disabled={savingProgress || selected.progress?.completed} className="btn-secondary w-full"><CheckCircle2 size={16} />{selected.progress?.completed ? 'Already completed' : 'Mark document as complete'}</button>}
+        </>}
+        {canTrack && finalAssessment?.required && <section aria-labelledby="final-assessment-heading" className={`space-y-4 rounded-xl border border-brand-200 bg-brand-50 p-4 ${assessmentActive ? 'mx-auto max-w-3xl border-0 bg-white p-0' : ''}`} onCopy={(event) => assessmentActive && event.preventDefault()} onContextMenu={(event) => assessmentActive && event.preventDefault()}>
+          <div>
+            <h2 id="final-assessment-heading" className="text-lg font-bold text-slate-900">Final reading assessment</h2>
+            <p className="mt-1 text-sm text-slate-600">Pass mark: 80% · Maximum attempts: 3</p>
+          </div>
+          {assessmentActive && finalAssessment.questions?.length === 20 && <div className="select-none space-y-4">
+            <p className="text-sm font-medium text-slate-700">Answer all 20 questions. Leaving this tab, exiting fullscreen, or using a detected copy/screenshot shortcut will submit your current answers and report the event to the administrator.</p>
+            {finalAssessment.questions.map((question, questionIndex) => <fieldset key={question.id} className="rounded-xl border border-slate-200 bg-white p-4">
+              <legend className="px-1 text-sm font-semibold text-slate-900">{questionIndex + 1}. {question.prompt}</legend>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">{question.options.map((option, optionIndex) => <label key={optionIndex} className="flex cursor-pointer items-start gap-2 rounded-lg border border-slate-200 p-3 text-sm hover:bg-slate-50"><input className="mt-1" type="radio" name={`final-assessment-${questionIndex}`} checked={assessmentAnswers[question.id] === optionIndex} onChange={() => setAssessmentAnswers((current) => ({ ...current, [question.id]: optionIndex }))} /><span>{option}</span></label>)}</div>
+            </fieldset>)}
+            <p className="text-xs text-slate-500">The browser cannot block or reliably detect operating-system screenshots. Fullscreen and shortcut monitoring are best-effort.</p>
+            <button type="button" className="btn-primary w-full" disabled={assessmentSubmitting} onClick={() => submitFinalAssessment()}>{assessmentSubmitting ? <Spinner size={16} /> : <CheckCircle2 size={16} />}Submit assessment</button>
+          </div>}
+          {!assessmentActive && assessmentResult?.submissionError && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800"><p>Your assessment could not be submitted: {assessmentResult.submissionError}</p><p className="mt-1">Your answers are still on this device. Retry the submission or contact the administrator.</p><button className="btn-secondary mt-3" disabled={assessmentSubmitting} onClick={() => submitFinalAssessment(assessmentPendingViolation)}>{assessmentSubmitting ? <Spinner size={16} /> : null}Retry submission</button></div>}
+          {!assessmentActive && assessmentResult && !assessmentResult.submissionError && <div role="status" className={`rounded-lg p-3 text-sm ${assessmentResult.passed ? 'bg-emerald-100 text-emerald-900' : 'bg-amber-100 text-amber-900'}`}>{assessmentResult.passed ? `Passed with ${assessmentResult.score}%.` : `Scored ${assessmentResult.score}%. ${assessmentResult.attemptsRemaining} attempt${assessmentResult.attemptsRemaining === 1 ? '' : 's'} remaining.`}{assessmentResult.reportToAdministrator && <p className="mt-1">The administrator has been notified of the integrity event.</p>}</div>}
+          {!assessmentActive && !assessmentResult?.submissionError && finalAssessment.passed && <p className="text-sm font-semibold text-emerald-800">Assessment passed. Your course completion status will update automatically.</p>}
+          {!assessmentActive && !assessmentResult?.submissionError && !finalAssessment.configured && <p className="text-sm text-amber-800">The administrator has not configured this assessment yet.</p>}
+          {!assessmentActive && !assessmentResult?.submissionError && finalAssessment.configured && !finalAssessment.readingCompleted && <p className="text-sm text-slate-700">Complete the required reading before starting this assessment.</p>}
+          {!assessmentActive && !assessmentResult?.submissionError && !assessmentResult?.passed && finalAssessment.configured && finalAssessment.readingCompleted && !finalAssessment.passed && finalAssessment.attemptsRemaining > 0 && <button className="btn-primary w-full" onClick={startFinalAssessment}>Start final assessment ({finalAssessment.attemptsRemaining} attempt{finalAssessment.attemptsRemaining === 1 ? '' : 's'} remaining)</button>}
+          {!assessmentActive && !assessmentResult?.submissionError && !finalAssessment.passed && finalAssessment.attemptsRemaining === 0 && <p className="text-sm text-amber-800">No attempts remain. Contact your administrator for help.</p>}
+        </section>}
         {isAdmin && !selected.active && <p className="text-xs text-slate-500">This draft or archived resource is visible only to administrators. Publish it from Manage document after previewing.</p>}
       </div>}
     </Modal>

@@ -35,10 +35,28 @@ const bookUpdateSchema = z.object({
   level: z.enum(['L3', 'L4', 'L5']).optional(),
   active: z.boolean().optional(),
 }).refine((value) => Object.keys(value).length > 0);
+const assessmentQuestion = z.object({
+  prompt: z.string().trim().min(1).max(1200),
+  options: z.array(z.string().trim().min(1).max(500)).length(4),
+  correctOption: z.number().int().min(0).max(3),
+});
+const assessmentSchema = z.object({ questions: z.array(assessmentQuestion).refine((questions) => questions.length === 0 || questions.length === 20) });
+const assessmentAnswersSchema = z.object({
+  answers: z.array(z.object({
+    questionIndex: z.number().int().min(0).max(19),
+    optionIndex: z.number().int().min(0).max(3),
+  })).max(20).refine((answers) => new Set(answers.map((answer) => answer.questionIndex)).size === answers.length),
+  violation: z.enum(['tab_hidden', 'window_blur', 'fullscreen_exit', 'copy', 'screenshot_shortcut']).optional(),
+});
 
 router.get('/summary', learning.learningSummary);
 router.post('/books/upload', requireOwner, upload.single('file'), validate(z.object({ level: z.enum(['L3', 'L4', 'L5']), category: z.string().trim().min(1).max(120) })), learning.uploadBook);
 router.get('/books', validate(z.object({ manage: z.enum(['true', 'false']).optional(), level: z.enum(['L3', 'L4', 'L5']).optional(), category: z.string().trim().max(120).optional(), format: z.string().regex(/^(pdf|doc|docx|txt|md|ppt|pptx|xls|xlsx)$/).optional(), search: z.string().max(120).optional(), limit: z.string().regex(/^\d{1,3}$/).optional() }), 'query'), learning.listBooks);
+router.get('/books/:id/final-assessment', validate(idSchema, 'params'), learning.getFinalAssessment);
+router.post('/books/:id/final-assessment', validate(idSchema, 'params'), validate(assessmentAnswersSchema), learning.submitFinalAssessment);
+router.get('/books/:id/assessment-attempts', requireOwner, validate(idSchema, 'params'), learning.listBookAssessmentAttempts);
+router.get('/books/:id/assessment', requireOwner, validate(idSchema, 'params'), learning.getBookAssessment);
+router.put('/books/:id/assessment', requireOwner, validate(idSchema, 'params'), validate(assessmentSchema), learning.saveBookAssessment);
 router.get('/books/:id/preview', validate(idSchema, 'params'), learning.previewBook);
 router.get('/books/:id/cover', validate(idSchema, 'params'), learning.streamBookCover);
 router.get('/books/:id/file', validate(idSchema, 'params'), learning.streamBook);

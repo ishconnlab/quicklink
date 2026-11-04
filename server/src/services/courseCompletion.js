@@ -2,6 +2,7 @@ import { Assignment } from '../models/Assignment.js';
 import { AssignmentSubmission } from '../models/AssignmentSubmission.js';
 import { LearningBook } from '../models/LearningBook.js';
 import { LearningProgress } from '../models/LearningProgress.js';
+import { LearningAssessmentAttempt } from '../models/LearningAssessmentAttempt.js';
 import { LiveSession } from '../models/LiveSession.js';
 
 export async function evaluateCourseCompletion(course, studentId) {
@@ -15,6 +16,22 @@ export async function evaluateCourseCompletion(course, studentId) {
     const progress = ids.length ? await LearningProgress.find({ student: studentId, book: { $in: ids } }).select('book completed').lean() : [];
     const done = new Set(progress.filter((item) => item.completed).map((item) => item.book.toString()));
     checks.push({ key: 'reading', label: 'Complete assigned reading', complete: ids.length > 0 && ids.every((book) => done.has(book.toString())), detail: `${done.size} of ${ids.length} materials complete` });
+    const [books, passedAttempts] = ids.length ? await Promise.all([
+      LearningBook.find({ _id: { $in: ids } }).select('_id assessmentQuestions').lean(),
+      LearningAssessmentAttempt.find({ student: studentId, book: { $in: ids }, passed: true }).select('book').lean(),
+    ]) : [[], []];
+    const configured = new Set(books.filter((book) => book.assessmentQuestions?.length === 20).map((book) => book._id.toString()));
+    const passed = new Set(passedAttempts.map((attempt) => attempt.book.toString()));
+    const passedRequired = ids.filter((book) => configured.has(book.toString()) && passed.has(book.toString())).length;
+    const unconfigured = ids.length - configured.size;
+    checks.push({
+      key: 'readingAssessment',
+      label: 'Pass final reading assessments',
+      complete: ids.length > 0 && unconfigured === 0 && passedRequired === ids.length,
+      detail: unconfigured
+        ? `${unconfigured} assessment${unconfigured === 1 ? ' needs' : 's need'} administrator setup; ${passedRequired} of ${ids.length} passed`
+        : `${passedRequired} of ${ids.length} passed (80% required)`,
+    });
   }
 
   const assignmentTypes = [];
