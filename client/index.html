@@ -9,9 +9,61 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>QuickLink</title>
+    <style>
+      .app-loader {
+        min-height: 100vh;
+        min-height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        color: #64748b;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      .app-loader-content {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 1rem;
+      }
+      .app-loader-mark {
+        display: grid;
+        width: 2rem;
+        height: 2rem;
+        place-items: center;
+        border-radius: 0.625rem;
+        background: #15803d;
+        color: white;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .app-loader-spinner {
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid #bbf7d0;
+        border-top-color: #15803d;
+        border-radius: 50%;
+        animation: app-loader-spin 0.8s linear infinite;
+      }
+      @keyframes app-loader-spin {
+        to { transform: rotate(360deg); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .app-loader-spinner { animation-duration: 2s; }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="app-loader" role="status" aria-label="Loading QuickLink">
+        <div class="app-loader-content">
+          <span class="app-loader-mark" aria-hidden="true">QL</span>
+          <span>QuickLink</span>
+          <span class="app-loader-spinner" aria-hidden="true"></span>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
