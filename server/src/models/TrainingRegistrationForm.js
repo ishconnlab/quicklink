@@ -19,6 +19,8 @@ const trainingRegistrationFormSchema = new mongoose.Schema({
   },
   fields: { type: [customFieldSchema], default: [], validate: (fields) => fields.length <= 10 },
   imageFile: { type: String, default: '', match: /^(|[0-9a-f-]{36}\.(png|jpg|webp))$/ },
+  imagePublicId: { type: String, default: '', maxlength: 255 },
+  imageUrl: { type: String, default: '', maxlength: 1000 },
   active: { type: Boolean, default: true, index: true },
 }, { timestamps: true });
 

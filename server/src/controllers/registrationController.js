@@ -10,6 +10,7 @@ import { LearningClass } from '../models/LearningClass.js';
 import { LiveSession } from '../models/LiveSession.js';
 import { TrainingRegistration } from '../models/TrainingRegistration.js';
 import { TrainingRegistrationForm } from '../models/TrainingRegistrationForm.js';
+import { deleteCloudinaryAsset, uploadCloudinaryBuffer, validateCloudinaryConfig } from '../services/cloudinary.js';
 
 const IMAGE_ROOT = path.resolve(config.registrationImageDir || fileURLToPath(new URL('../../registration-images/', import.meta.url)));
 const imageTypes = [
@@ -18,7 +19,7 @@ const imageTypes = [
   { ext: 'webp', mime: 'image/webp', matches: (buffer) => buffer.subarray(0, 4).toString() === 'RIFF' && buffer.subarray(8, 12).toString() === 'WEBP' },
 ];
 
-const publicImageUrl = (form) => form.imageFile ? `/api/registrations/public/${form.slug}/image` : '';
+const publicImageUrl = (form) => form.imageUrl || (form.imageFile ? `/api/registrations/public/${form.slug}/image` : '');
 const normalizeEmail = (email) => String(email).trim().toLowerCase();
 const safeForm = (form) => ({
   id: form._id.toString(),
@@ -98,21 +99,44 @@ export const uploadFormImage = asyncHandler(async (req, res) => {
   if (!type) throw ApiError.badRequest('Image content must match a PNG, JPEG, or WebP file.');
   const form = await TrainingRegistrationForm.findById(req.params.formId);
   if (!form) throw ApiError.notFound('Registration form not found.');
-  await fs.mkdir(IMAGE_ROOT, { recursive: true });
-  const fileName = `${randomUUID()}.${type.ext}`;
-  const filePath = path.join(IMAGE_ROOT, fileName);
-  await fs.writeFile(filePath, req.file.buffer, { flag: 'wx', mode: 0o640 });
-  const previous = form.imageFile;
-  form.imageFile = fileName;
+  const previousFile = form.imageFile;
+  const previousPublicId = form.imagePublicId;
+  let uploaded;
+  let localPath;
+  if (validateCloudinaryConfig()) {
+    uploaded = await uploadCloudinaryBuffer({
+      buffer: req.file.buffer,
+      folder: `${config.cloudinary.folderPrefix}/registration-forms`,
+      resourceType: 'image',
+    });
+    form.imageFile = '';
+    form.imagePublicId = uploaded.publicId;
+    form.imageUrl = uploaded.secureUrl;
+  } else {
+    await fs.mkdir(IMAGE_ROOT, { recursive: true });
+    const fileName = `${randomUUID()}.${type.ext}`;
+    localPath = path.join(IMAGE_ROOT, fileName);
+    await fs.writeFile(localPath, req.file.buffer, { flag: 'wx', mode: 0o640 });
+    form.imageFile = fileName;
+    form.imagePublicId = '';
+    form.imageUrl = '';
+  }
   try { await form.save(); }
-  catch (error) { await fs.unlink(filePath).catch(() => {}); throw error; }
-  if (previous) await fs.unlink(path.join(IMAGE_ROOT, path.basename(previous))).catch(() => {});
+  catch (error) {
+    if (localPath) await fs.unlink(localPath).catch(() => {});
+    if (uploaded?.publicId) await deleteCloudinaryAsset({ publicId: uploaded.publicId, resourceType: 'image' }).catch((cleanupError) => console.warn('[storage] Could not remove unreferenced registration image from Cloudinary:', cleanupError.message));
+    throw error;
+  }
+  if (previousFile) await fs.unlink(path.join(IMAGE_ROOT, path.basename(previousFile))).catch(() => {});
+  if (previousPublicId) await deleteCloudinaryAsset({ publicId: previousPublicId, resourceType: 'image' }).catch((error) => console.warn('[storage] Could not remove replaced registration image from Cloudinary:', error.message));
   res.json({ success: true, data: { imageUrl: publicImageUrl(form) } });
 });
 
 export const getPublicImage = asyncHandler(async (req, res) => {
-  const form = await TrainingRegistrationForm.findOne({ slug: req.params.slug, active: true }).select('imageFile learningClass').populate('learningClass', 'active');
-  if (!form?.learningClass?.active || !form.imageFile || !/^[0-9a-f-]{36}\.(png|jpg|webp)$/.test(form.imageFile)) throw ApiError.notFound('Registration image not found.');
+  const form = await TrainingRegistrationForm.findOne({ slug: req.params.slug, active: true }).select('imageFile imageUrl learningClass').populate('learningClass', 'active');
+  if (!form?.learningClass?.active || (!form.imageFile && !form.imageUrl)) throw ApiError.notFound('Registration image not found.');
+  if (form.imageUrl) return res.redirect(302, form.imageUrl);
+  if (!/^[0-9a-f-]{36}\.(png|jpg|webp)$/.test(form.imageFile)) throw ApiError.notFound('Registration image not found.');
   let buffer;
   try { buffer = await fs.readFile(path.join(IMAGE_ROOT, form.imageFile)); }
   catch (error) { if (error.code === 'ENOENT') throw ApiError.notFound('Registration image not found.'); throw error; }

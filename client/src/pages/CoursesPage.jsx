@@ -43,7 +43,7 @@ export default function CoursesPage() {
   return <div><PageHeader title="Courses" subtitle="Explore published courses and continue your training." />
     <div className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
       <label className="relative sm:col-span-2 lg:col-span-1"><Search size={16} className="absolute left-3 top-3.5 text-slate-400" /><input className="input pl-9" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Search courses" aria-label="Search courses" /></label>
-      <select className="input" value={filters.level} onChange={(event) => setFilters({ ...filters, level: event.target.value })} aria-label="Filter by education level"><option value="">All levels</option>{['L3', 'L4', 'L5'].map((level) => <option key={level}>{level}</option>)}</select>
+      <select className="input" value={filters.level} onChange={(event) => setFilters({ ...filters, level: event.target.value })} aria-label="Filter by course level"><option value="">All levels</option>{['L3', 'L4', 'L5', 'Bootcamp', 'Training'].map((level) => <option key={level}>{level}</option>)}</select>
       <select className="input" value={filters.subject} onChange={(event) => setFilters({ ...filters, subject: event.target.value })} aria-label="Filter by subject"><option value="">All subjects</option>{result.subjects.map((subject) => <option key={subject}>{subject}</option>)}</select>
       <select className="input" value={filters.trade} onChange={(event) => setFilters({ ...filters, trade: event.target.value })} aria-label="Filter by trade"><option value="">All trades</option>{result.trades.map((trade) => <option key={trade}>{trade}</option>)}</select>
     </div>

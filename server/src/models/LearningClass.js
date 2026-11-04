@@ -6,6 +6,8 @@ const learningClassSchema = new mongoose.Schema({
   trade: { type: String, default: '', trim: true, maxlength: 120, index: true },
   introduction: { type: String, default: '', trim: true, maxlength: 500 },
   thumbnailFile: { type: String, default: '', maxlength: 200 },
+  thumbnailPublicId: { type: String, default: '', maxlength: 255 },
+  thumbnailUrl: { type: String, default: '', maxlength: 1000 },
   learningMaterials: [{ type: mongoose.Schema.Types.ObjectId, ref: 'LearningBook' }],
   completionRequirements: {
     requireReading: { type: Boolean, default: false },
@@ -28,7 +30,7 @@ const learningClassSchema = new mongoose.Schema({
     validate: { validator: (questions) => questions.length === 0 || questions.length === 10, message: 'A certification assessment must contain exactly 10 questions.' },
   },
   course: { type: String, default: '', trim: true, maxlength: 160 },
-  level: { type: String, required: true, enum: ['L3', 'L4', 'L5'], index: true },
+  level: { type: String, required: true, enum: ['L3', 'L4', 'L5', 'Bootcamp', 'Training'], index: true },
   description: { type: String, default: '', trim: true, maxlength: 12000 },
   teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   teachers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],

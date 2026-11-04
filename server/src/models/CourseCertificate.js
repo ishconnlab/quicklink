@@ -6,7 +6,7 @@ const certificateSchema = new mongoose.Schema({
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningClass', required: true, index: true },
   studentName: { type: String, required: true, trim: true, maxlength: 120 },
   courseTitle: { type: String, required: true, trim: true, maxlength: 160 },
-  level: { type: String, enum: ['L3', 'L4', 'L5'], required: true },
+  level: { type: String, enum: ['L3', 'L4', 'L5', 'Bootcamp', 'Training'], required: true },
   issuedAt: { type: Date, required: true, default: Date.now },
   revokedAt: { type: Date, default: null },
   revokedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },

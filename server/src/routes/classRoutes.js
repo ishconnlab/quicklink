@@ -51,7 +51,7 @@ const classFields = {
     minimumScore: z.number().min(0).max(100).optional().default(0),
   }).optional(),
   course: z.string().trim().max(160).optional().default(''),
-  level: z.enum(['L3', 'L4', 'L5']),
+  level: z.enum(['L3', 'L4', 'L5', 'Bootcamp', 'Training']),
   description: z.string().trim().max(12000).optional().default(''),
   teacherId: objectId.optional(),
   teacherIds: z.array(objectId).min(1).max(20).optional(),

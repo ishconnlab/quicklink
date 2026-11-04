@@ -10,6 +10,7 @@ import { LearningBook } from '../models/LearningBook.js';
 import { LearningProgress } from '../models/LearningProgress.js';
 import { LiveSession } from '../models/LiveSession.js';
 import { emitClassSessionEnded } from '../services/classRealtime.js';
+import { deleteCloudinaryAsset, uploadCloudinaryBuffer, validateCloudinaryConfig } from '../services/cloudinary.js';
 import { AccessToken, TrackSource } from 'livekit-server-sdk';
 import config from '../config/env.js';
 
@@ -61,7 +62,7 @@ function classJson(item, liveSession = null, recentSession = null) {
     subject: item.subject,
     trade: item.trade || '',
     introduction: item.introduction || '',
-    thumbnailUrl: item.thumbnailFile ? `/api/courses/${item._id}/thumbnail` : '',
+    thumbnailUrl: item.thumbnailUrl || (item.thumbnailFile ? `/api/courses/${item._id}/thumbnail` : ''),
     course: item.course || '',
     level: item.level,
     description: item.description,
@@ -241,21 +242,43 @@ export const updateCourseThumbnail = asyncHandler(async (req, res) => {
   if (!format) throw ApiError.badRequest('Thumbnail content must match a PNG, JPEG, or WebP image.');
   const item = await LearningClass.findById(req.params.id);
   if (!item) throw ApiError.notFound('Course not found.');
-  await fs.mkdir(COURSE_IMAGE_DIR, { recursive: true });
-  const name = `${randomUUID()}.${format.ext}`;
-  const fullPath = path.join(COURSE_IMAGE_DIR, name);
-  await fs.writeFile(fullPath, req.file.buffer, { flag: 'wx', mode: 0o640 });
-  const previous = item.thumbnailFile;
-  item.thumbnailFile = name;
+  const previousFile = item.thumbnailFile;
+  const previousPublicId = item.thumbnailPublicId;
+  let uploaded;
+  let localPath;
+  if (validateCloudinaryConfig()) {
+    uploaded = await uploadCloudinaryBuffer({
+      buffer: req.file.buffer,
+      folder: `${config.cloudinary.folderPrefix}/course-thumbnails`,
+      resourceType: 'image',
+    });
+    item.thumbnailFile = '';
+    item.thumbnailPublicId = uploaded.publicId;
+    item.thumbnailUrl = uploaded.secureUrl;
+  } else {
+    await fs.mkdir(COURSE_IMAGE_DIR, { recursive: true });
+    const name = `${randomUUID()}.${format.ext}`;
+    localPath = path.join(COURSE_IMAGE_DIR, name);
+    await fs.writeFile(localPath, req.file.buffer, { flag: 'wx', mode: 0o640 });
+    item.thumbnailFile = name;
+    item.thumbnailPublicId = '';
+    item.thumbnailUrl = '';
+  }
   try { await item.save(); }
-  catch (error) { await fs.unlink(fullPath).catch(() => {}); throw error; }
-  if (previous) await fs.unlink(path.join(COURSE_IMAGE_DIR, path.basename(previous))).catch(() => {});
-  res.json({ success: true, data: { thumbnailUrl: `/api/courses/${item._id}/thumbnail` } });
+  catch (error) {
+    if (localPath) await fs.unlink(localPath).catch(() => {});
+    if (uploaded?.publicId) await deleteCloudinaryAsset({ publicId: uploaded.publicId, resourceType: 'image' }).catch((cleanupError) => console.warn('[storage] Could not remove unreferenced course thumbnail from Cloudinary:', cleanupError.message));
+    throw error;
+  }
+  if (previousFile) await fs.unlink(path.join(COURSE_IMAGE_DIR, path.basename(previousFile))).catch(() => {});
+  if (previousPublicId) await deleteCloudinaryAsset({ publicId: previousPublicId, resourceType: 'image' }).catch((error) => console.warn('[storage] Could not remove replaced course thumbnail from Cloudinary:', error.message));
+  res.json({ success: true, data: { thumbnailUrl: item.thumbnailUrl || `/api/courses/${item._id}/thumbnail` } });
 });
 
 export const getCourseThumbnail = asyncHandler(async (req, res) => {
-  const item = await LearningClass.findById(req.params.id).select('active published thumbnailFile');
-  if (!item || !item.thumbnailFile || (req.user?.role !== 'owner' && (!item.active || item.published === false))) throw ApiError.notFound('Course thumbnail not found.');
+  const item = await LearningClass.findById(req.params.id).select('active published thumbnailFile thumbnailUrl');
+  if (!item || (!item.thumbnailFile && !item.thumbnailUrl) || (req.user?.role !== 'owner' && (!item.active || item.published === false))) throw ApiError.notFound('Course thumbnail not found.');
+  if (item.thumbnailUrl) return res.redirect(302, item.thumbnailUrl);
   const name = path.basename(item.thumbnailFile);
   if (name !== item.thumbnailFile) throw ApiError.notFound('Course thumbnail not found.');
   const fullPath = path.join(COURSE_IMAGE_DIR, name);

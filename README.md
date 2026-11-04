@@ -64,7 +64,7 @@ Admins assign active teachers and enroll active students through **Courses and c
 ## Courses, practical work, and certificates
 
 - Published courses reuse the existing class records and teacher/student rosters. Student pages support course search, L3/L4/L5, subject and trade filters, enrollment state, pagination, learning materials, and progress.
-- Admins manage course title, introduction, detailed description, subject/trade, level, learning materials, enrollment capacity, publication, completion rules, and an optional validated PNG/JPEG/WebP thumbnail (maximum 3 MB). Course images are stored in `COURSE_IMAGE_DIR`.
+- Admins manage course title, introduction, detailed description, subject/trade, level, learning materials, enrollment capacity, publication, completion rules, and an optional validated PNG/JPEG/WebP thumbnail (maximum 3 MB). Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` to store course and registration-form images in Cloudinary. Existing local images remain readable, and local storage remains the fallback when Cloudinary is not configured.
 - Assigned teachers and admins can publish practical assignments with objectives, materials, tasks, due dates, score limits, pass marks, and submission requirements. Students can save drafts, submit text, links, or supported files (PDF, PNG/JPEG, ZIP, and UTF-8 text/source; up to five files at 10 MB each), and resubmit when enabled. Student code is stored as a file and never executed by the application server.
 - Assigned teachers and admins can review and grade submissions, leave feedback, request a revision, or mark work passed/failed. Grading history is retained. Students cannot grade their own work.
 - Course completion requirements can include reading, theory quizzes, practical assignments, attendance, and a minimum score. A student can issue a certificate only after all configured requirements pass. Admins can review enrolled students and issue certificates individually or in batches from a course page; the same completion checks apply. Certificates use the IshConnect completion template, retain its printed signature without adding it a second time, and overlay the corporate seal beside the signature. Server-generated PDFs have unique IDs and a QR verification link at `/verify/:code`. Students can download and share issued certificates from their account; the public share link includes social preview metadata, and admins can revoke certificates.
@@ -168,7 +168,7 @@ Socket.IO handles authenticated room membership, chat, and attendance presence. 
 
 Admins can create one public registration form for each active class/training from **Registrations**. Forms support a description, custom placeholders, up to 10 optional or required text fields, and an optional PNG/JPEG/WebP header image (maximum 3 MB). The public URL can be shared directly. Registrations are stored as contact records only; they do not create accounts or enroll students. Admins can view the submitted contact details, start the training's live class, send a class link by configured email, or open a prefilled WhatsApp message.
 
-Email invitations require `SMTP_URL`, `MAIL_FROM`, and `APP_URL`. WhatsApp invitations open WhatsApp for the admin to send manually. Live-class join links continue to require an existing enrolled student account; collecting a registration does not grant class access. Uploaded registration images use the server filesystem; configure persistent storage with `REGISTRATION_IMAGE_DIR`.
+Email invitations require `SMTP_URL`, `MAIL_FROM`, and `APP_URL`. WhatsApp invitations open WhatsApp for the admin to send manually. Live-class join links continue to require an existing enrolled student account; collecting a registration does not grant class access. Registration-form images use Cloudinary when its credentials are configured; otherwise they use the local filesystem, which requires persistent storage.
 
 | Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
@@ -209,7 +209,7 @@ The learning and course smoke commands use the running local API and configured 
 
 ## Deployment and storage
 
-- Use MongoDB reachable by the API service. Mount persistent storage for `LEARNING_BOOKS_DIR`, `BOOK_COVER_DIR`, `COURSE_IMAGE_DIR`, and `SUBMISSIONS_DIR`; database records refer to those files. Back up the storage together with MongoDB.
+- Use MongoDB reachable by the API service. Mount persistent storage for `LEARNING_BOOKS_DIR`, `BOOK_COVER_DIR`, and `SUBMISSIONS_DIR`; database records refer to those files. Class and registration images use Cloudinary when configured. If Cloudinary is not configured, mount persistent storage for `COURSE_IMAGE_DIR` and `REGISTRATION_IMAGE_DIR` for local image fallback. Back up local storage together with MongoDB.
 - Configure a strong `JWT_SECRET`, `CORS_ORIGIN`, and HTTPS. Keep LiveKit and SMTP credentials on the server. The API host must allow WebSocket upgrades for Socket.IO.
 - Configure `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` for live media. Set `SMTP_URL`, `MAIL_FROM`, and `APP_URL` to send class invitations. Without SMTP, invitation records show delivery failure.
 - Set client `VITE_API_URL` to the deployed API origin if no development proxy or same-origin deployment is used.
