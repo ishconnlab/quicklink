@@ -7,6 +7,20 @@ import { CertificationAssessmentAttempt } from '../models/CertificationAssessmen
 import { LiveSession } from '../models/LiveSession.js';
 import { getLearningSettings } from './settings.js';
 
+export const REQUIRED_ATTENDANCE_SESSIONS = 2;
+
+export function evaluateAttendanceRequirement(sessions, studentId) {
+  const attended = sessions.filter((session) => session.report?.attendance?.some(
+    (record) => record.user?.toString() === studentId.toString() && record.attended,
+  )).length;
+  return {
+    key: 'attendance',
+    label: `Attend at least ${REQUIRED_ATTENDANCE_SESSIONS} class sessions`,
+    complete: attended >= REQUIRED_ATTENDANCE_SESSIONS,
+    detail: `${attended} sessions attended (${REQUIRED_ATTENDANCE_SESSIONS} required)`,
+  };
+}
+
 export function evaluateAssignmentRequirements(assignments, submissions) {
   const latest = new Map();
   for (const submission of [...submissions].sort((a, b) => b.attempt - a.attempt)) {
@@ -94,8 +108,7 @@ export async function evaluateCourseCompletion(course, studentId) {
 
   if (rules.requireAttendance) {
     const sessions = await LiveSession.find({ learningClass: course._id, status: 'ended' }).select('report.attendance').lean();
-    const attended = sessions.filter((session) => session.report?.attendance?.some((record) => record.user?.toString() === studentId.toString() && record.attended)).length;
-    checks.push({ key: 'attendance', label: 'Attend required class sessions', complete: sessions.length > 0 && attended === sessions.length, detail: `${attended} of ${sessions.length} sessions attended` });
+    checks.push(evaluateAttendanceRequirement(sessions, studentId));
   }
 
   if (rules.minimumScore > 0) {

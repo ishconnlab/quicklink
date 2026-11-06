@@ -165,7 +165,7 @@ export default function CourseDetailPage() {
         </section>}
         {isAdmin(user) && <section className="mt-8 border-t border-slate-200 pt-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div><h2 className="flex items-center gap-2 font-semibold text-slate-900"><Award size={18} />Training certificates</h2><p className="mt-1 text-sm text-slate-500">{certificateTotal} enrolled student{certificateTotal === 1 ? '' : 's'} · certificates can only be issued when all configured completion requirements are met.</p></div>
+            <div><h2 className="flex items-center gap-2 font-semibold text-slate-900"><Award size={18} />Training certificates</h2><p className="mt-1 text-sm text-slate-500">{certificateTotal} enrolled student{certificateTotal === 1 ? '' : 's'} · certificates require all configured completion requirements; the attendance requirement is met after two sessions.</p></div>
             <button className="btn-primary" disabled={certificateLoading || issuingIds.length > 0 || !certificateCandidates.some((candidate) => candidate.eligible && !candidate.certificate)} onClick={() => issueForStudents(certificateCandidates.filter((candidate) => candidate.eligible && !candidate.certificate).map((candidate) => candidate.studentId))}>
               {issuingIds.length > 0 ? <Spinner size={16} /> : <Award size={16} />}Issue eligible on this page
             </button>
