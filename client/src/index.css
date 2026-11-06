@@ -5,13 +5,44 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    min-height: 100%;
   }
   body {
     @apply bg-slate-100 text-slate-800 antialiased;
+    min-height: 100dvh;
+    overflow-x: hidden;
     font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  #root {
+    min-height: 100dvh;
   }
   * {
     -webkit-tap-highlight-color: transparent;
+  }
+  ::selection {
+    @apply bg-brand-200 text-brand-900;
+  }
+  input,
+  select,
+  textarea {
+    font-size: 1rem;
+  }
+  @media (min-width: 640px) {
+    input,
+    select,
+    textarea {
+      font-size: 0.875rem;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 
@@ -32,33 +63,35 @@
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold
-      transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
+      transition duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60 focus-visible:ring-offset-1
       disabled:cursor-not-allowed disabled:opacity-60 min-h-[44px];
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-800;
+    @apply btn bg-gradient-to-r from-brand-600 to-emerald-600 text-white shadow-sm shadow-brand-900/20
+      hover:from-brand-700 hover:to-emerald-700 active:from-brand-800 active:to-emerald-800;
   }
   .btn-secondary {
-    @apply btn bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50;
+    @apply btn bg-white text-slate-700 shadow-sm shadow-slate-900/[0.03] ring-1 ring-slate-200
+      hover:bg-slate-50 hover:ring-slate-300;
   }
   .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700;
+    @apply btn bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-sm shadow-red-900/20 hover:from-red-700 hover:to-rose-700;
   }
   .btn-ghost {
     @apply btn bg-transparent text-slate-600 hover:bg-slate-100;
   }
   .input {
-    @apply w-full rounded-lg border-0 bg-white px-3.5 py-2.5 text-sm text-slate-900 ring-1 ring-slate-300
-      placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 min-h-[44px];
+    @apply w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-slate-900 ring-1 ring-slate-200
+      transition placeholder:text-slate-400 hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-brand-500 min-h-[44px];
   }
   .label {
     @apply mb-1.5 block text-sm font-medium text-slate-700;
   }
   .card {
-    @apply rounded-xl border border-slate-200 bg-white p-4 sm:p-5;
+    @apply rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5;
   }
   .badge {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold;
   }
 }
