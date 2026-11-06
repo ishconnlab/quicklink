@@ -58,11 +58,11 @@ For invitations configure `SMTP_URL`, `MAIL_FROM`, and the frontend `APP_URL` (`
 
 ## Accounts and access
 
-- **Admin:** the existing account owner role. From **People and accounts**, admins can create, search, edit, deactivate, and restore teacher and student accounts. Removing an account is a reversible deactivation that invalidates active sessions while preserving class and attendance history.
+- **Admin:** the existing account owner role. From **People and accounts**, admins can create, search, edit, deactivate, restore, or permanently delete teacher and student accounts. Permanent deletion requires typing `DELETE`, removes the account's personal records, and removes it from rosters and attendance/chat history. Classes and teaching content remain; a class whose teacher is deleted is reassigned to another existing class teacher when possible, otherwise it remains without a teacher. A teacher cannot be deleted while a class they teach has a live session; any user currently in another live session must leave before deletion.
 - **Teacher:** an account created by an admin. Teachers can teach their assigned classes, share live session links, and generate attendance reports.
 - **Student:** students may register at `/register` or be created by an admin. They can browse published courses, enroll subject to capacity, read resources, submit practical work, track their progress, and join classes they are enrolled in.
 
-Admins assign active teachers and enroll active students through **Courses and classes** when creating or editing a class. Role changes are rejected while the person is assigned to a class roster. Account management is owner-only; an administrator cannot deactivate or remove their own account.
+Admins assign active teachers and enroll active students through **Courses and classes** when creating or editing a class. Role changes are rejected while the person is assigned to a class roster. Account management is owner-only; an administrator cannot deactivate or delete their own account. Deactivation is reversible and retains history; permanent deletion is separate and irreversible.
 
 ## Courses, practical work, and certificates
 
@@ -175,18 +175,21 @@ Socket.IO handles authenticated room membership, chat, and attendance presence. 
 
 ## Training registration forms
 
-Admins can create one public registration form for each active class/training from **Registrations**. Forms support a description, custom placeholders, up to 10 optional or required text fields, and an optional PNG/JPEG/WebP header image (maximum 3 MB). The public URL can be shared directly. Registrations are stored as contact records only; they do not create accounts or enroll students. Admins can view the submitted contact details, start the training's live class, send a class link by configured email, or open a prefilled WhatsApp message.
+Admins and teachers can create one public registration form for each active class/training from **Registrations**. Forms support a description, custom placeholders, up to 10 optional or required text fields, and an optional PNG/JPEG/WebP header image (maximum 3 MB). The public URL can be shared directly. After submitting, a registrant can create an account using the same email, verify ownership through a one-hour email link, set a password, and be enrolled automatically; existing student accounts can sign in to link their registration. New account setup requires SMTP, `MAIL_FROM`, and `APP_URL`. Registrants who have not linked accounts remain contact records and can be enrolled by an administrator or teacher. The class roster then shows enrolled students' names and email addresses. Instructors can send class-specific email invitations and prefilled WhatsApp messages, before or during a live session.
 
-Email invitations require `SMTP_URL`, `MAIL_FROM`, and `APP_URL`. Invitations are sent separately using a bounded SMTP connection pool. WhatsApp invitations open WhatsApp for the admin to send manually. Live-class join links continue to require an existing enrolled student account; collecting a registration does not grant class access. Registration-form images use Cloudinary when its credentials are configured; otherwise they use the local filesystem, which requires persistent storage.
+Email invitations and account verification require `SMTP_URL`, `MAIL_FROM`, and `APP_URL`. WhatsApp invitations open WhatsApp for the teacher or admin to send manually. A registration alone does not grant class access; the registrant must verify their email and create or link a student account, which enrolls them in the class. Live-class join links still require that enrolled account. Registration-form images use Cloudinary when its credentials are configured; otherwise they use the local filesystem, which requires persistent storage.
 
 | Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |
 | `GET` | `/api/registrations/public/:slug` | Public | Load an active training registration form |
 | `POST` | `/api/registrations/public/:slug` | Public, rate-limited | Submit a registration |
-| `GET` | `/api/registrations` | Admin | List forms and registration counts |
-| `POST` | `/api/registrations` | Admin | Create a form for an active class |
-| `GET` | `/api/registrations/:formId/entries` | Admin | View the form's registrations |
-| `POST` | `/api/registrations/:formId/entries/:registrationId/email` | Admin | Email the active live-class join link |
+| `POST` | `/api/registrations/public/:slug/create-account` | Public, rate-limited | Request student-account creation and email verification |
+| `POST` | `/api/registrations/public/:slug/verify-account` | Public, rate-limited | Verify email, create the student account, and enroll in class |
+| `POST` | `/api/registrations/public/:slug/claim-account` | Signed-in student | Link an existing student account and enroll in class |
+| `GET` | `/api/registrations` | Teacher or admin | List forms and registration counts |
+| `POST` | `/api/registrations` | Teacher or admin | Create a form for an active class |
+| `GET` | `/api/registrations/:formId/entries` | Teacher or admin | View the form's registrations |
+| `POST` | `/api/registrations/:formId/entries/:registrationId/email` | Teacher or admin | Email class details and the class/live-session link |
 
 ## Book catalog behavior
 

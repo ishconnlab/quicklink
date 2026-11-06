@@ -11,7 +11,7 @@ const columns = [
 ];
 
 function allowed(classItem, user) {
-  const teacherIds = [classItem.teacher, ...(classItem.teachers || [])].map((teacher) => (teacher._id || teacher).toString());
+  const teacherIds = [classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map((teacher) => (teacher._id || teacher).toString());
   const canAccess = user.role === 'admin' || teacherIds.includes(user._id.toString()) || classItem.students.some((student) => student._id.toString() === user._id.toString());
   if (!canAccess) throw ApiError.forbidden('You are not enrolled in this class.');
 }
@@ -33,7 +33,7 @@ export const downloadAttendancePdf = asyncHandler(async (req, res) => {
     .populate('teacher', 'name email').populate('teachers', 'name email').populate('students', 'name email');
   if (!classItem) throw ApiError.notFound('Class not found');
   allowed(classItem, req.user);
-  const teacherIds = [classItem.teacher, ...(classItem.teachers || [])].map((teacher) => (teacher._id || teacher).toString());
+  const teacherIds = [classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map((teacher) => (teacher._id || teacher).toString());
   if (req.user.role !== 'admin' && !teacherIds.includes(req.user._id.toString())) throw ApiError.forbidden('Attendance reports are available to the assigned teacher and admin.');
   const filter = { learningClass: classItem._id, status: 'ended' };
   if (req.query.from || req.query.to) {
@@ -58,7 +58,7 @@ export const downloadAttendancePdf = asyncHandler(async (req, res) => {
   doc.moveDown(0.35).font('Helvetica').fontSize(10).fillColor('#334155');
   doc.text(`Course: ${classItem.course || classItem.title}`);
   doc.text(`Class: ${classItem.title} Â· ${classItem.subject} Â· ${classItem.level}`);
-  doc.text(`Teacher(s): ${[classItem.teacher, ...(classItem.teachers || [])].map((teacher) => teacher.name).filter(Boolean).join(', ')}`);
+  doc.text(`Teacher(s): ${[classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map((teacher) => teacher.name).filter(Boolean).join(', ') || 'Not assigned'}`);
   doc.text(`Timezone: ${classItem.timezone || 'UTC'} Â· ${classItem.schedule || 'Scheduled time not set'}`);
   doc.text(`Planned class start: ${classItem.startsAt ? new Date(classItem.startsAt).toLocaleString('en', { timeZone: classItem.timezone || 'UTC' }) : 'Not set'} Â· Planned duration: ${classItem.durationMinutes || 60} minutes`);
   doc.text(`Report ID: ${classItem._id.toString()} Â· Generated: ${new Date().toISOString()}`);
@@ -104,4 +104,3 @@ export const downloadAttendancePdf = asyncHandler(async (req, res) => {
 });
 
 export default { downloadAttendancePdf };
-

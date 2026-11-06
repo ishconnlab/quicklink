@@ -5,6 +5,7 @@ import api, { apiError } from '../api/client.js';
 import { PageHeader, Modal, Badge } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useDialog } from '../context/DialogContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDateTime } from '../lib/format.js';
 import { isAdminRole, roleLabel } from '../lib/roles.js';
@@ -26,6 +27,7 @@ export default function UsersPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(1);
   const toast = useToast();
+  const { confirm } = useDialog();
   const { user: currentUser } = useAuth();
 
   const load = useCallback(async () => {
@@ -130,11 +132,18 @@ export default function UsersPage() {
   };
 
   const removeAccount = async (person) => {
-    if (!window.confirm(`Deactivate ${person.name}'s account? They will lose access, and class and attendance history will be retained.`)) return;
+    const confirmed = await confirm({
+      title: `Permanently delete ${person.name}'s account?`,
+      message: `This permanently deletes the account, learning progress, certificates, submissions, registrations, follows, and notifications. The user will be removed from class rosters and attendance/chat records. Classes and their teaching content will remain; assigned classes will have no teacher if nobody else is assigned. End any live session the teacher started or teaches, and have the user leave other live sessions. This cannot be undone.`,
+      confirmLabel: 'Delete account permanently',
+      confirmationText: 'DELETE',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
     setBusyId(person.id);
     try {
       await api.delete(`/users/${person.id}`);
-      toast.success('Account deactivated. Class history was retained.');
+      toast.success(`${person.name}'s account and personal records were permanently deleted.`);
       await load();
     } catch (err) {
       toast.error(apiError(err).message);
@@ -168,7 +177,7 @@ export default function UsersPage() {
           {person.role === 'student' && ['pending', 'rejected'].includes(person.registrationStatus) && <><button onClick={() => reviewRegistration(person, 'approved')} disabled={busyId === person.id} className="btn-primary min-h-10 px-3"><CheckCircle2 size={16} /><span className="text-xs">Approve</span></button>{person.registrationStatus === 'pending' && <button onClick={() => reviewRegistration(person, 'rejected')} disabled={busyId === person.id} className="btn-ghost min-h-10 px-3 text-red-600"><XCircle size={16} /><span className="text-xs">Reject</span></button>}</>}
           <button onClick={() => openEdit(person)} className="btn-ghost min-h-10 px-3" aria-label={`Edit ${person.name}`}><Pencil size={16} /><span className="text-xs">Edit</span></button>
           {person.registrationStatus !== 'pending' && <button onClick={() => setActive(person, !person.isActive)} disabled={busyId === person.id} className="btn-ghost min-h-10 px-3" title={person.isActive ? 'Deactivate account' : 'Restore account'} aria-label={person.isActive ? `Deactivate ${person.name}` : `Restore ${person.name}`}><Power size={16} className={person.isActive ? 'text-emerald-600' : 'text-slate-400'} /><span className="text-xs">{person.isActive ? 'Disable' : 'Restore'}</span></button>}
-          {person.isActive && <button onClick={() => removeAccount(person)} disabled={busyId === person.id} className="btn-ghost min-h-10 px-3 text-red-600" aria-label={`Remove ${person.name}`} title="Deactivate and preserve class history"><Trash2 size={16} /><span className="text-xs">Remove</span></button>}
+          <button onClick={() => removeAccount(person)} disabled={busyId === person.id} className="btn-ghost min-h-10 px-3 text-red-600" aria-label={`Permanently delete ${person.name}`} title="Permanently delete account and personal records"><Trash2 size={16} /><span className="text-xs">Delete</span></button>
           {busyId === person.id && <Spinner size={15} />}
         </div>}
       </article>)}
@@ -182,7 +191,7 @@ export default function UsersPage() {
         <div><label className="label" htmlFor="account-email">Email</label><input id="account-email" type="email" autoComplete="email" required value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className={`input ${errors.email ? 'ring-2 ring-red-400' : ''}`} placeholder="jane@example.com" />{errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}</div>
         <div><label className="label" htmlFor="account-password">{editing ? 'Reset password (optional)' : 'Temporary password'}</label><input id="account-password" type="password" autoComplete={editing ? 'new-password' : 'new-password'} minLength={editing && !form.password ? undefined : 8} required={!editing} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} className={`input font-mono ${errors.password ? 'ring-2 ring-red-400' : ''}`} placeholder={editing ? 'Leave blank to keep current password' : 'At least 8 characters'} />{errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}<p className="mt-1 text-xs text-slate-400">Passwords are hashed on the server and never returned by the API.</p></div>
         <div><label className="label" htmlFor="account-role">Account type</label><select id="account-role" className="input" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value, educationLevel: event.target.value === 'student' ? form.educationLevel : '' })}><option value="student">Student</option><option value="teacher">Teacher</option></select>{editing && form.role !== editing.role && <p className="mt-1 text-xs text-amber-700">{form.role === 'teacher' ? 'Changing this student to a teacher removes them from their current student rosters.' : 'The teacher must be removed from assigned classes before becoming a student.'}</p>}</div>
-        {form.role === 'student' && <div><label className="label" htmlFor="account-level">Education level</label><select id="account-level" required className={`input ${errors.educationLevel ? 'ring-2 ring-red-400' : ''}`} value={form.educationLevel} onChange={(event) => setForm({ ...form, educationLevel: event.target.value })}><option value="">Choose a level</option><option value="L3">L3</option><option value="L4">L4</option><option value="L5">L5</option></select>{errors.educationLevel && <p className="mt-1 text-xs text-red-600">{errors.educationLevel}</p>}</div>}
+        {form.role === 'student' && <div><label className="label" htmlFor="account-level">Education level</label><select id="account-level" required className={`input ${errors.educationLevel ? 'ring-2 ring-red-400' : ''}`} value={form.educationLevel} onChange={(event) => setForm({ ...form, educationLevel: event.target.value })}><option value="">Choose a level</option><option value="L3">L3</option><option value="L4">L4</option><option value="L5">L5</option><option value="Bootcamp">Bootcamp</option><option value="Training">Training / non-student</option></select>{errors.educationLevel && <p className="mt-1 text-xs text-red-600">{errors.educationLevel}</p>}</div>}
       </form>
     </Modal>
   </div>;

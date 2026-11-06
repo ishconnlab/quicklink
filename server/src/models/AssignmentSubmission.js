@@ -21,7 +21,7 @@ const submissionSchema = new mongoose.Schema({
   feedback: { type: String, default: '', trim: true, maxlength: 8000 },
   gradedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   gradedAt: { type: Date, default: null },
-  gradingHistory: [{ score: { type: Number, min: 0 }, feedback: { type: String, maxlength: 8000 }, status: { type: String, enum: ['graded', 'passed', 'failed', 'revision-requested'] }, gradedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, gradedAt: { type: Date } }],
+  gradingHistory: [{ score: { type: Number, min: 0 }, feedback: { type: String, maxlength: 8000 }, status: { type: String, enum: ['graded', 'passed', 'failed', 'revision-requested'] }, gradedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, gradedAt: { type: Date } }],
 }, { timestamps: true });
 
 submissionSchema.index({ assignment: 1, student: 1, attempt: 1 }, { unique: true });

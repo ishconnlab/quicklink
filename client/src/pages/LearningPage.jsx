@@ -5,6 +5,7 @@ import api, { apiError } from '../api/client.js';
 import { PageHeader, Badge, Modal, StatCard } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useDialog } from '../context/DialogContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { isAdmin as isAdminUser } from '../lib/roles.js';
 
@@ -52,6 +53,7 @@ function BookCover({ src, alt, className = '' }) {
 export default function LearningPage({ learner = false }) {
   const [searchParams] = useSearchParams();
   const toast = useToast();
+  const { confirm } = useDialog();
   const { user } = useAuth();
   const isAdmin = !learner && isAdminUser(user);
   const canTrack = learner && user?.role === 'student';
@@ -62,7 +64,7 @@ export default function LearningPage({ learner = false }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [level, setLevel] = useState(learner && user?.role === 'student' && user.educationLevel ? user.educationLevel : 'All levels');
+  const [level, setLevel] = useState(learner && user?.role === 'student' && ['L3', 'L4', 'L5'].includes(user.educationLevel) ? user.educationLevel : 'All levels');
   const [category, setCategory] = useState('All subjects');
   const [format, setFormat] = useState('All formats');
   const [availability, setAvailability] = useState('All availability');
@@ -488,7 +490,7 @@ export default function LearningPage({ learner = false }) {
   };
 
   const deleteBook = async (book) => {
-    if (!window.confirm(`Permanently delete “${book.title}” and its saved progress?`)) return;
+    if (!await confirm({ title: 'Delete learning resource?', message: `Permanently delete “${book.title}” and its saved progress? This cannot be undone.`, confirmLabel: 'Delete resource', tone: 'danger' })) return;
     try { await api.delete(`/learning/books/${book.id}`); toast.success('Document deleted.'); await load(); }
     catch (err) { toast.error(apiError(err).message); }
   };
@@ -510,7 +512,7 @@ export default function LearningPage({ learner = false }) {
 
     <div className={`mb-4 grid gap-2 sm:grid-cols-[minmax(180px,1fr)_auto_auto_auto${isAdmin ? '_auto' : ''}]`}>
       <label className="relative"><Search size={16} className="absolute left-3 top-3.5 text-slate-400" /><input className="input pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search resources" /></label>
-      <select className="input sm:w-36" value={level} onChange={(event) => setLevel(event.target.value)} aria-label="Filter by level" disabled={canTrack && Boolean(user?.educationLevel)}>{(canTrack && user?.educationLevel ? [user.educationLevel] : LEVELS).map((item) => <option key={item}>{item}</option>)}</select>
+      <select className="input sm:w-36" value={level} onChange={(event) => setLevel(event.target.value)} aria-label="Filter by level" disabled={canTrack && ['L3', 'L4', 'L5'].includes(user?.educationLevel)}>{(canTrack && ['L3', 'L4', 'L5'].includes(user?.educationLevel) ? [user.educationLevel] : LEVELS).map((item) => <option key={item}>{item}</option>)}</select>
       <select className="input sm:w-56" value={category} onChange={(event) => setCategory(event.target.value)} aria-label="Filter by subject">{categories.map((item) => <option key={item}>{item}</option>)}</select>
       <select className="input sm:w-40" value={format} onChange={(event) => setFormat(event.target.value)} aria-label="Filter by file format"><option>All formats</option>{FORMATS.map((item) => <option key={item} value={item}>{FORMAT_NAMES[item]} (.{item})</option>)}</select>
       {isAdmin && <select className="input sm:w-44" value={availability} onChange={(event) => setAvailability(event.target.value)} aria-label="Filter by availability"><option>All availability</option><option>Available</option><option>Drafts and archived</option></select>}

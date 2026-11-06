@@ -32,7 +32,7 @@ const learningClassSchema = new mongoose.Schema({
   course: { type: String, default: '', trim: true, maxlength: 160 },
   level: { type: String, required: true, enum: ['L3', 'L4', 'L5', 'Bootcamp', 'Training'], index: true },
   description: { type: String, default: '', trim: true, maxlength: 12000 },
-  teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  teacher: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, index: true },
   teachers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   startsAt: { type: Date, default: null },
@@ -46,7 +46,7 @@ const learningClassSchema = new mongoose.Schema({
   timezone: { type: String, default: 'Africa/Johannesburg', trim: true, maxlength: 80 },
   maxStudents: { type: Number, default: 300, min: 1, max: 10000 },
   enrollmentOpen: { type: Boolean, default: true },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   active: { type: Boolean, default: true, index: true },
   published: { type: Boolean, default: true, index: true },
   archivedAt: { type: Date, default: null },
@@ -59,4 +59,3 @@ learningClassSchema.index({ published: 1, active: 1, level: 1, subject: 1, trade
 
 export const LearningClass = mongoose.model('LearningClass', learningClassSchema);
 export default LearningClass;
-

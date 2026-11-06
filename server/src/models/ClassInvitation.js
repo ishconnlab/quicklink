@@ -10,7 +10,7 @@ const classInvitationSchema = new mongoose.Schema({
   acceptedAt: { type: Date, default: null },
   sentAt: { type: Date, default: null },
   lastError: { type: String, default: '', maxlength: 500 },
-  sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
 }, { timestamps: true });
 
 classInvitationSchema.index({ learningClass: 1, student: 1, status: 1 });

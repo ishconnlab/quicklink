@@ -5,6 +5,8 @@ import { CourseCertificate } from '../models/CourseCertificate.js';
 import { TeacherFollow } from '../models/TeacherFollow.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
+import { permanentlyDeleteUser as deleteUserAccount } from '../services/permanentlyDeleteUser.js';
+import { recordActivity } from '../services/activityLog.js';
 
 // Account management is restricted to owners (enforced by route middleware).
 export const listUsers = asyncHandler(async (_req, res) => {
@@ -191,18 +193,15 @@ export const updateUser = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user: user.toSafeJSON() } });
 });
 
-// Account removal is a reversible deactivation so class and attendance history remains intact.
 export const deleteUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
-  if (!user) throw ApiError.notFound('User not found');
-  if (['admin', 'owner'].includes(user.role)) throw ApiError.forbidden('Owner accounts cannot be removed here.');
-  if (String(req.user._id) === String(user._id)) throw ApiError.badRequest('You cannot remove your own account.');
-  if (user.isActive) {
-    user.isActive = false;
-    user.tokenVersion += 1;
-    await user.save();
-  }
-  res.json({ success: true, data: { user: user.toSafeJSON(), message: 'Account deactivated. Historical class and attendance records are retained.' } });
+  if (String(req.user._id) === req.params.id) throw ApiError.badRequest('You cannot permanently delete your own account.');
+  const user = await deleteUserAccount(req.params.id);
+  await recordActivity(req, {
+    action: 'user.permanently_deleted',
+    resourceType: 'user',
+    message: `Permanently deleted a ${user.role} account and its personal records.`,
+  });
+  res.json({ success: true, data: { user: { id: user._id.toString(), deleted: true } } });
 });
 
 export default {
@@ -215,4 +214,3 @@ export default {
   createUser,
   updateUser,
 };
-

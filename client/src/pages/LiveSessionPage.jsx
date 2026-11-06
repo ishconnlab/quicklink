@@ -8,6 +8,7 @@ import { Badge, PageHeader } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useDialog } from '../context/DialogContext.jsx';
 import { formatDateTime } from '../lib/format.js';
 import { isAdmin } from '../lib/roles.js';
 
@@ -60,6 +61,7 @@ export default function LiveSessionPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
+  const { prompt } = useDialog();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
@@ -307,8 +309,16 @@ export default function LiveSessionPage() {
     if (!result?.ok) toast.error(result?.message || 'Could not update this message.');
   });
 
-  const reportMessage = (message) => {
-    const reason = window.prompt('Why are you reporting this message?', '');
+  const reportMessage = async (message) => {
+    const reason = await prompt({
+      title: 'Report class message',
+      message: 'Tell the teacher why this message should be reviewed.',
+      label: 'Reason for report',
+      multiline: true,
+      required: true,
+      maxLength: 1000,
+      confirmLabel: 'Send report',
+    });
     if (!reason?.trim()) return;
     socketRef.current?.emit('chat:report', { messageId: message.id, reason }, (result) => {
       if (result?.ok) toast.success('Message reported to the class teacher.');
@@ -362,10 +372,18 @@ export default function LiveSessionPage() {
   const setActiveLayout = (next) => { setLayout(next); sessionStorage.setItem(`quicklink.layout.${sessionId}`, next); };
 
   const endSession = async () => {
-    const teacherNotes = window.prompt('Optional: add notes for the attendance report.', '') || '';
+    const notes = await prompt({
+      title: 'End live session',
+      message: 'Add optional notes for the attendance report.',
+      label: 'Teacher notes',
+      multiline: true,
+      maxLength: 5000,
+      confirmLabel: 'End session',
+    });
+    if (notes === null) return;
     setEnding(true);
     try {
-      await api.post(`/classes/sessions/${sessionId}/end`, { teacherNotes });
+      await api.post(`/classes/sessions/${sessionId}/end`, { teacherNotes: notes });
       disconnectRoom();
       navigate(`/classes/sessions/${sessionId}/report`, { replace: true });
     } catch (error) { toast.error(apiError(error).message); }

@@ -54,7 +54,9 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     const teacherList = await fetch(`${root}/api/users/teachers`);
     const teacherFollowers = await fetch(`${root}/api/users/followers`);
     const permanentClassDelete = await fetch(`${root}/api/classes/0123456789abcdef01234567/permanent`, { method: 'DELETE' });
+    const permanentUserDelete = await fetch(`${root}/api/users/0123456789abcdef01234567`, { method: 'DELETE' });
     const assignmentDelete = await fetch(`${root}/api/assignments/0123456789abcdef01234567`, { method: 'DELETE' });
+    const linkRegistrationAccount = await fetch(`${root}/api/registrations/public/${'a'.repeat(32)}/claim-account`, { method: 'POST' });
     assert.equal(completion.status, 401);
     assert.equal(issue.status, 401);
     assert.equal(download.status, 400);
@@ -74,7 +76,9 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     assert.equal(teacherList.status, 401);
     assert.equal(teacherFollowers.status, 401);
     assert.equal(permanentClassDelete.status, 401);
+    assert.equal(permanentUserDelete.status, 401);
     assert.equal(assignmentDelete.status, 401);
+    assert.equal(linkRegistrationAccount.status, 401);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

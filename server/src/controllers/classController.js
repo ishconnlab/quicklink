@@ -83,7 +83,7 @@ function classJson(item, liveSession = null, recentSession = null) {
     enrollmentOpen: item.enrollmentOpen !== false,
     teacher: item.teacher && typeof item.teacher === 'object' && item.teacher.name
       ? { id: item.teacher._id.toString(), name: item.teacher.name, email: item.teacher.email }
-      : { id: item.teacher.toString(), name: 'Teacher' },
+      : item.teacher ? { id: item.teacher.toString(), name: 'Teacher' } : null,
     students: (item.students || []).map((student) => student.name
       ? { id: student._id.toString(), name: student.name, email: student.email }
       : { id: student.toString(), name: 'Student' }),
@@ -214,7 +214,7 @@ export const getCourse = asyncHandler(async (req, res) => {
   const item = await LearningClass.findById(req.params.id).populate('teacher', 'name email').populate('teachers', 'name email').populate('students', 'name email').populate('learningMaterials', 'title level format active').lean();
   if (!item) throw ApiError.notFound('Course not found.');
   const enrolled = (item.students || []).some((person) => person._id.toString() === req.user._id.toString());
-  const teacherIds = [item.teacher, ...(item.teachers || [])].map((teacher) => teacher._id.toString());
+  const teacherIds = [item.teacher, ...(item.teachers || [])].filter(Boolean).map((teacher) => teacher._id.toString());
   const assignedTeacher = req.user.role === 'teacher' && teacherIds.includes(req.user._id.toString());
   if (!isAdmin(req.user) && !assignedTeacher && (!item.active || (item.published === false && !enrolled))) throw ApiError.notFound('Course not found.');
   const progress = req.user.role === 'student' ? await LearningProgress.find({ student: req.user._id, book: { $in: item.learningMaterials.map((book) => book._id) } }).lean() : [];
@@ -398,9 +398,10 @@ export const updateClass = asyncHandler(async (req, res) => {
     throw ApiError.conflict('End the live session before changing the class roster.');
   }
   const canReassignTeachers = isAdmin(req.user);
+  const existingTeacherIds = item.teachers.map(String).concat(item.teachers.length || !item.teacher ? [] : [item.teacher.toString()]);
   const teacherIds = canReassignTeachers
-    ? (req.body.teacherIds || req.body.teacherId || item.teachers.map(String).concat(item.teachers.length ? [] : [item.teacher.toString()]))
-    : item.teachers.map(String).concat(item.teachers.length ? [] : [item.teacher.toString()]);
+    ? (req.body.teacherIds || req.body.teacherId || existingTeacherIds)
+    : existingTeacherIds;
   const studentIds = req.body.studentIds || item.students.map(String);
   const { teachers, students } = await resolveRoster(teacherIds, studentIds);
   const learningMaterials = await validateLearningMaterials(req.body.learningMaterials || item.learningMaterials.map(String), req.body.level || item.level);
@@ -529,7 +530,7 @@ export const endSession = asyncHandler(async (req, res) => {
   });
   if (!session) throw ApiError.notFound('Class session not found');
   await assertClassAccess(session.learningClass, req.user);
-  const assignedTeacher = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].some((teacher) => (teacher._id || teacher).toString() === req.user._id.toString());
+  const assignedTeacher = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].filter(Boolean).some((teacher) => (teacher._id || teacher).toString() === req.user._id.toString());
   if (!isAdmin(req.user) && !assignedTeacher) throw ApiError.forbidden('Only the assigned teacher or an admin can end this class.');
   if (session.status === 'ended') return res.json({ success: true, data: { session: sessionJson(session) } });
 
@@ -543,7 +544,7 @@ export const endSession = asyncHandler(async (req, res) => {
     const ongoing = item.lastLeftAt ? 0 : Math.max(0, Math.floor((now.getTime() - item.lastJoinedAt.getTime()) / 1000));
     return [item.user.toString(), { item, totalSeconds: item.totalSeconds + ongoing }];
   }));
-  const teachers = [session.learningClass.teacher, ...(session.learningClass.teachers || [])];
+  const teachers = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].filter(Boolean);
   const roster = [...new Map([...teachers, ...session.learningClass.students].map((person) => [person._id.toString(), person])).values()];
   session.report.enrolledCount = session.learningClass.students.length;
   const scheduledStart = session.learningClass.startsAt ? new Date(session.learningClass.startsAt).getTime() : null;
@@ -583,7 +584,7 @@ export const getSessionReport = asyncHandler(async (req, res) => {
   });
   if (!session) throw ApiError.notFound('Class session not found');
   await assertClassAccess(session.learningClass, req.user);
-  const teacherIds = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].map((teacher) => (teacher._id || teacher).toString());
+  const teacherIds = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].filter(Boolean).map((teacher) => (teacher._id || teacher).toString());
   if (!isAdmin(req.user) && !teacherIds.includes(req.user._id.toString())) throw ApiError.forbidden('Attendance reports are available to the assigned teacher and admin.');
   if (session.status !== 'ended') throw ApiError.conflict('The report is available after the teacher ends the session.');
   res.json({ success: true, data: { session: sessionJson(session), class: classJson(session.learningClass) } });
@@ -596,7 +597,7 @@ export const correctAttendance = asyncHandler(async (req, res) => {
   if (!session) throw ApiError.notFound('Class session not found');
   await assertClassAccess(session.learningClass, req.user);
   if (session.status !== 'ended') throw ApiError.conflict('Attendance can be corrected after the session ends.');
-  const teachers = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].map((person) => person._id.toString());
+  const teachers = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].filter(Boolean).map((person) => person._id.toString());
   if (!isAdmin(req.user) && !teachers.includes(req.user._id.toString())) throw ApiError.forbidden('Only an assigned teacher or admin can correct attendance.');
   const entry = session.report.attendance.find((person) => person.user?.toString() === req.params.studentId);
   if (!entry || entry.role !== 'student') throw ApiError.notFound('Student attendance record not found.');
@@ -632,6 +633,5 @@ export const permanentlyDeleteClass = asyncHandler(async (req, res) => {
 });
 
 export default { listPeople, listClasses, createClass, updateClass, archiveClass, permanentlyDeleteClass, getClass, listClassSessions, startSession, joinByCode, getSession, createLiveKitToken, endSession, getSessionReport, correctAttendance };
-
 
 

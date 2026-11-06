@@ -15,7 +15,7 @@ const userSchema = new mongoose.Schema(
     },
     passwordHash: { type: String, required: true, select: false },
     role: { type: String, enum: Object.values(ROLES), default: ROLES.STUDENT, index: true },
-    educationLevel: { type: String, enum: ['L3', 'L4', 'L5'], default: null },
+    educationLevel: { type: String, enum: ['L3', 'L4', 'L5', 'Bootcamp', 'Training'], default: null },
     registrationStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved', index: true },
     isActive: { type: Boolean, default: true },
     lastLoginAt: { type: Date, default: null },

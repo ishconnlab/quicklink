@@ -16,6 +16,15 @@ export function setToken(token) {
 const RAW_BASE = (import.meta.env.VITE_API_URL || '').trim().replace(/\/+$/, '').replace(/\/api$/i, '');
 const API_BASE = RAW_BASE || (import.meta.env.PROD ? 'https://quicklink-3eng.onrender.com' : '');
 
+export function assetUrl(url) {
+  if (!url) return '';
+  try {
+    return new URL(url, API_BASE || window.location.origin).toString();
+  } catch {
+    return '';
+  }
+}
+
 const api = axios.create({
   baseURL: `${API_BASE}/api`,
   timeout: 20000,

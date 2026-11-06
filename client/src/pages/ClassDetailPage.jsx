@@ -5,8 +5,10 @@ import api, { apiError } from '../api/client.js';
 import { PageHeader, Badge, Modal } from '../components/layout.jsx';
 import PagedCheckboxList from '../components/PagedCheckboxList.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
+import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useDialog } from '../context/DialogContext.jsx';
 import { formatDateTime } from '../lib/format.js';
 import { isAdmin } from '../lib/roles.js';
 
@@ -15,6 +17,7 @@ export default function ClassDetailPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
+  const { confirm } = useDialog();
   const [item, setItem] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +70,7 @@ export default function ClassDetailPage() {
     };
   }, [id, item?.id, item?.liveSession?.id]);
 
-  const canTeach = isAdmin(user) || (user?.role === 'teacher' && (item?.teacher.id === user.id || item?.teachers?.some((teacher) => teacher.id === user.id)));
+  const canTeach = isAdmin(user) || (user?.role === 'teacher' && (item?.teacher?.id === user.id || item?.teachers?.some((teacher) => teacher.id === user.id)));
   const sessionLink = item?.liveSession ? `${window.location.origin}/classes/join/${item.liveSession.sessionCode}` : '';
 
   const startClass = async () => {
@@ -80,7 +83,7 @@ export default function ClassDetailPage() {
   };
 
   const endLiveSession = async () => {
-    if (!item.liveSession || !window.confirm('End this live session for all participants? Attendance and the session report will be saved.')) return;
+    if (!item.liveSession || !await confirm({ title: 'End live session?', message: 'End this live session for all participants? Attendance and the session report will be saved.', confirmLabel: 'End session', tone: 'danger' })) return;
     setEndingSession(true);
     try {
       await api.post(`/classes/sessions/${item.liveSession.id}/end`, { teacherNotes: '' });
@@ -129,7 +132,7 @@ export default function ClassDetailPage() {
       const levelBookIds = new Set(activeBooks.filter((book) => book.level === item.level).map((book) => book.id));
       const assessmentSettings = assessmentResponse.data.data;
       setCertificationAssessmentLocked(Boolean(assessmentSettings.attemptsStarted));
-      setEditForm({ title: item.title, subject: item.subject, trade: item.trade || '', introduction: item.introduction || '', course: item.course || '', level: item.level, description: item.description || '', learningMaterials: (item.learningMaterials || []).filter((bookId) => levelBookIds.has(bookId)), completionRequirements: item.completionRequirements || { requireReading: false, requireTheory: false, requirePractical: false, requireAttendance: false, minimumScore: 0 }, certificationAssessmentEnabled: assessmentSettings.enabled, certificationQuestions: assessmentSettings.questions, published: item.published !== false, startsAt: item.startsAt ? new Date(item.startsAt).toISOString().slice(0, 16) : '', schedule: item.schedule || '', durationMinutes: item.durationMinutes || 60, timezone: item.timezone || 'Africa/Johannesburg', maxStudents: item.maxStudents || 300, enrollmentOpen: item.enrollmentOpen !== false, teacherIds: (item.teachers?.length ? item.teachers : [item.teacher]).map((teacher) => teacher.id), studentIds: item.students.map((student) => student.id) });
+      setEditForm({ title: item.title, subject: item.subject, trade: item.trade || '', introduction: item.introduction || '', course: item.course || '', level: item.level, description: item.description || '', learningMaterials: (item.learningMaterials || []).filter((bookId) => levelBookIds.has(bookId)), completionRequirements: item.completionRequirements || { requireReading: false, requireTheory: false, requirePractical: false, requireAttendance: false, minimumScore: 0 }, certificationAssessmentEnabled: assessmentSettings.enabled, certificationQuestions: assessmentSettings.questions, published: item.published !== false, startsAt: item.startsAt ? new Date(item.startsAt).toISOString().slice(0, 16) : '', schedule: item.schedule || '', durationMinutes: item.durationMinutes || 60, timezone: item.timezone || 'Africa/Johannesburg', maxStudents: item.maxStudents || 300, enrollmentOpen: item.enrollmentOpen !== false, teacherIds: item.teachers?.length ? item.teachers.map((teacher) => teacher.id) : item.teacher ? [item.teacher.id] : [], studentIds: item.students.map((student) => student.id) });
       setEditStep(0);
       setEditOpen(true);
     } catch (error) { toast.error(apiError(error).message); }
@@ -161,7 +164,7 @@ export default function ClassDetailPage() {
   };
 
   const archiveClass = async () => {
-    if (item.active && !window.confirm('Archive this class? Class history and reports will be kept.')) return;
+    if (item.active && !await confirm({ title: 'Archive class?', message: 'Archive this class? Class history and reports will be kept.', confirmLabel: 'Archive class', tone: 'danger' })) return;
     try {
       if (item.active) { await api.delete(`/classes/${id}`); navigate('/classes', { replace: true }); toast.success('Class archived.'); }
       else { await api.patch(`/classes/${id}`, { active: true }); toast.success('Class restored.'); await load(); }
@@ -170,8 +173,14 @@ export default function ClassDetailPage() {
   };
 
   const permanentlyDeleteClass = async () => {
-    const confirmation = window.prompt(`This permanently deletes ${item.title}, its registrations, sessions, attendance, assignments, invitations, and certificates. Type DELETE to continue.`);
-    if (confirmation !== 'DELETE') return;
+    const confirmed = await confirm({
+      title: `Permanently delete ${item.title}?`,
+      message: `This permanently deletes ${item.title}, its registrations, sessions, attendance, assignments, invitations, and certificates. This action cannot be undone.`,
+      confirmLabel: 'Delete permanently',
+      tone: 'danger',
+      confirmationText: 'DELETE',
+    });
+    if (!confirmed) return;
     try {
       await api.delete(`/classes/${id}/permanent`);
       toast.success('Class and its related records were permanently deleted.');
@@ -194,6 +203,7 @@ export default function ClassDetailPage() {
 
   return <div className="min-w-0">
     <Link to="/classes" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"><ArrowLeft size={16} />All classes</Link>
+    <CourseThumbnail imageUrl={item.thumbnailUrl} title={item.title} loading="eager" className="mb-4 aspect-[16/7] max-h-80 rounded-xl" />
     <PageHeader title={item.title} subtitle={`${item.course ? `${item.course} · ` : ''}${item.subject} · ${item.level}`} actions={<div className="flex flex-wrap gap-2">{canTeach && item.active && <button onClick={openInvitations} className="btn-secondary"><Mail size={16} />Invite students</button>}{isAdmin(user) && <><button onClick={openEdit} className="btn-secondary"><Pencil size={16} />Edit class</button><button onClick={archiveClass} className={item.active ? 'btn-ghost text-red-600' : 'btn-secondary'}><Archive size={16} />{item.active ? 'Archive' : 'Restore class'}</button><button onClick={permanentlyDeleteClass} className="btn-ghost text-red-700"><Trash2 size={16} />Delete permanently</button></>}{canTeach && item.active && !item.liveSession && <button onClick={startClass} disabled={starting} className="btn-primary">{starting ? <Spinner size={16} /> : <Play size={16} />}Start live class</button>}</div>} />
     {item.description && <p className="mb-4 text-sm text-slate-600">{item.description}</p>}
 
@@ -202,7 +212,7 @@ export default function ClassDetailPage() {
     </section> : item.recentSession?.status === 'ended' ? <section className="card mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex items-center gap-2"><Badge color="slate">Not live</Badge><span className="text-xs text-slate-500">Previous session ended {formatDateTime(item.recentSession.endedAt)}</span></div><p className="mt-2 text-sm text-slate-600">Wait here. The join button will appear automatically when your teacher or an admin starts the next live session.</p>{item.startsAt && <p className="mt-1 text-xs text-slate-500">Scheduled start: {formatDateTime(item.startsAt)}</p>}{waitingError && <p role="status" className="mt-2 text-xs text-amber-700">Live status could not refresh: {waitingError}</p>}</div>{canTeach && <Link to={`/classes/sessions/${item.recentSession.id}/report`} className="btn-secondary"><FileText size={16} />View report</Link>}</section> : <section className="card mb-4 border-slate-200 bg-slate-50"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2"><Badge color="slate">Not live</Badge>{item.startsAt && <span className="text-xs text-slate-500">Scheduled start: {formatDateTime(item.startsAt)}</span>}</div><p className="mt-2 text-sm text-slate-700">Wait here until your teacher or an admin starts the live session. This page checks for the session automatically.</p>{waitingError && <p role="status" className="mt-2 text-xs text-amber-700">Live status could not refresh: {waitingError}</p>}</div></div></section>}
 
     <div className="grid gap-4 lg:grid-cols-3">
-      <section className="card min-w-0 lg:col-span-1"><h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800"><Users size={17} />Class people</h2><p className="mb-3 break-words text-sm text-slate-600">Teacher: <span className="font-medium text-slate-800">{item.teacher.name}</span></p><div className="space-y-2">{item.students.map((student) => <div key={student.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">{student.name.slice(0, 1).toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-sm font-medium text-slate-700">{student.name}</span><span className="block break-all text-xs text-slate-400">{student.email}</span></span></div>)}{item.students.length === 0 && <p className="text-sm text-slate-400">No students have been enrolled yet.</p>}</div></section>
+      <section className="card min-w-0 lg:col-span-1"><h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800"><Users size={17} />Class people</h2><p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Teachers</p><div className="mb-4 space-y-2">{(item.teachers?.length ? item.teachers : item.teacher ? [item.teacher] : []).map((teacher) => <div key={teacher.id} className="rounded-lg bg-slate-50 px-3 py-2"><p className="text-sm font-medium text-slate-700">{teacher.name}</p>{teacher.email && <p className="break-all text-xs text-slate-400">{teacher.email}</p>}</div>)}{!item.teacher && !item.teachers?.length && <p className="text-sm text-slate-400">No teacher assigned.</p>}</div><p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Enrolled students ({item.students.length})</p><div className="space-y-2">{item.students.map((student) => <div key={student.id} className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-semibold text-brand-700">{student.name?.slice(0, 1).toUpperCase() || '?'}</span><span className="min-w-0"><span className="block truncate text-sm font-medium text-slate-700">{student.name || 'Student'}</span><span className="block break-all text-xs text-slate-400">{student.email || 'Email unavailable'}</span></span></div>)}{item.students.length === 0 && <p className="text-sm text-slate-400">No students have been enrolled yet.</p>}</div></section>
       <section className="card min-w-0 lg:col-span-2"><h2 className="mb-2 text-sm font-semibold text-slate-800">About this class</h2><p className="break-words text-sm leading-6 text-slate-600">Your teacher can start a live session with audio, video, screen sharing, and class chat. Share the live join link with enrolled students so attendance is recorded as they connect.</p>{!item.liveSession && canTeach && <p className="mt-3 text-xs text-slate-400">Students must have accounts and be enrolled in this class before joining.</p>}</section>
     </div>
     {sessions.length > 0 && <section className="card mt-4"><h2 className="mb-3 font-semibold text-slate-800">Class history</h2><div className="divide-y divide-slate-100">{sessions.map((session) => <div key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div><p className="text-sm font-medium text-slate-800">{session.title}</p><p className="mt-1 text-xs text-slate-500">Started {formatDateTime(session.startedAt)}{session.endedAt ? ` · Ended ${formatDateTime(session.endedAt)}` : ''}</p></div><div className="flex items-center gap-2"><Badge color={session.status === 'live' ? 'red' : 'slate'}>{session.status}</Badge>{session.status === 'live' ? <Link to={`/classes/sessions/${session.id}/live`} className="btn-secondary">Join</Link> : canTeach && <Link to={`/classes/sessions/${session.id}/report`} className="btn-secondary"><FileText size={15} />Report</Link>}</div></div>)}</div></section>}

@@ -4,6 +4,7 @@ import api, { apiError } from '../api/client.js';
 import { Badge } from './layout.jsx';
 import { EmptyState, Spinner } from './ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useDialog } from '../context/DialogContext.jsx';
 import { isAdmin } from '../lib/roles.js';
 
 const blankAssignment = () => ({ title: '', instructions: '', objectives: '', toolsAndMaterials: '', tasks: '', dueAt: '', maxPoints: 100, passMark: 50, published: false });
@@ -17,6 +18,7 @@ const submissionErrorMessage = (error) => {
 
 export default function CourseAssignments({ course, user, onCompletionChange }) {
   const toast = useToast();
+  const { confirm } = useDialog();
   const teacher = isAdmin(user) || (user?.role === 'teacher' && (course.teacher?.id === user.id || course.teachers?.some((item) => item.id === user.id)));
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,7 +69,7 @@ export default function CourseAssignments({ course, user, onCompletionChange }) 
     catch (error) { toast.error(apiError(error).message); }
   };
   const deleteAssignment = async (assignment) => {
-    if (!window.confirm(`Permanently delete "${assignment.title}" and all student submissions? This cannot be undone.`)) return;
+    if (!await confirm({ title: 'Delete practical assignment?', message: `Permanently delete "${assignment.title}" and all student submissions? This cannot be undone.`, confirmLabel: 'Delete assignment', tone: 'danger' })) return;
     setDeletingId(assignment.id);
     try {
       await api.delete(`/assignments/${assignment.id}`);

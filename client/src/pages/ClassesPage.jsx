@@ -5,6 +5,7 @@ import api, { apiError } from '../api/client.js';
 import { PageHeader, Modal, Badge } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import PagedCheckboxList from '../components/PagedCheckboxList.jsx';
+import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { isAdmin } from '../lib/roles.js';
@@ -105,8 +106,9 @@ export default function ClassesPage() {
       <EmptyState icon={BookOpen} title="No classes yet" description={isAdmin(user) ? 'Create a class, choose a teacher, and enroll students to begin.' : 'Your admin will add you to a class.'} action={isAdmin(user) && <button onClick={openCreate} className="btn-primary"><Plus size={17} />Create class</button>} />
     ) : <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {classes.map((item) => <Link key={item.id} to={`/classes/${item.id}`} className={`card block transition-shadow hover:shadow-md ${item.active ? '' : 'opacity-70'}`}>
+        <CourseThumbnail imageUrl={item.thumbnailUrl} title={item.title} className="-mx-4 -mt-4 mb-4 aspect-[16/9] rounded-t-xl" />
         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-semibold text-slate-900">{item.title}</h2><p className="mt-1 text-sm text-slate-500">{item.subject}</p></div><span className="flex gap-1"><Badge color="brand">{item.level}</Badge>{!item.active && <Badge color="slate">Archived</Badge>}</span></div>
-        <p className="mt-4 text-sm text-slate-600">Teacher: {item.teacher.name}</p>
+        <p className="mt-4 text-sm text-slate-600">Teacher: {item.teacher?.name || 'Not assigned'}</p>
         <div className="mt-3 flex items-center gap-4 text-xs text-slate-500"><span className="flex items-center gap-1"><Users size={14} />{item.students.length} students</span>{item.liveSession && <Badge color="red"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />Live now</Badge>}</div>
         {item.recentSession && !item.liveSession && <p className="mt-3 flex items-center gap-1 text-xs text-slate-400"><Clock3 size={13} />Last class {item.recentSession.status === 'ended' ? 'ended' : 'started'}</p>}
       </Link>)}

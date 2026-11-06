@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen, GraduationCap, Search, Users } from 'lucide-react';
+import { BookOpen, Search, Users } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader } from '../components/layout.jsx';
 import { EmptyState, PageLoader } from '../components/ui.jsx';
+import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 
 function CourseCard({ course }) {
   const action = course.enrolled ? 'Continue Learning' : course.enrollmentStatus === 'open' ? 'View Course' : 'View Details';
   return <article className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-    <div className="relative aspect-[16/9] overflow-hidden bg-gradient-to-br from-brand-700 to-sky-600">
-      {course.thumbnailUrl ? <img src={course.thumbnailUrl} alt={`Cover for ${course.title}`} loading="lazy" className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <div className="flex h-full items-center justify-center text-white/90"><GraduationCap size={42} aria-hidden="true" /></div>}
+    <div className="relative aspect-[16/9] overflow-hidden">
+      <CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="absolute inset-0" />
       <div className="absolute left-3 top-3 flex gap-2"><Badge color="brand">{course.level}</Badge>{course.enrolled && <Badge color="green">Enrolled</Badge>}</div>
     </div>
     <div className="flex flex-1 flex-col p-4"><div className="mb-2 flex flex-wrap gap-1.5"><Badge>{course.subject}</Badge>{course.trade && <Badge color="slate">{course.trade}</Badge>}</div>

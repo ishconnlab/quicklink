@@ -10,7 +10,7 @@ const questionSchema = new mongoose.Schema({
 
 const assignmentSchema = new mongoose.Schema({
   learningClass: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningClass', required: true, index: true },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   title: { type: String, required: true, trim: true, maxlength: 180 },
   instructions: { type: String, default: '', trim: true, maxlength: 12000 },
   objectives: { type: String, default: '', trim: true, maxlength: 4000 },

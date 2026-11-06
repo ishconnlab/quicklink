@@ -115,7 +115,7 @@ export const listMyCertificates = asyncHandler(async (req, res) => {
 export const listCourseCertificates = asyncHandler(async (req, res) => {
   const course = await LearningClass.findById(req.params.id).select('title teacher teachers students');
   if (!course) throw ApiError.notFound('Course not found.');
-  const teacherIds = [course.teacher, ...(course.teachers || [])].map((id) => id.toString());
+  const teacherIds = [course.teacher, ...(course.teachers || [])].filter(Boolean).map((id) => id.toString());
   if (req.user.role !== 'admin' && !teacherIds.includes(req.user._id.toString())) throw ApiError.forbidden('Only the assigned teacher or admin can view course certificates.');
   const certificates = await CourseCertificate.find({ course: course._id }).sort({ issuedAt: -1 }).limit(500).lean();
   res.json({ success: true, data: { certificates: certificates.map((certificate) => ({ ...certificateJson(certificate), studentId: certificate.student.toString(), revokedAt: certificate.revokedAt || null, revocationReason: certificate.revocationReason || '' })) } });
@@ -381,4 +381,3 @@ export default {
   revokeCertificate,
   downloadCertificate,
 };
-

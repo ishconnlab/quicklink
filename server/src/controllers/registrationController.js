@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +16,9 @@ import { assertCanManageClass, isAdmin } from '../security/roles.js';
 import { recordActivity } from '../services/activityLog.js';
 
 const IMAGE_ROOT = path.resolve(config.registrationImageDir || fileURLToPath(new URL('../../registration-images/', import.meta.url)));
+const ACCOUNT_CLAIM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const ACCOUNT_VERIFICATION_TTL_MS = 60 * 60 * 1000;
+const ACCOUNT_SETUP_TTL_MS = 15 * 60 * 1000;
 const imageTypes = [
   { ext: 'png', mime: 'image/png', matches: (buffer) => buffer.subarray(0, 8).toString('hex') === '89504e470d0a1a0a' },
   { ext: 'jpg', mime: 'image/jpeg', matches: (buffer) => buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff },
@@ -97,6 +100,15 @@ export function statusTransition(registration, status, user, note = '') {
   }
   registration.status = status;
   registration.statusHistory.push({ status, by: user?._id || null, note: String(note || '').slice(0, 1000) });
+  if (status === 'REJECTED') {
+    registration.accountClaimTokenHash = null;
+    registration.accountClaimExpiresAt = null;
+    registration.accountVerificationTokenHash = null;
+    registration.accountVerificationExpiresAt = null;
+    registration.accountSetupTokenHash = null;
+    registration.accountSetupExpiresAt = null;
+    registration.pendingAccountEducationLevel = null;
+  }
   if (status === 'APPROVED') {
     registration.reviewedBy = user?._id || null;
     registration.reviewedAt = new Date();
@@ -117,7 +129,7 @@ async function manageableClassIds(user) {
 }
 
 async function formWithClass(formId, user) {
-  const form = await TrainingRegistrationForm.findById(formId).populate('learningClass', 'title course subject active published teacher teachers students maxStudents enrollmentOpen');
+  const form = await TrainingRegistrationForm.findById(formId).populate('learningClass', 'title course subject level active published teacher teachers students maxStudents enrollmentOpen startsAt schedule timezone');
   if (!form) throw ApiError.notFound('Registration form not found.');
   assertCanManageClass(user, form.learningClass);
   return form;
@@ -198,6 +210,8 @@ async function enrollRegistration(form, registration, req) {
   if (!alreadyEnrolled) await LearningClass.updateOne({ _id: learningClass._id }, { $addToSet: { students: student._id } });
   registration.student = student._id;
   statusTransition(registration, 'ENROLLED', req.user, 'Registration approved and student enrolled.');
+  registration.accountClaimTokenHash = null;
+  registration.accountClaimExpiresAt = null;
   await registration.save();
   const emailSent = await sendEnrollmentEmail({ student, learningClass, temporaryPassword: created ? password : '' });
   return {
@@ -318,9 +332,9 @@ export const getPublicImage = asyncHandler(async (req, res) => {
 });
 
 export const getPublicForm = asyncHandler(async (req, res) => {
-  const form = await TrainingRegistrationForm.findOne({ slug: req.params.slug, active: true }).populate('learningClass', 'title course subject active');
+  const form = await TrainingRegistrationForm.findOne({ slug: req.params.slug, active: true }).populate('learningClass', 'title course subject level active');
   if (!form?.learningClass?.active) throw ApiError.notFound('This registration form is unavailable.');
-  res.json({ success: true, data: { form: { title: form.title, description: form.description, training: form.learningClass.course || form.learningClass.title, subject: form.learningClass.subject, imageUrl: publicImageUrl(form), placeholders: form.placeholders, fields: form.fields } } });
+  res.json({ success: true, data: { form: { classId: form.learningClass._id.toString(), classTitle: form.learningClass.title, level: form.learningClass.level, title: form.title, description: form.description, training: form.learningClass.course || form.learningClass.title, subject: form.learningClass.subject, imageUrl: publicImageUrl(form), placeholders: form.placeholders, fields: form.fields } } });
 });
 
 export const submitRegistration = asyncHandler(async (req, res) => {
@@ -335,6 +349,7 @@ export const submitRegistration = asyncHandler(async (req, res) => {
   }).select('_id').lean();
   if (duplicate) throw ApiError.conflict('These contact details have already been registered for this training.');
   try {
+    const accountClaimToken = randomBytes(32).toString('base64url');
     const registration = await TrainingRegistration.create({
       form: form._id,
       name: req.body.name.trim(),
@@ -343,12 +358,215 @@ export const submitRegistration = asyncHandler(async (req, res) => {
       answers,
       status: 'PENDING',
       statusHistory: [{ status: 'PENDING', at: new Date(), note: 'Registration submitted.' }],
+      accountClaimTokenHash: createHash('sha256').update(accountClaimToken).digest('hex'),
+      accountClaimExpiresAt: new Date(Date.now() + ACCOUNT_CLAIM_TTL_MS),
     });
-    res.status(201).json({ success: true, data: { registration: { name: registration.name, email: registration.email, status: registration.status } } });
+    res.status(201).json({ success: true, data: { registration: { id: registration._id.toString(), name: registration.name, email: registration.email, status: registration.status }, accountClaimToken } });
   } catch (error) {
     if (error?.code === 11000) throw ApiError.conflict('This email address has already registered for this training.');
     throw error;
   }
+});
+
+async function findClaimableRegistration(slug, registrationId, accountClaimToken) {
+  const form = await TrainingRegistrationForm.findOne({ slug, active: true }).populate('learningClass', 'title course subject level active maxStudents students');
+  if (!form?.learningClass?.active) throw ApiError.notFound('This training registration is unavailable.');
+  const registration = await TrainingRegistration.findOne({ _id: registrationId, form: form._id })
+    .select('+accountClaimTokenHash +accountClaimExpiresAt');
+  const suppliedHash = createHash('sha256').update(accountClaimToken).digest();
+  const storedHash = registration?.accountClaimTokenHash ? Buffer.from(registration.accountClaimTokenHash, 'hex') : Buffer.alloc(0);
+  if (!registration || storedHash.length !== suppliedHash.length || !timingSafeEqual(storedHash, suppliedHash)
+    || !registration.accountClaimExpiresAt || registration.accountClaimExpiresAt <= new Date()) {
+    throw ApiError.conflict('This account-creation link is invalid or expired. Submit the registration form again or contact the training administrator.');
+  }
+  if (registration.status === 'REJECTED' || registration.student) {
+    throw ApiError.conflict('This registration is no longer available for account creation.');
+  }
+  return { form, registration };
+}
+
+async function addStudentToRegistrationClass(form, registration, student) {
+  const learningClass = form.learningClass;
+  const alreadyEnrolled = learningClass.students.some((studentId) => studentId.toString() === student._id.toString());
+  let addedToRoster = false;
+  if (!alreadyEnrolled) {
+    const result = await LearningClass.updateOne({
+      _id: learningClass._id,
+      active: true,
+      $expr: { $lt: [{ $size: { $ifNull: ['$students', []] } }, { $ifNull: ['$maxStudents', 300] }] },
+    }, { $addToSet: { students: student._id } });
+    if (!result.modifiedCount) throw ApiError.conflict('This class is full or no longer active. Contact the training administrator.');
+    addedToRoster = true;
+  }
+
+  try {
+    const updated = await TrainingRegistration.findOneAndUpdate({
+      _id: registration._id,
+      form: form._id,
+      accountClaimTokenHash: registration.accountClaimTokenHash,
+      accountClaimExpiresAt: { $gt: new Date() },
+      status: { $nin: ['REJECTED', 'ENROLLED', 'INVITED', 'ATTENDED', 'COMPLETED'] },
+      student: null,
+    }, {
+      $set: {
+        student: student._id,
+        status: 'ENROLLED',
+        enrolledAt: new Date(),
+        accountClaimTokenHash: null,
+        accountClaimExpiresAt: null,
+        accountVerificationTokenHash: null,
+        accountVerificationExpiresAt: null,
+        accountSetupTokenHash: null,
+        accountSetupExpiresAt: null,
+        pendingAccountEducationLevel: null,
+      },
+      $push: { statusHistory: { status: 'ENROLLED', at: new Date(), note: 'Student account created and enrolled from the training registration form.' } },
+    }, { new: true });
+    if (!updated) throw ApiError.conflict('This registration has already been linked to an account.');
+  } catch (error) {
+    if (addedToRoster) await LearningClass.updateOne({ _id: learningClass._id }, { $pull: { students: student._id } });
+    throw error;
+  }
+}
+
+export const createStudentAccountFromRegistration = asyncHandler(async (req, res) => {
+  const { registrationId, accountClaimToken, educationLevel } = req.body;
+  const { form, registration } = await findClaimableRegistration(req.params.slug, registrationId, accountClaimToken);
+  if (await User.exists({ email: registration.email })) {
+    throw ApiError.conflict('An account already uses this email. Sign in with that account to link it to this training.');
+  }
+
+  if (!config.mail.smtpUrl || !config.mail.from || !config.mail.appUrl) {
+    throw ApiError.conflict('Account verification email is not configured. Contact the training administrator.');
+  }
+  const verificationToken = randomBytes(32).toString('base64url');
+  const verificationTokenHash = createHash('sha256').update(verificationToken).digest('hex');
+  const verificationExpiresAt = new Date(Date.now() + ACCOUNT_VERIFICATION_TTL_MS);
+  const updated = await TrainingRegistration.updateOne({
+    _id: registration._id,
+    form: form._id,
+    accountClaimTokenHash: registration.accountClaimTokenHash,
+    accountClaimExpiresAt: { $gt: new Date() },
+    student: null,
+    status: { $nin: ['REJECTED', 'ENROLLED', 'INVITED', 'ATTENDED', 'COMPLETED'] },
+  }, {
+    $set: {
+      accountVerificationTokenHash: verificationTokenHash,
+      accountVerificationExpiresAt: verificationExpiresAt,
+      pendingAccountEducationLevel: educationLevel,
+      accountSetupTokenHash: null,
+      accountSetupExpiresAt: null,
+    },
+  });
+  if (!updated.modifiedCount) throw ApiError.conflict('This registration has already been linked to an account.');
+
+  const verificationUrl = new URL(`/training-registration/${req.params.slug}`, config.mail.appUrl);
+  verificationUrl.searchParams.set('registration', registration._id.toString());
+  verificationUrl.searchParams.set('verify', verificationToken);
+  try {
+    const transport = nodemailer.createTransport(config.mail.smtpUrl);
+    await transport.sendMail({
+      from: config.mail.from,
+      to: registration.email,
+      subject: `Verify your QuickLink account for ${form.learningClass.title}`,
+      text: `Hello ${registration.name},\n\nUse this secure link to verify your email and finish creating your QuickLink student account for ${form.learningClass.title}:\n${verificationUrl}\n\nThis link expires in one hour. If you did not request this account, you can ignore this email.`,
+      html: `<p>Hello ${escapeHtml(registration.name)},</p><p>Use this secure link to verify your email and finish creating your QuickLink student account for <strong>${escapeHtml(form.learningClass.title)}</strong>:</p><p><a href="${escapeHtml(verificationUrl.toString())}">Verify email and create account</a></p><p>This link expires in one hour. If you did not request this account, you can ignore this email.</p>`,
+    });
+  } catch (error) {
+    await TrainingRegistration.updateOne({ _id: registration._id, accountVerificationTokenHash: verificationTokenHash }, {
+      $set: { accountVerificationTokenHash: null, accountVerificationExpiresAt: null, pendingAccountEducationLevel: null },
+    });
+    throw ApiError.conflict('The account verification email could not be sent. Check the email service configuration and try again.');
+  }
+  res.json({ success: true, data: { verificationRequired: true, email: registration.email } });
+});
+
+export const verifyStudentAccountFromRegistration = asyncHandler(async (req, res) => {
+  const form = await TrainingRegistrationForm.findOne({ slug: req.params.slug, active: true })
+    .populate('learningClass', 'title course subject level active maxStudents students');
+  if (!form?.learningClass?.active) throw ApiError.notFound('This training registration is unavailable.');
+  const registration = await TrainingRegistration.findOne({
+    _id: req.body.registrationId,
+    form: form._id,
+    accountVerificationExpiresAt: { $gt: new Date() },
+  }).select('+accountClaimTokenHash +accountClaimExpiresAt +accountVerificationTokenHash +accountVerificationExpiresAt +pendingAccountEducationLevel');
+  const suppliedHash = createHash('sha256').update(req.body.accountVerificationToken).digest();
+  const storedHash = registration?.accountVerificationTokenHash ? Buffer.from(registration.accountVerificationTokenHash, 'hex') : Buffer.alloc(0);
+  if (!registration || storedHash.length !== suppliedHash.length || !timingSafeEqual(storedHash, suppliedHash)
+    || !registration.pendingAccountEducationLevel
+    || !registration.accountClaimExpiresAt || registration.accountClaimExpiresAt <= new Date()
+    || registration.status === 'REJECTED' || registration.student) {
+    throw ApiError.conflict('This verification link is invalid, expired, or already used. Request a new verification email.');
+  }
+  const accountSetupToken = randomBytes(32).toString('base64url');
+  const accountSetupTokenHash = createHash('sha256').update(accountSetupToken).digest('hex');
+  const updated = await TrainingRegistration.updateOne({
+    _id: registration._id,
+    accountVerificationTokenHash: registration.accountVerificationTokenHash,
+    accountVerificationExpiresAt: { $gt: new Date() },
+    student: null,
+    status: { $nin: ['REJECTED', 'ENROLLED', 'INVITED', 'ATTENDED', 'COMPLETED'] },
+  }, {
+    $set: {
+      accountVerificationTokenHash: null,
+      accountVerificationExpiresAt: null,
+      accountSetupTokenHash,
+      accountSetupExpiresAt: new Date(Date.now() + ACCOUNT_SETUP_TTL_MS),
+    },
+  });
+  if (!updated.modifiedCount) throw ApiError.conflict('This verification link has already been used.');
+  res.json({ success: true, data: { accountSetupToken, registrationId: registration._id.toString(), email: registration.email, educationLevel: registration.pendingAccountEducationLevel } });
+});
+
+export const completeStudentAccountFromRegistration = asyncHandler(async (req, res) => {
+  const form = await TrainingRegistrationForm.findOne({ slug: req.params.slug, active: true })
+    .populate('learningClass', 'title course subject level active maxStudents students');
+  if (!form?.learningClass?.active) throw ApiError.notFound('This training registration is unavailable.');
+  const registration = await TrainingRegistration.findOne({
+    _id: req.body.registrationId,
+    form: form._id,
+    accountSetupExpiresAt: { $gt: new Date() },
+  }).select('+accountClaimTokenHash +accountClaimExpiresAt +accountSetupTokenHash +accountSetupExpiresAt +pendingAccountEducationLevel');
+  const suppliedHash = createHash('sha256').update(req.body.accountSetupToken).digest();
+  const storedHash = registration?.accountSetupTokenHash ? Buffer.from(registration.accountSetupTokenHash, 'hex') : Buffer.alloc(0);
+  if (!registration || storedHash.length !== suppliedHash.length || !timingSafeEqual(storedHash, suppliedHash)
+    || !registration.pendingAccountEducationLevel || !registration.accountClaimExpiresAt || registration.accountClaimExpiresAt <= new Date()
+    || registration.status === 'REJECTED' || registration.student) {
+    throw ApiError.conflict('Your email verification has expired. Request a new account-verification email.');
+  }
+  if (await User.exists({ email: registration.email })) {
+    throw ApiError.conflict('An account already uses this email. Sign in with that account to link it to this training.');
+  }
+
+  const student = new User({
+    name: registration.name,
+    email: registration.email,
+    educationLevel: registration.pendingAccountEducationLevel,
+    role: 'student',
+    isActive: true,
+    registrationStatus: 'approved',
+  });
+  await student.setPassword(req.body.password);
+  try {
+    await student.save();
+    await addStudentToRegistrationClass(form, registration, student);
+  } catch (error) {
+    if (student.isNew === false) await User.deleteOne({ _id: student._id });
+    if (error?.code === 11000) throw ApiError.conflict('An account already uses this email. Sign in with that account to link it to this training.');
+    throw error;
+  }
+  await recordActivity(req, { action: 'registration.account_created', resourceType: 'registration', resourceId: registration._id, message: `Created and enrolled a verified student account for ${registration.email}.` });
+  res.json({ success: true, data: { classId: form.learningClass._id.toString(), email: registration.email } });
+});
+export const linkExistingStudentAccount = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'student') throw ApiError.forbidden('Sign in with the student account used for this training.');
+  const { form, registration } = await findClaimableRegistration(req.params.slug, req.body.registrationId, req.body.accountClaimToken);
+  if (normalizedEmail(req.user.email) !== normalizedEmail(registration.email)) {
+    throw ApiError.forbidden('Sign in with the same email address you entered on the training registration form.');
+  }
+  await addStudentToRegistrationClass(form, registration, req.user);
+  await recordActivity(req, { action: 'registration.account_linked', resourceType: 'registration', resourceId: registration._id, message: `Linked ${registration.email} to the training registration and enrolled them.` });
+  res.json({ success: true, data: { classId: form.learningClass._id.toString() } });
 });
 
 export const listRegistrations = asyncHandler(async (req, res) => {
@@ -401,6 +619,19 @@ export const enrollSelectedRegistrations = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { results } });
 });
 
+function classInvitationContent(registration, learningClass, target, session) {
+  const trainingName = learningClass.course || learningClass.title;
+  const classDetails = [learningClass.subject, learningClass.level, learningClass.schedule].filter(Boolean).join(' · ');
+  const sessionIntro = session
+    ? 'Your live class is ready. Use the link below to join.'
+    : 'Your class is ready. Open the class page to see updates and upcoming sessions.';
+  return {
+    subject: `Your ${learningClass.title} class details | QuickLink`,
+    text: `Hello ${registration.name},\n\nWelcome to QuickLink! You are enrolled in ${trainingName}.\n\nClass: ${learningClass.title}${classDetails ? `\nDetails: ${classDetails}` : ''}\n\n${sessionIntro}\n${target}\n\nSign in with your student account before opening the class. Please join a few minutes early for a live session. We look forward to learning with you!\n\nQuickLink Training Team`,
+    html: `<p>Hello ${escapeHtml(registration.name)},</p><p>Welcome to QuickLink! You are enrolled in <strong>${escapeHtml(trainingName)}</strong>.</p><p><strong>Class:</strong> ${escapeHtml(learningClass.title)}${classDetails ? `<br><strong>Details:</strong> ${escapeHtml(classDetails)}` : ''}</p><p>${escapeHtml(sessionIntro)}</p><p><a href="${escapeHtml(target)}">${session ? 'Join your live class' : 'Open your class page'}</a></p><p>Sign in with your student account before opening the class. Please join a few minutes early for a live session.</p><p>We look forward to learning with you!<br>QuickLink Training Team</p>`,
+  };
+}
+
 export const sendLiveClassEmail = asyncHandler(async (req, res) => {
   const form = await formWithClass(req.params.formId, req.user);
   const registration = await registrationFor(form, req.params.registrationId);
@@ -415,17 +646,13 @@ export const sendLiveClassEmail = asyncHandler(async (req, res) => {
   const target = session
     ? new URL(`/classes/join/${session.sessionCode}`, config.mail.appUrl).toString()
     : new URL(`/classes/${form.learningClass._id}`, config.mail.appUrl).toString();
-  const trainingName = form.learningClass.course || form.learningClass.title;
-  const subject = `QuickLink class invitation: ${trainingName}`;
-  const text = `Hello ${registration.name},\n\nYou are invited to your QuickLink class for ${trainingName}.\n\n${session ? 'The live class is starting now. Join here' : 'Open your class here'}: ${target}\n\nSign in with your registered QuickLink student account.`;
+  const content = classInvitationContent(registration, form.learningClass, target, session);
   try {
     const transport = nodemailer.createTransport(config.mail.smtpUrl);
     await transport.sendMail({
       from: config.mail.from,
       to: registration.email,
-      subject,
-      text,
-      html: `<p>Hello ${escapeHtml(registration.name)},</p><p>You are invited to your QuickLink class for <strong>${escapeHtml(trainingName)}</strong>.</p><p><a href="${escapeHtml(target)}">${session ? 'Join the live class' : 'Open your class'}</a></p><p>Sign in with your registered QuickLink student account.</p>`,
+      ...content,
     });
   } catch {
     throw ApiError.conflict('The invitation email could not be sent. Check the email service configuration.');
@@ -452,13 +679,12 @@ export const sendClassInvitations = asyncHandler(async (req, res) => {
       const target = session
         ? new URL(`/classes/join/${session.sessionCode}`, config.mail.appUrl).toString()
         : new URL(`/classes/${form.learningClass._id}`, config.mail.appUrl).toString();
-      const trainingName = form.learningClass.course || form.learningClass.title;
+      const content = classInvitationContent(registration, form.learningClass, target, session);
       const transport = nodemailer.createTransport(config.mail.smtpUrl);
       await transport.sendMail({
         from: config.mail.from,
         to: registration.email,
-        subject: `QuickLink class invitation: ${trainingName}`,
-        text: `Hello ${registration.name},\n\nYour QuickLink class for ${trainingName} is ready.\n\n${session ? 'Join the live class' : 'Open your class'}: ${target}\n\nSign in with your registered student account.`,
+        ...content,
       });
       if (registration.status === 'ENROLLED') statusTransition(registration, 'INVITED', req.user, 'Class invitation sent.');
       registration.invitedAt = new Date();
@@ -490,4 +716,3 @@ export default {
   sendLiveClassEmail,
   sendClassInvitations,
 };
-

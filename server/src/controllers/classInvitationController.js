@@ -45,7 +45,7 @@ async function canManage(item, user) {
 }
 
 function emailContent(classItem, student, url) {
-  const teachers = [classItem.teacher, ...(classItem.teachers || [])].map((teacher) => teacher.name).filter(Boolean).join(', ');
+  const teachers = [classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map((teacher) => teacher.name).filter(Boolean).join(', ');
   const details = [
     `Training: ${classItem.course || classItem.title}`,
     `Class: ${classItem.title} (${classItem.level} Â· ${classItem.subject})`,
@@ -175,5 +175,4 @@ export const acceptInvitation = asyncHandler(async (req, res) => {
 });
 
 export default { listInvitations, sendInvitations, resendInvitation, revokeInvitation, acceptInvitation };
-
 

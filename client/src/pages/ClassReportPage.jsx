@@ -5,6 +5,7 @@ import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader, StatCard } from '../components/layout.jsx';
 import { EmptyState, PageLoader } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useDialog } from '../context/DialogContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDateTime } from '../lib/format.js';
 import { isAdmin } from '../lib/roles.js';
@@ -15,6 +16,7 @@ const duration = (seconds) => `${Math.floor(seconds / 60)} min`;
 export default function ClassReportPage() {
   const { sessionId } = useParams();
   const toast = useToast();
+  const { form } = useDialog();
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -42,12 +44,25 @@ export default function ClassReportPage() {
   };
 
   const correctAttendance = async (person) => {
-    const status = window.prompt('Set status: present, absent, late, early, or excused', person.status || (person.attended ? 'present' : 'absent'));
-    if (!['present','absent','late','early','excused'].includes(status)) return;
-    const reason = window.prompt('Enter a reason for the attendance correction.', '');
-    if (!reason?.trim()) return;
+    const correction = await form({
+      title: `Correct attendance for ${person.name}`,
+      message: 'Choose the accurate attendance status and provide a reason. The correction will be recorded in the audit history.',
+      confirmLabel: 'Save correction',
+      fields: [
+        {
+          name: 'status',
+          label: 'Attendance status',
+          type: 'select',
+          value: person.status || (person.attended ? 'present' : 'absent'),
+          required: true,
+          options: ['present', 'absent', 'late', 'early', 'excused'].map((value) => ({ value, label: value[0].toUpperCase() + value.slice(1) })),
+        },
+        { name: 'reason', label: 'Reason for correction', type: 'textarea', required: true, maxLength: 1000 },
+      ],
+    });
+    if (!correction?.reason?.trim()) return;
     try {
-      await api.patch(`/classes/sessions/${sessionId}/attendance/${person.user}`, { status, reason });
+      await api.patch(`/classes/sessions/${sessionId}/attendance/${person.user}`, { status: correction.status, reason: correction.reason.trim() });
       const response = await api.get(`/classes/sessions/${sessionId}/report`);
       setData(response.data.data);
       toast.success('Attendance correction saved with an audit record.');
@@ -70,7 +85,7 @@ export default function ClassReportPage() {
   if (!data) return <EmptyState title="Report unavailable" description="The session may still be live or you may not have access." />;
   const { session, class: classInfo } = data;
   const report = session.report;
-  const canManage = isAdmin(user) || (user?.role === 'teacher' && (classInfo.teacher.id === user.id || classInfo.teachers?.some((teacher) => teacher.id === user.id)));
+  const canManage = isAdmin(user) || (user?.role === 'teacher' && (classInfo.teacher?.id === user.id || classInfo.teachers?.some((teacher) => teacher.id === user.id)));
   return <div>
     <Link to={`/classes/${classInfo.id}`} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"><ArrowLeft size={16} />Back to class</Link>
     <PageHeader title="Class attendance report" subtitle={`${classInfo.title} · ${classInfo.subject} · ${classInfo.level}`} actions={<div className="flex gap-2"><button className="btn-secondary" onClick={downloadCsv}><Download size={17} />CSV</button><button className="btn-primary" onClick={downloadPdf}><FileText size={17} />Download PDF</button></div>} />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, ClipboardList, Copy, ExternalLink, Mail, MessageCircle, Plus, Radio, UserPlus } from 'lucide-react';
-import api, { apiError } from '../api/client.js';
+import api, { apiError, assetUrl } from '../api/client.js';
 import { Badge, Modal, PageHeader } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -14,12 +14,6 @@ const blankForm = () => ({
   placeholders: { name: 'Your full name', email: 'you@example.com', whatsapp: '+27 00 000 0000' },
   fields: [],
 });
-
-function publicImageUrl(imageUrl) {
-  if (!imageUrl) return '';
-  const origin = new URL(api.defaults.baseURL || '/', window.location.origin).origin;
-  return `${origin}${imageUrl}`;
-}
 
 function whatsappLink(number, message) {
   const digits = String(number || '').replace(/\D/g, '');
@@ -39,6 +33,7 @@ export default function TrainingRegistrationsPage() {
   const [saving, setSaving] = useState(false);
   const [starting, setStarting] = useState(false);
   const [emailing, setEmailing] = useState('');
+  const [enrolling, setEnrolling] = useState('');
   const [copied, setCopied] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [formData, setFormData] = useState(blankForm);
@@ -126,9 +121,23 @@ export default function TrainingRegistrationsPage() {
     setEmailing(entry.id);
     try {
       await api.post(`/registrations/${selectedForm.id}/entries/${entry.id}/email`);
-      toast.success(`Live-class invitation sent to ${entry.email}.`);
+      toast.success(`Class invitation emailed to ${entry.email}.`);
     } catch (error) { toast.error(apiError(error).message); }
     finally { setEmailing(''); }
+  };
+
+  const enrollRegistrant = async (entry) => {
+    if (!selectedForm) return;
+    setEnrolling(entry.id);
+    try {
+      const response = await api.post(`/registrations/${selectedForm.id}/entries/${entry.id}/enroll`);
+      const { created, emailSent, temporaryPassword } = response.data.data;
+      if (emailSent) toast.success(`${created ? 'Student account created' : 'Student enrolled'} and access details emailed to ${entry.email}.`);
+      else if (temporaryPassword) toast.error(`Student enrolled, but the email could not be sent. Temporary password: ${temporaryPassword}`);
+      else toast.error('Student enrolled, but the email could not be sent. Verify the SMTP settings and contact the student.');
+      await loadSelected();
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setEnrolling(''); }
   };
 
   const copyFormLink = async () => {
@@ -172,7 +181,7 @@ export default function TrainingRegistrationsPage() {
         {selectedForm && <section className="min-w-0 space-y-4">
           <div className="card">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-slate-900">{selectedForm.title}</h2><Badge color={selectedForm.active ? 'green' : 'slate'}>{selectedForm.active ? 'Active' : 'Paused'}</Badge></div><p className="mt-1 text-sm text-slate-500">Training: {selectedForm.classTitle}</p><p className="mt-3 break-all rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600">{window.location.origin}{selectedForm.publicUrl}</p></div>
+              <div className="min-w-0">{selectedForm.imageUrl && <img src={assetUrl(selectedForm.imageUrl)} alt="" className="mb-3 aspect-[16/7] max-h-48 w-full rounded-lg object-cover sm:max-w-sm" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}<div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-bold text-slate-900">{selectedForm.title}</h2><Badge color={selectedForm.active ? 'green' : 'slate'}>{selectedForm.active ? 'Active' : 'Paused'}</Badge></div><p className="mt-1 text-sm text-slate-500">Training: {selectedForm.classTitle}</p><p className="mt-3 break-all rounded-lg bg-slate-50 px-3 py-2 font-mono text-xs text-slate-600">{window.location.origin}{selectedForm.publicUrl}</p></div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <button className="btn-secondary" onClick={copyFormLink}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Copied' : 'Copy link'}</button>
                 <a className="btn-secondary" href={`${window.location.origin}${selectedForm.publicUrl}`} target="_blank" rel="noreferrer"><ExternalLink size={16} />Preview</a>
@@ -187,10 +196,14 @@ export default function TrainingRegistrationsPage() {
           </div>
           <div className="card">
             <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="font-semibold text-slate-900">Registered people</h2><p className="text-sm text-slate-500">{entries.length} registration{entries.length === 1 ? '' : 's'}</p></div><button className="btn-secondary" disabled={entryLoading} onClick={loadSelected}>Refresh</button></div>
-            {!session && <p className="mb-3 rounded-lg bg-amber-50 p-3 text-xs leading-5 text-amber-900">Start the class to enable live-class invitations. Email uses the configured SMTP service; WhatsApp opens a prefilled message for you to send.</p>}
+            <p className="mb-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">Enroll a registrant to create their student account and email access details. Enrolled students can receive an email invitation before or during a live class; WhatsApp opens a class-specific invitation for you to send.</p>
             {entryLoading ? <div className="py-8 text-center"><Spinner size={22} /></div> : entries.length === 0 ? <EmptyState icon={UserPlus} title="No one has registered yet" description="Share the form link with prospective trainees." /> : <div className="space-y-3">
               {entries.map((entry) => {
-                const message = session ? `Hello ${entry.name}, join the live ${selectedForm.title} class here: ${joinUrl}. Sign in with an enrolled QuickLink student account.` : '';
+                const trainingClass = currentClass?.title || selectedForm.classTitle;
+                const classDetails = [currentClass?.subject, currentClass?.level, currentClass?.schedule].filter(Boolean).join(' · ');
+                const classUrl = session ? joinUrl : `${window.location.origin}/classes/${selectedForm.classId}`;
+                const registrationUrl = `${window.location.origin}${selectedForm.publicUrl}`;
+                const message = `Hello ${entry.name}! 👋\n\nWelcome to QuickLink. Your registration for ${selectedForm.title} is connected to ${trainingClass}${classDetails ? ` (${classDetails})` : ''}.\n\n${session ? `Your live class is ready. Join here: ${classUrl}` : `Open your class here: ${classUrl}`}\n\nIf you have not created your student account yet, finish setting it up here: ${registrationUrl}\n\nPlease sign in before class, join a few minutes early, and bring your questions. We look forward to learning with you!\n\nQuickLink Training Team`;
                 const waUrl = whatsappLink(entry.whatsapp, message);
                 return <article key={entry.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -202,8 +215,8 @@ export default function TrainingRegistrationsPage() {
                       {selectedForm.fields?.filter((field) => entry.answers[field.key]).map((field) => <p key={field.key} className="mt-2 text-sm text-slate-600"><span className="font-medium">{field.label}:</span> {entry.answers[field.key]}</p>)}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
-                      <button className="btn-secondary" disabled={!session || emailing === entry.id} onClick={() => sendEmail(entry)}>{emailing === entry.id ? <Spinner size={15} /> : <Mail size={15} />}Email invite</button>
-                      {waUrl ? <a className="btn-secondary" href={waUrl} target="_blank" rel="noreferrer"><MessageCircle size={15} />WhatsApp</a> : <button className="btn-secondary" disabled title={session ? 'This registration has no usable WhatsApp number.' : 'Start the live class first.'}><MessageCircle size={15} />WhatsApp</button>}
+                      {entry.studentId ? <button className="btn-secondary" disabled={emailing === entry.id || enrolling === entry.id} onClick={() => sendEmail(entry)}>{emailing === entry.id ? <Spinner size={15} /> : <Mail size={15} />}Email invite</button> : <button className="btn-secondary" disabled={entry.status === 'REJECTED' || enrolling === entry.id || emailing === entry.id} title={entry.status === 'REJECTED' ? 'A rejected registration cannot be enrolled.' : 'Create a student account, enroll them in the class, and email their access details.'} onClick={() => enrollRegistrant(entry)}>{enrolling === entry.id ? <Spinner size={15} /> : <Mail size={15} />}{entry.status === 'REJECTED' ? 'Rejected' : 'Enroll & email access'}</button>}
+                      {waUrl ? <a className="btn-secondary" href={waUrl} target="_blank" rel="noreferrer"><MessageCircle size={15} />WhatsApp</a> : <button className="btn-secondary" disabled title="This registration has no usable WhatsApp number."><MessageCircle size={15} />WhatsApp</button>}
                     </div>
                   </div>
                 </article>;

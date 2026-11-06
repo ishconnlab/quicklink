@@ -161,12 +161,23 @@ try {
   const revokedVerification = await request(`/certificates/verify/${certificateCode}`);
   assert.equal(revokedVerification.payload.data.status, 'revoked', 'Public verification reports revoked certificates accurately');
 
+  await LearningClass.updateOne({ _id: courseId }, {
+    $set: { teacher: managedStudentId, teachers: [managedStudentId, teacherId] },
+    $addToSet: { students: managedStudentId },
+  });
+  await LearningProgress.create({ student: managedStudentId, book: book._id });
   const removedManaged = await request(`/users/${managedStudentId}`, { token: ownerToken, method: 'DELETE' });
-  assert.equal(removedManaged.response.status, 200, 'Admin can deactivate a managed account');
-  assert.equal(removedManaged.payload.data.user.isActive, false);
-  assert.equal((await request('/auth/me', { token: managedLogin.payload.data.token })).response.status, 401, 'Deactivation invalidates existing sessions');
-  const restoredManaged = await request(`/users/${managedStudentId}`, { token: ownerToken, method: 'PATCH', body: { isActive: true } });
-  assert.equal(restoredManaged.response.status, 200, 'Admin can restore a deactivated account');
+  assert.equal(removedManaged.response.status, 200, 'Admin can permanently delete a managed account');
+  assert.equal(removedManaged.payload.data.user.deleted, true);
+  assert.equal((await request('/auth/me', { token: managedLogin.payload.data.token })).response.status, 401, 'A permanently deleted account cannot restore an existing session');
+  const restoreDeleted = await request(`/users/${managedStudentId}`, { token: ownerToken, method: 'PATCH', body: { isActive: true } });
+  assert.equal(restoreDeleted.response.status, 404, 'A permanently deleted account cannot be restored');
+  assert.equal(await User.exists({ _id: managedStudentId }), null, 'Permanent deletion removes the account record');
+  assert.equal(await LearningProgress.exists({ student: managedStudentId }), null, 'Permanent deletion removes learning progress');
+  const updatedClass = await LearningClass.findById(courseId).select('teacher teachers students').lean();
+  assert.equal(updatedClass.teacher.toString(), teacherId, 'Permanent deletion reassigns the class to another existing teacher');
+  assert.equal(updatedClass.teachers.some((id) => id.toString() === managedStudentId), false, 'Permanent deletion removes deleted teachers from class rosters');
+  assert.equal(updatedClass.students.some((id) => id.toString() === managedStudentId), false, 'Permanent deletion removes deleted students from class rosters');
 
   const loggedOut = await request('/auth/logout', { token: secondToken, method: 'POST', body: {} });
   assert.equal(loggedOut.response.status, 200, 'Student logout invalidates the server session');

@@ -31,7 +31,7 @@ async function assertSessionAccess(session, user) {
   const item = await LearningClass.findById(session.learningClass).select('teacher teachers students');
   if (!item) throw new Error('Class not found.');
   const allowed = isAdmin(user)
-    || item.teacher.toString() === user._id.toString()
+    || item.teacher?.toString() === user._id.toString()
     || item.teachers.some((teacher) => teacher.toString() === user._id.toString())
     || item.students.some((student) => student.toString() === user._id.toString());
   if (!allowed) throw new Error('You are not enrolled in this class.');
@@ -166,7 +166,7 @@ export function initializeClassRealtime(httpServer) {
       try {
         const session = await LiveSession.findOne({ _id: sessionId, status: 'live' });
         const classItem = await assertSessionAccess(session, user);
-        const teacherIds = [classItem.teacher, ...(classItem.teachers || [])].map(String);
+        const teacherIds = [classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map(String);
         if (user.role !== 'admin' && !teacherIds.includes(user._id)) {
           return acknowledge({ ok: false, message: 'Only the assigned teacher or an admin can request student screen sharing.' });
         }
@@ -233,7 +233,7 @@ export function initializeClassRealtime(httpServer) {
         const session = await LiveSession.findById(sessionId);
         if (!session || session.status !== 'live') return acknowledge({ ok: false, message: 'This class has ended.' });
         const classItem = session && await LearningClass.findById(session.learningClass).select('teacher teachers');
-        const teacherIds = classItem ? [classItem.teacher, ...(classItem.teachers || [])].map(String) : [];
+        const teacherIds = classItem ? [classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map(String) : [];
         if (user.role !== 'admin' && !teacherIds.includes(user._id)) return acknowledge({ ok: false, message: 'Only a teacher can pin class messages.' });
         const message = await ClassChatMessage.findOneAndUpdate(
           { _id: messageId, session: sessionId, removedAt: null },
@@ -254,7 +254,7 @@ export function initializeClassRealtime(httpServer) {
         const session = await LiveSession.findById(sessionId);
         if (!session || session.status !== 'live') return acknowledge({ ok: false, message: 'This class has ended.' });
         const classItem = session && await LearningClass.findById(session.learningClass).select('teacher teachers');
-        const teacherIds = classItem ? [classItem.teacher, ...(classItem.teachers || [])].map(String) : [];
+        const teacherIds = classItem ? [classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map(String) : [];
         if (user.role !== 'admin' && !teacherIds.includes(user._id)) return acknowledge({ ok: false, message: 'Only a teacher can remove class messages.' });
         const message = await ClassChatMessage.findOneAndUpdate({ _id: messageId, session: sessionId, removedAt: null }, { $set: { removedAt: new Date(), removedBy: user._id, body: '' } }, { new: true });
         if (!message) return acknowledge({ ok: false, message: 'Message not found.' });
@@ -294,4 +294,3 @@ export function emitClassSessionEnded(sessionId) {
 }
 
 export default initializeClassRealtime;
-

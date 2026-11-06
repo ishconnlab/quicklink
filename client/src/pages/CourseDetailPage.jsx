@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Award, BookOpen, Check, CheckCircle2, ChevronLeft, ChevronRight, GraduationCap, Pencil, Share2, Users } from 'lucide-react';
+import { ArrowLeft, Award, BookOpen, Check, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Share2, Users } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import CourseAssignments from '../components/CourseAssignments.jsx';
+import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { isAdmin } from '../lib/roles.js';
 
 export default function CourseDetailPage() {
@@ -137,7 +138,7 @@ export default function CourseDetailPage() {
   if (!course) return <EmptyState title="Course unavailable" description="This course may be unpublished or no longer available." action={<Link to="/courses" className="btn-secondary">Browse courses</Link>} />;
   return <div className="min-w-0"><Link to="/courses" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"><ArrowLeft size={16} />All courses</Link>
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="relative aspect-[16/7] max-h-80 bg-gradient-to-br from-brand-700 to-sky-600">{course.thumbnailUrl ? <img src={course.thumbnailUrl} alt={`Cover for ${course.title}`} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-white"><GraduationCap size={64} /></div>}</div>
+      <CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} loading="eager" className="aspect-[16/7] max-h-80" />
       <div className="min-w-0 p-4 sm:p-8"><div className="mb-3 flex flex-wrap gap-2"><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{course.trade && <Badge>{course.trade}</Badge>}<Badge color={course.enrollmentStatus === 'enrolled' ? 'green' : 'slate'}>{course.enrollmentStatus}</Badge></div>
         <PageHeader title={course.title} subtitle={course.introduction || ''} actions={course.enrolled ? <Link to={`/classes/${course.id}`} className="btn-primary"><CheckCircle2 size={16} />Continue learning</Link> : <button disabled={enrolling || course.enrollmentStatus !== 'open'} onClick={enroll} className="btn-primary">{enrolling ? <Spinner size={16} /> : <Users size={16} />}{course.enrollmentStatus === 'open' ? 'Enroll in course' : course.enrollmentStatus}</button>} />
         <div className="grid min-w-0 gap-4 lg:grid-cols-3"><article className="min-w-0 lg:col-span-2"><h2 className="mb-2 font-semibold text-slate-900">About this course</h2><p className="break-words whitespace-pre-wrap text-sm leading-6 text-slate-600">{course.description || course.introduction || 'Course information will be provided by the instructor.'}</p></article>

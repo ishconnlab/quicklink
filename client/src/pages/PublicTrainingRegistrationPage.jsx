@@ -1,60 +1,188 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { CheckCircle2, GraduationCap, UserRoundPlus } from 'lucide-react';
-import api, { apiError } from '../api/client.js';
+import { useNavigate, useParams } from 'react-router-dom';
+import { CheckCircle2, GraduationCap, LockKeyhole, Mail, UserRoundPlus } from 'lucide-react';
+import api, { apiError, assetUrl } from '../api/client.js';
 import { Spinner } from '../components/ui.jsx';
-
-function imageSrc(url) {
-  if (!url) return '';
-  const origin = new URL(api.defaults.baseURL || '/', window.location.origin).origin;
-  return `${origin}${url}`;
-}
+import { useAuth } from '../context/AuthContext.jsx';
 
 export default function PublicTrainingRegistrationPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
+  const { login } = useAuth();
   const [form, setForm] = useState(null);
   const [values, setValues] = useState({ name: '', email: '', whatsapp: '', answers: {} });
+  const [accountDetails, setAccountDetails] = useState({ password: '', confirmPassword: '', educationLevel: '' });
+  const [claim, setClaim] = useState(null);
+  const [accountSetup, setAccountSetup] = useState(null);
+  const [accountMode, setAccountMode] = useState('');
+  const [accountEmail, setAccountEmail] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [accountSaving, setAccountSaving] = useState(false);
   const [error, setError] = useState('');
+  const [verificationError, setVerificationError] = useState('');
+  const [verifying, setVerifying] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     let active = true;
     api.get(`/registrations/public/${slug}`)
-      .then((response) => { if (active) setForm(response.data.data.form); })
+      .then((response) => {
+        if (active) {
+          setForm(response.data.data.form);
+          setAccountDetails((current) => ({ ...current, educationLevel: response.data.data.form.level || '' }));
+        }
+      })
       .catch((requestError) => { if (active) setError(apiError(requestError).message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [slug]);
+
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const registrationId = query.get('registration');
+    const accountVerificationToken = query.get('verify');
+    if (!registrationId || !accountVerificationToken) {
+      try {
+        const saved = sessionStorage.getItem(`training-account-setup:${slug}`);
+        if (saved) {
+          setAccountSetup(JSON.parse(saved));
+          setAccountMode('setup');
+          setSubmitted(true);
+        }
+      } catch {
+        sessionStorage.removeItem(`training-account-setup:${slug}`);
+      }
+      return undefined;
+    }
+    let active = true;
+    setVerifying(true);
+    api.post(`/registrations/public/${slug}/verify-account`, { registrationId, accountVerificationToken })
+      .then((response) => {
+        sessionStorage.setItem(`training-account-setup:${slug}`, JSON.stringify(response.data.data));
+        setAccountSetup(response.data.data);
+        setAccountMode('setup');
+        setSubmitted(true);
+      })
+      .catch((requestError) => { if (active) setVerificationError(apiError(requestError).message); })
+      .finally(() => { if (active) setVerifying(false); });
+    return () => { active = false; };
+  }, [slug, navigate]);
 
   const submit = async (event) => {
     event.preventDefault();
     setSaving(true);
     setError('');
     try {
-      await api.post(`/registrations/public/${slug}`, values);
+      const response = await api.post(`/registrations/public/${slug}`, values);
+      setClaim({ ...response.data.data.registration, accountClaimToken: response.data.data.accountClaimToken });
       setSubmitted(true);
     } catch (requestError) { setError(apiError(requestError).message); }
     finally { setSaving(false); }
   };
 
+  const createAccount = async (event) => {
+    event.preventDefault();
+    setError('');
+    if (!claim) return;
+    setAccountSaving(true);
+    try {
+      await api.post(`/registrations/public/${slug}/create-account`, {
+        registrationId: claim.id,
+        accountClaimToken: claim.accountClaimToken,
+        educationLevel: accountDetails.educationLevel,
+      });
+      setAccountMode('verify');
+    } catch (requestError) { setError(apiError(requestError).message); }
+    finally { setAccountSaving(false); }
+  };
+
+  const completeAccount = async (event) => {
+    event.preventDefault();
+    setError('');
+    if (accountDetails.password !== accountDetails.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+    if (!accountSetup) return;
+    setAccountSaving(true);
+    try {
+      const response = await api.post(`/registrations/public/${slug}/complete-account`, {
+        registrationId: accountSetup.registrationId,
+        accountSetupToken: accountSetup.accountSetupToken,
+        password: accountDetails.password,
+      });
+      sessionStorage.removeItem(`training-account-setup:${slug}`);
+      navigate('/login', {
+        replace: true,
+        state: { email: accountSetup.email, from: { pathname: `/classes/${response.data.data.classId}` } },
+      });
+    } catch (requestError) { setError(apiError(requestError).message); }
+    finally { setAccountSaving(false); }
+  };
+
+  const linkExistingAccount = async (event) => {
+    event.preventDefault();
+    if (!claim) return;
+    setError('');
+    setAccountSaving(true);
+    try {
+      await login(accountEmail.trim(), accountPassword);
+      await api.post(`/registrations/public/${slug}/claim-account`, {
+        registrationId: claim.id,
+        accountClaimToken: claim.accountClaimToken,
+      });
+      navigate(`/classes/${form.classId}`, { replace: true });
+    } catch (requestError) { setError(apiError(requestError).message); }
+    finally { setAccountSaving(false); }
+  };
+
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-slate-100"><Spinner size={28} /></div>;
   if (!form) return <div className="flex min-h-screen items-center justify-center bg-slate-100 px-4"><div className="max-w-md rounded-xl border border-slate-200 bg-white p-6 text-center"><h1 className="text-lg font-semibold text-slate-900">Form unavailable</h1><p className="mt-2 text-sm text-slate-500">{error || 'This registration link may have expired.'}</p></div></div>;
+  if (verifying) return <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-100 text-sm text-slate-600"><Spinner size={28} />Verifying your email…</div>;
 
   return <main className="min-h-screen bg-slate-100 px-4 py-8 sm:py-12">
     <section className="mx-auto w-full max-w-xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      {form.imageUrl && <img src={imageSrc(form.imageUrl)} alt="" className="h-52 w-full object-cover" />}
+      {form.imageUrl && <img src={assetUrl(form.imageUrl)} alt="" className="h-52 w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
       <div className="p-6 sm:p-8">
         <div className="mb-5 flex items-center gap-2 text-sm font-semibold text-brand-700"><GraduationCap size={19} />QuickLink training registration</div>
         <h1 className="text-2xl font-bold text-slate-900">{form.title}</h1>
         <p className="mt-1 text-sm font-medium text-slate-500">{form.training}{form.subject ? ` · ${form.subject}` : ''}</p>
         {form.description && <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-600">{form.description}</p>}
+        {verificationError && <div role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{verificationError}</div>}
 
-        {submitted ? <div role="status" className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-5">
-          <CheckCircle2 size={24} className="text-emerald-600" />
-          <h2 className="mt-2 font-semibold text-emerald-900">Registration received</h2>
-          <p className="mt-1 text-sm leading-6 text-emerald-800">Thank you, {values.name}. The training administrator has received your details. This registration does not create a QuickLink student account.</p>
+        {submitted ? <div className="mt-6">
+          <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+            <CheckCircle2 size={24} className="text-emerald-600" />
+            <h2 className="mt-2 font-semibold text-emerald-900">{accountSetup ? 'Email verified' : 'Registration received'}</h2>
+            <p className="mt-1 text-sm leading-6 text-emerald-800">{accountSetup ? `Your email is verified. Set a password to create your account and enroll in ${form.classTitle}.` : `Thank you, ${values.name}. Your registration is linked to ${form.classTitle}. Create or link a student account to enroll and open your class.`}</p>
+          </div>
+          {claim && !accountMode && <div className="mt-4 grid gap-2 sm:grid-cols-2"><button className="btn-primary" onClick={() => setAccountMode('create')}><UserRoundPlus size={17} />Create my student account</button><button className="btn-secondary" onClick={() => setAccountMode('signin')}><Mail size={17} />I already have an account</button></div>}
+          {claim && accountMode === 'create' && <form onSubmit={createAccount} className="mt-4 space-y-3 rounded-xl border border-slate-200 p-4">
+            <h2 className="font-semibold text-slate-900">Create your student account</h2>
+            <p className="text-sm text-slate-600">We’ll use {values.email} to create your account and enroll you in {form.classTitle}.</p>
+            {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</div>}
+            <div><label className="label" htmlFor="account-level">Training level</label><select id="account-level" required className="input" value={accountDetails.educationLevel} onChange={(event) => setAccountDetails({ ...accountDetails, educationLevel: event.target.value })}><option value="" disabled>Select your level</option>{['L3', 'L4', 'L5', 'Bootcamp', 'Training'].map((level) => <option key={level} value={level}>{level === 'Training' ? 'Training / non-student' : level}</option>)}</select></div>
+            <button type="submit" className="btn-primary w-full" disabled={accountSaving}>{accountSaving ? <Spinner size={17} /> : <Mail size={17} />}{accountSaving ? 'Sending verification…' : 'Email me a verification link'}</button>
+          </form>}
+          {claim && accountMode === 'verify' && <div role="status" className="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4"><h2 className="font-semibold text-brand-900">Check your email to finish creating your account</h2><p className="mt-1 text-sm leading-6 text-brand-800">We sent a secure verification link to {values.email}. Open it within one hour to verify your email, then set a password to enroll in {form.classTitle}. Check your spam folder if it does not arrive.</p></div>}
+          {accountSetup && accountMode === 'setup' && <form onSubmit={completeAccount} className="mt-4 space-y-3 rounded-xl border border-slate-200 p-4">
+            <h2 className="font-semibold text-slate-900">Set your student account password</h2>
+            <p className="text-sm text-slate-600">Email verified for {accountSetup.email}. Choose a password to finish creating your account and enroll in {form.classTitle}.</p>
+            {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</div>}
+            <div><label className="label" htmlFor="account-password">Password</label><input id="account-password" type="password" autoComplete="new-password" minLength={10} maxLength={200} required className="input" value={accountDetails.password} onChange={(event) => setAccountDetails({ ...accountDetails, password: event.target.value })} /></div>
+            <div><label className="label" htmlFor="account-confirm-password">Confirm password</label><input id="account-confirm-password" type="password" autoComplete="new-password" minLength={10} maxLength={200} required className="input" value={accountDetails.confirmPassword} onChange={(event) => setAccountDetails({ ...accountDetails, confirmPassword: event.target.value })} /></div>
+            <button type="submit" className="btn-primary w-full" disabled={accountSaving}>{accountSaving ? <Spinner size={17} /> : <LockKeyhole size={17} />}{accountSaving ? 'Creating account…' : 'Create account and enroll'}</button>
+          </form>}
+          {claim && accountMode === 'signin' && <form onSubmit={linkExistingAccount} className="mt-4 space-y-3 rounded-xl border border-slate-200 p-4">
+            <h2 className="font-semibold text-slate-900">Link your existing student account</h2>
+            <p className="text-sm text-slate-600">Sign in with the same email address used on this registration to enroll in {form.classTitle}.</p>
+            {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</div>}
+            <div><label className="label" htmlFor="existing-account-email">Account email</label><input id="existing-account-email" type="email" autoComplete="username" required className="input" value={accountEmail || values.email} onChange={(event) => setAccountEmail(event.target.value)} /></div>
+            <div><label className="label" htmlFor="existing-account-password">Password</label><input id="existing-account-password" type="password" autoComplete="current-password" required className="input" value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} /></div>
+            <button type="submit" className="btn-primary w-full" disabled={accountSaving}>{accountSaving ? <Spinner size={17} /> : <LockKeyhole size={17} />}{accountSaving ? 'Signing in…' : 'Sign in and enroll'}</button>
+          </form>}
         </div> : <form onSubmit={submit} className="mt-6 space-y-4">
           {error && <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</div>}
           <div><label className="label" htmlFor="registration-name">Full name</label><input id="registration-name" autoComplete="name" className="input" required maxLength={120} minLength={2} placeholder={form.placeholders.name} value={values.name} onChange={(event) => setValues({ ...values, name: event.target.value })} /></div>

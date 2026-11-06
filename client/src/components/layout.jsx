@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 
 export function PageHeader({ title, subtitle, actions }) {
   return (
@@ -58,6 +58,7 @@ export function StatCard({ label, value, icon: Icon, hint, accent = 'brand' }) {
 }
 
 export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
+  const titleId = useId();
   useEffect(() => {
     const onKey = (e) => e.key === 'Escape' && onClose?.();
     if (open) document.addEventListener('keydown', onKey);
@@ -82,10 +83,13 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
             transition={{ type: 'tween', duration: 0.2 }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
             className={`relative z-10 w-full ${sizes[size]} rounded-t-2xl bg-white p-4 shadow-xl sm:rounded-2xl sm:p-5 ${size === 'reader' ? 'reader-modal-scroll max-h-[96dvh] overflow-y-auto' : size === 'manage' || size === 'lg' ? 'manage-modal-scroll max-h-[92dvh] overflow-y-auto' : ''}`}
           >
             <div className="mb-4 flex items-start justify-between gap-4">
-              <h3 className="min-w-0 break-words text-lg font-semibold text-slate-900">{title}</h3>
+              <h3 id={titleId} className="min-w-0 break-words text-lg font-semibold text-slate-900">{title}</h3>
               <button onClick={onClose} className="btn-ghost p-1.5" aria-label="Close">
                 <X size={18} />
               </button>

@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import JSZip from 'jszip';
 import { notifyUsers } from '../services/notifications.js';
 
-const teacherIdsFor = (item) => [item.teacher, ...(item.teachers || [])].map((person) => (person._id || person).toString());
+const teacherIdsFor = (item) => [item.teacher, ...(item.teachers || [])].filter(Boolean).map((person) => (person._id || person).toString());
 const isTeacher = (item, user) => user.role === 'admin' || teacherIdsFor(item).includes(user._id.toString());
 const SUBMISSION_DIR = path.resolve(process.env.SUBMISSIONS_DIR || fileURLToPath(new URL('../../private-submissions/', import.meta.url)));
 
@@ -252,4 +252,3 @@ export const downloadSubmissionFile = asyncHandler(async (req, res) => {
 });
 
 export default { listClassAssignments, createAssignment, updateAssignment, deleteAssignment, submitAssignment, listSubmissions, gradeSubmission };
-

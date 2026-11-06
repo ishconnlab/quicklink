@@ -37,6 +37,22 @@ const registrationBody = z.object({
   whatsapp: z.string().trim().min(7).max(40),
   answers: z.record(z.string(), z.string().max(2000)).optional().default({}),
 });
+const accountClaimBody = z.object({
+  registrationId: id,
+  accountClaimToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+});
+const accountVerificationBody = z.object({
+  registrationId: id,
+  accountVerificationToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+});
+const createAccountBody = accountClaimBody.extend({
+  educationLevel: z.enum(['L3', 'L4', 'L5', 'Bootcamp', 'Training']),
+});
+const completeAccountBody = z.object({
+  registrationId: id,
+  accountSetupToken: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+  password: z.string().min(10, 'Password must be at least 10 characters').max(200),
+});
 const uploadImage = multer({ storage: multer.memoryStorage(), limits: { fileSize: 3 * 1024 * 1024, files: 1, fields: 0 } });
 const submissionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -46,10 +62,22 @@ const submissionLimiter = rateLimit({
   skip: () => config.isTest,
   message: { success: false, error: { message: 'Too many registration attempts. Please try again later.' } },
 });
+const accountCreationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => config.isTest,
+  message: { success: false, error: { message: 'Too many account-creation attempts. Please try again later.' } },
+});
 
 router.get('/public/:slug/image', validate(slugParams, 'params'), registrations.getPublicImage);
 router.get('/public/:slug', validate(slugParams, 'params'), registrations.getPublicForm);
 router.post('/public/:slug', submissionLimiter, validate(slugParams, 'params'), validate(registrationBody), registrations.submitRegistration);
+router.post('/public/:slug/create-account', accountCreationLimiter, validate(slugParams, 'params'), validate(createAccountBody), registrations.createStudentAccountFromRegistration);
+router.post('/public/:slug/verify-account', accountCreationLimiter, validate(slugParams, 'params'), validate(accountVerificationBody), registrations.verifyStudentAccountFromRegistration);
+router.post('/public/:slug/complete-account', accountCreationLimiter, validate(slugParams, 'params'), validate(completeAccountBody), registrations.completeStudentAccountFromRegistration);
+router.post('/public/:slug/claim-account', requireAuth, validate(slugParams, 'params'), validate(accountClaimBody), registrations.linkExistingStudentAccount);
 
 router.use(requireAuth, requireTeacher);
 router.get('/', registrations.listForms);
