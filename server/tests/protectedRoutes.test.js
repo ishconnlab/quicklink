@@ -34,6 +34,7 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     const completion = await fetch(`${root}/api/courses/0123456789abcdef01234567/completion`);
     const issue = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificate`, { method: 'POST' });
     const download = await fetch(`${root}/api/certificates/verify/not-a-valid-code`);
+    const downloadByCode = await fetch(`${root}/api/certificates/${'a'.repeat(32)}.pdf`);
     const candidates = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificate-candidates`);
     const bulkIssue = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificates/issue`, { method: 'POST' });
     const editName = await fetch(`${root}/api/certificates/0123456789abcdef01234567/name`, { method: 'PATCH' });
@@ -60,6 +61,7 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     assert.equal(completion.status, 401);
     assert.equal(issue.status, 401);
     assert.equal(download.status, 400);
+    assert.equal(downloadByCode.status, 401);
     assert.equal(candidates.status, 401);
     assert.equal(bulkIssue.status, 401);
     assert.equal(editName.status, 401);

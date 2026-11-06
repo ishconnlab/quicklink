@@ -97,7 +97,7 @@ export default function CourseDetailPage() {
   };
   const downloadCertificate = async (target = certificate) => {
     if (!target) return;
-    try { const response = await api.get(`/certificates/${target.id}.pdf`, { responseType: 'blob' }); const url = URL.createObjectURL(response.data); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `ishconnect-quicklink-certificate-${target.code}.pdf`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    try { const response = await api.get(`/certificates/${target.code}.pdf`, { responseType: 'blob' }); const url = URL.createObjectURL(response.data); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `ishconnect-quicklink-certificate-${target.code}.pdf`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
     catch (error) { toast.error(apiError(error).message); }
   };
   const shareCertificate = async (target) => {

@@ -350,7 +350,9 @@ export const revokeCertificate = asyncHandler(async (req, res) => {
 });
 
 export const downloadCertificate = asyncHandler(async (req, res) => {
-  const certificate = await CourseCertificate.findById(req.params.id);
+  const certificate = /^[0-9a-fA-F]{24}$/.test(req.params.id)
+    ? await CourseCertificate.findById(req.params.id)
+    : await CourseCertificate.findOne({ code: req.params.id });
   if (!certificate || certificate.revokedAt) throw ApiError.notFound('Certificate is unavailable.');
   if (req.user.role !== 'admin' && certificate.student.toString() !== req.user._id.toString()) throw ApiError.forbidden('You cannot download another studentâ€™s certificate.');
   const appUrl = config.mail.appUrl || config.corsOrigin[0];

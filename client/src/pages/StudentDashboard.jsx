@@ -24,7 +24,7 @@ export default function StudentDashboard() {
   if (loading) return <PageLoader label="Loading your dashboard…" />;
   if (!data) return <EmptyState title="Dashboard could not load" description="Check your connection and try again." action={<button className="btn-primary" onClick={() => window.location.reload()}>Try again</button>} />;
   const download = async (certificate) => {
-    try { const response = await api.get(`/certificates/${certificate.id}.pdf`, { responseType: 'blob' }); const url = URL.createObjectURL(response.data); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `ishconnect-quicklink-certificate-${certificate.code}.pdf`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    try { const response = await api.get(`/certificates/${certificate.code}.pdf`, { responseType: 'blob' }); const url = URL.createObjectURL(response.data); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `ishconnect-quicklink-certificate-${certificate.code}.pdf`; anchor.click(); window.setTimeout(() => URL.revokeObjectURL(url), 1000); }
     catch (error) { toast.error(apiError(error).message); }
   };
   const share = async (certificate) => {
