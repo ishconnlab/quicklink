@@ -3,7 +3,7 @@ import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import * as registrations from '../controllers/registrationController.js';
-import { requireAuth, requireOwner } from '../middleware/auth.js';
+import { requireAuth, requireTeacher } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import config from '../config/env.js';
 
@@ -13,6 +13,7 @@ const slug = z.string().regex(/^[A-Za-z0-9_-]{32,48}$/);
 const slugParams = z.object({ slug });
 const idParams = z.object({ formId: id });
 const registrationParams = z.object({ formId: id, registrationId: id });
+const registrationStatus = z.enum(['PENDING', 'APPROVED', 'REJECTED', 'ENROLLED', 'INVITED', 'ATTENDED', 'COMPLETED']);
 const fields = z.array(z.object({
   key: z.string().regex(/^custom_[a-z0-9_-]+$/).max(40),
   label: z.string().trim().min(1).max(80),
@@ -50,12 +51,16 @@ router.get('/public/:slug/image', validate(slugParams, 'params'), registrations.
 router.get('/public/:slug', validate(slugParams, 'params'), registrations.getPublicForm);
 router.post('/public/:slug', submissionLimiter, validate(slugParams, 'params'), validate(registrationBody), registrations.submitRegistration);
 
-router.use(requireAuth, requireOwner);
+router.use(requireAuth, requireTeacher);
 router.get('/', registrations.listForms);
 router.post('/', validate(formBody), registrations.createForm);
 router.patch('/:formId', validate(idParams, 'params'), validate(z.object({ active: z.boolean() })), registrations.updateFormStatus);
 router.post('/:formId/image', validate(idParams, 'params'), uploadImage.single('image'), registrations.uploadFormImage);
 router.get('/:formId/entries', validate(idParams, 'params'), registrations.listRegistrations);
+router.patch('/:formId/entries/:registrationId/status', validate(registrationParams, 'params'), validate(z.object({ status: registrationStatus, note: z.string().trim().max(1000).optional().default('') })), registrations.reviewRegistration);
+router.post('/:formId/entries/:registrationId/enroll', validate(registrationParams, 'params'), registrations.enrollRegistrationStudent);
+router.post('/:formId/entries/enroll', validate(idParams, 'params'), validate(z.object({ registrationIds: z.array(id).min(1).max(200) })), registrations.enrollSelectedRegistrations);
 router.post('/:formId/entries/:registrationId/email', validate(registrationParams, 'params'), registrations.sendLiveClassEmail);
+router.post('/:formId/entries/invite', validate(idParams, 'params'), validate(z.object({ registrationIds: z.array(id).max(500).optional().default([]) })), registrations.sendClassInvitations);
 
 export default router;

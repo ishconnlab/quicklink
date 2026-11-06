@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import { apiError } from '../api/client.js';
 import { formatDateTime } from '../lib/format.js';
 import { Spinner } from '../components/ui.jsx';
+import { roleLabel } from '../lib/roles.js';
 
 export default function SettingsPage() {
   const { user, changePassword } = useAuth();
@@ -52,7 +53,7 @@ export default function SettingsPage() {
       <dl className="grid grid-cols-2 gap-3 text-sm">
         <div><dt className="text-xs uppercase text-slate-400">Name</dt><dd className="mt-0.5 font-medium text-slate-800">{user?.name}</dd></div>
         <div><dt className="text-xs uppercase text-slate-400">Email</dt><dd className="mt-0.5 font-medium text-slate-800">{user?.email}</dd></div>
-        <div><dt className="text-xs uppercase text-slate-400">Role</dt><dd className="mt-0.5"><span className="badge bg-brand-100 text-brand-700"><ShieldCheck size={11} />{user?.role === 'owner' ? 'Admin' : 'Student'}</span></dd></div>
+        <div><dt className="text-xs uppercase text-slate-400">Role</dt><dd className="mt-0.5"><span className="badge bg-brand-100 text-brand-700"><ShieldCheck size={11} />{roleLabel(user?.role)}</span></dd></div>
         <div><dt className="text-xs uppercase text-slate-400">Last sign-in</dt><dd className="mt-0.5 font-medium text-slate-800">{formatDateTime(user?.lastLoginAt)}</dd></div>
       </dl>
     </div>

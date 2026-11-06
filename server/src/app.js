@@ -14,9 +14,12 @@ import courseRoutes from './routes/courseRoutes.js';
 import assignmentRoutes from './routes/assignmentRoutes.js';
 import certificateRoutes from './routes/certificateRoutes.js';
 import registrationRoutes from './routes/registrationRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import teacherRoutes from './routes/teacherRoutes.js';
 
 export function createApp() {
   const app = express();
+  app.locals.startupReady = true;
 
   app.set('trust proxy', config.trustProxy ? 1 : false);
 
@@ -57,11 +60,19 @@ export function createApp() {
 
   // Readiness probe: distinguishes DB readiness from process liveness.
   app.get('/health/ready', (_req, res) => {
-    const ready = isDbReady();
+    const ready = app.locals.startupReady && isDbReady();
     res.status(ready ? 200 : 503).json({
       status: ready ? 'ready' : 'not-ready',
       db: ready ? 'up' : 'down',
       timestamp: new Date().toISOString(),
+    });
+  });
+
+  app.use('/api', (req, res, next) => {
+    if (app.locals.startupReady || req.path === '/health') return next();
+    res.status(503).json({
+      success: false,
+      error: { message: 'QuickLink is still starting. Please retry shortly.' },
     });
   });
 
@@ -73,6 +84,8 @@ export function createApp() {
   app.use('/api/assignments', assignmentRoutes);
   app.use('/api/certificates', certificateRoutes);
   app.use('/api/registrations', registrationRoutes);
+  app.use('/api/admin', adminRoutes);
+  app.use('/api/teacher', teacherRoutes);
 
   app.use(notFound);
   app.use(errorHandler);
@@ -81,3 +94,5 @@ export function createApp() {
 }
 
 export default createApp;
+
+

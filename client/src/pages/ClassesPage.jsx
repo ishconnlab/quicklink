@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, Clock3, Plus, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
@@ -7,6 +7,7 @@ import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import PagedCheckboxList from '../components/PagedCheckboxList.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { isAdmin } from '../lib/roles.js';
 
 const blankClass = () => ({ title: '', subject: '', trade: '', introduction: '', course: '', level: 'L3', description: '', learningMaterials: [], completionRequirements: { requireReading: false, requireTheory: false, requirePractical: false, requireAttendance: false, minimumScore: 0 }, published: true, startsAt: '', schedule: '', durationMinutes: 60, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg', maxStudents: 300, enrollmentOpen: true, teacherIds: [], studentIds: [] });
 
@@ -26,12 +27,15 @@ export default function ClassesPage() {
   const [includeArchived, setIncludeArchived] = useState(false);
   const [classPage, setClassPage] = useState(1);
   const [classPages, setClassPages] = useState(1);
+  const creatingClass = useRef(false);
+  const createdClass = useRef(null);
+  const createRequestId = useRef(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const requests = [api.get('/classes', { params: { ...(includeArchived ? { includeArchived: true } : {}), page: classPage, limit: 12 } })];
-      if (user?.role === 'owner') requests.push(api.get('/classes/people/teachers'), api.get('/classes/people/students'), api.get('/learning/books', { params: { manage: true, limit: 500 } }));
+      if (isAdmin(user)) requests.push(api.get('/classes/people/teachers'), api.get('/classes/people/students'), api.get('/learning/books', { params: { manage: true, limit: 500 } }));
       const [classRes, teacherRes, studentRes] = await Promise.all(requests);
       setClasses(classRes.data.data.classes);
       setClassPages(classRes.data.data.pages || 1);
@@ -46,21 +50,44 @@ export default function ClassesPage() {
 
   const createClass = async (event) => {
     event.preventDefault();
+    if (creatingClass.current) return;
+    creatingClass.current = true;
     setSaving(true);
     try {
-      const response = await api.post('/classes', { ...form, startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null, durationMinutes: Number(form.durationMinutes), maxStudents: Number(form.maxStudents) });
-      const created = response.data.data.class;
+      let created = createdClass.current;
+      if (!created) {
+        if (!createRequestId.current) {
+          createRequestId.current = Array.from(crypto.getRandomValues(new Uint8Array(12)), (byte) => byte.toString(16).padStart(2, '0')).join('');
+        }
+        const response = await api.post('/classes', { ...form, startsAt: form.startsAt ? new Date(form.startsAt).toISOString() : null, durationMinutes: Number(form.durationMinutes), maxStudents: Number(form.maxStudents) }, { headers: { 'Idempotency-Key': createRequestId.current } });
+        created = response.data.data.class;
+        createdClass.current = created;
+      }
       if (thumbnail) await api.post(`/courses/${created.id}/thumbnail`, (() => { const data = new FormData(); data.append('thumbnail', thumbnail); return data; })());
       toast.success('Course created and assigned.');
       setModal(false);
       setForm(blankClass());
       setThumbnail(null);
+      createdClass.current = null;
+      createRequestId.current = null;
       load();
-    } catch (error) { toast.error(apiError(error).message); }
-    finally { setSaving(false); }
+    } catch (error) {
+      if (createdClass.current) {
+        toast.error(`Class was created, but its thumbnail could not be uploaded: ${apiError(error).message}`);
+        setModal(false);
+        setForm(blankClass());
+        setThumbnail(null);
+        createdClass.current = null;
+        createRequestId.current = null;
+        load();
+      } else {
+        toast.error(apiError(error).message);
+      }
+      creatingClass.current = false;
+    } finally { setSaving(false); }
   };
 
-  const openCreate = () => { setCreateStep(0); setForm(blankClass()); setThumbnail(null); setModal(true); };
+  const openCreate = () => { creatingClass.current = false; createdClass.current = null; createRequestId.current = null; setCreateStep(0); setForm(blankClass()); setThumbnail(null); setModal(true); };
   const nextCreateStep = () => {
     if ((createStep === 0 || createStep === 1) && !document.getElementById('create-class-form')?.reportValidity()) return;
     if (createStep === 1 && form.teacherIds.length === 0) { toast.error('Choose at least one teacher for this class.'); return; }
@@ -73,9 +100,9 @@ export default function ClassesPage() {
   const booksForLevel = books.filter((book) => book.level === form.level);
 
   return <div>
-    <PageHeader title={user?.role === 'owner' ? 'Courses and classes' : 'Classes'} subtitle={user?.role === 'owner' ? 'Publish courses, assign teachers, manage enrollment, and schedule classes.' : 'Your assigned teaching and learning groups.'} actions={user?.role === 'owner' && <div className="flex gap-2"><button className="btn-secondary" onClick={() => setIncludeArchived((value) => !value)}>{includeArchived ? 'Hide archived' : 'Show archived'}</button><button className="btn-primary" onClick={openCreate}><Plus size={18} />New course</button></div>} />
+    <PageHeader title={isAdmin(user) ? 'Courses and classes' : 'Classes'} subtitle={isAdmin(user) ? 'Publish courses, assign teachers, manage enrollment, and schedule classes.' : 'Your assigned teaching and learning groups.'} actions={isAdmin(user) && <div className="flex gap-2"><button className="btn-secondary" onClick={() => setIncludeArchived((value) => !value)}>{includeArchived ? 'Hide archived' : 'Show archived'}</button><button className="btn-primary" onClick={openCreate}><Plus size={18} />New course</button></div>} />
     {loading ? <PageLoader label="Loading classes…" /> : classes.length === 0 ? (
-      <EmptyState icon={BookOpen} title="No classes yet" description={user?.role === 'owner' ? 'Create a class, choose a teacher, and enroll students to begin.' : 'Your admin will add you to a class.'} action={user?.role === 'owner' && <button onClick={openCreate} className="btn-primary"><Plus size={17} />Create class</button>} />
+      <EmptyState icon={BookOpen} title="No classes yet" description={isAdmin(user) ? 'Create a class, choose a teacher, and enroll students to begin.' : 'Your admin will add you to a class.'} action={isAdmin(user) && <button onClick={openCreate} className="btn-primary"><Plus size={17} />Create class</button>} />
     ) : <><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {classes.map((item) => <Link key={item.id} to={`/classes/${item.id}`} className={`card block transition-shadow hover:shadow-md ${item.active ? '' : 'opacity-70'}`}>
         <div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="truncate font-semibold text-slate-900">{item.title}</h2><p className="mt-1 text-sm text-slate-500">{item.subject}</p></div><span className="flex gap-1"><Badge color="brand">{item.level}</Badge>{!item.active && <Badge color="slate">Archived</Badge>}</span></div>
@@ -108,7 +135,7 @@ export default function ClassesPage() {
             <div><PagedCheckboxList title="Enroll students" items={students} selectedIds={form.studentIds} onChange={(studentIds) => setForm({ ...form, studentIds })} emptyLabel="No students match this search." pageSize={6} /><p className="mt-1 text-xs text-slate-500">Enrollment is limited by the class capacity ({form.maxStudents}).</p></div>
           </div>}
           {createStep === 3 && <div className="space-y-4">
-            <fieldset className="rounded-xl border border-slate-200 p-4"><legend className="px-1 text-sm font-semibold">Completion requirements</legend><div className="grid gap-2 sm:grid-cols-2">{[['requireReading','Require linked reading to be completed'],['requireTheory','Require theory assessments to pass'],['requirePractical','Require practical work to pass'],['requireAttendance','Require class attendance']].map(([key,label]) => <label key={key} className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={form.completionRequirements[key]} onChange={(e) => setForm({ ...form, completionRequirements: { ...form.completionRequirements, [key]: e.target.checked } })} />{label}</label>)}</div></fieldset>
+            <fieldset className="rounded-xl border border-slate-200 p-4"><legend className="px-1 text-sm font-semibold">Completion requirements</legend><p className="mb-2 text-xs text-slate-500">Published theory and practical assignments are automatically included; students must pass every assigned item.</p><div className="grid gap-2 sm:grid-cols-2">{[['requireReading','Require linked reading to be completed'],['requireAttendance','Require class attendance']].map(([key,label]) => <label key={key} className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={form.completionRequirements[key]} onChange={(e) => setForm({ ...form, completionRequirements: { ...form.completionRequirements, [key]: e.target.checked } })} />{label}</label>)}</div></fieldset>
             <label className="flex min-h-11 items-center gap-2 rounded-lg bg-slate-50 px-3 text-sm text-slate-700"><input type="checkbox" checked={form.enrollmentOpen} onChange={(e) => setForm({ ...form, enrollmentOpen: e.target.checked })} />Enrollment open to eligible students</label>
             <label className="flex min-h-11 items-center gap-2 rounded-lg bg-slate-50 px-3 text-sm text-slate-700"><input type="checkbox" checked={form.published} onChange={(e) => setForm({ ...form, published: e.target.checked })} />Publish in the course catalog</label>
             <div className="rounded-lg border border-brand-100 bg-brand-50 p-3 text-sm text-brand-900"><p className="font-semibold">Review</p><p className="mt-1">{form.title || 'Untitled course'} · {form.level} · {form.teacherIds.length} teacher(s) · {form.studentIds.length} student(s) · {form.learningMaterials.length} resource(s)</p></div>

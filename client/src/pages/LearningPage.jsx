@@ -6,6 +6,7 @@ import { PageHeader, Badge, Modal, StatCard } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { isAdmin as isAdminUser } from '../lib/roles.js';
 
 const LEVELS = ['All levels', 'L3', 'L4', 'L5'];
 const FORMATS = ['pdf', 'doc', 'docx', 'txt', 'md', 'ppt', 'pptx', 'xls', 'xlsx'];
@@ -52,7 +53,7 @@ export default function LearningPage({ learner = false }) {
   const [searchParams] = useSearchParams();
   const toast = useToast();
   const { user } = useAuth();
-  const isAdmin = !learner && user?.role === 'owner';
+  const isAdmin = !learner && isAdminUser(user);
   const canTrack = learner && user?.role === 'student';
   const [books, setBooks] = useState([]);
   const [categoryOptions, setCategoryOptions] = useState([]);

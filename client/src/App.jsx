@@ -18,9 +18,11 @@ import CoursesPage from './pages/CoursesPage.jsx';
 import CourseDetailPage from './pages/CourseDetailPage.jsx';
 import StudentDashboard from './pages/StudentDashboard.jsx';
 import TeacherDashboard from './pages/TeacherDashboard.jsx';
+import AdminDashboard from './pages/AdminDashboard.jsx';
 import CertificateVerifyPage from './pages/CertificateVerifyPage.jsx';
 import PublicTrainingRegistrationPage from './pages/PublicTrainingRegistrationPage.jsx';
 import TrainingRegistrationsPage from './pages/TrainingRegistrationsPage.jsx';
+import { isAdmin, isTeacher } from './lib/roles.js';
 
 const LiveSessionPage = lazy(() => import('./pages/LiveSessionPage.jsx'));
 
@@ -33,18 +35,22 @@ function Protected({ children }) {
 }
 
 function Landing() {
-  const { user } = useAuth();
-  return <Navigate to={user?.role === 'owner' ? '/learning' : '/dashboard'} replace />;
+  return <Navigate to="/dashboard" replace />;
 }
 
-function OwnerOnly({ children }) {
+function AdminOnly({ children }) {
   const { user } = useAuth();
-  return user?.role === 'owner' ? children : <Navigate to="/learn" replace />;
+  return isAdmin(user) ? children : <Navigate to="/learn" replace />;
+}
+
+function LearningRoute({ children }) {
+  const { user } = useAuth();
+  return isAdmin(user) ? children : <Navigate to="/learn" replace />;
 }
 
 function StudentLearning({ children }) {
   const { user } = useAuth();
-  return user?.role === 'owner' ? <Navigate to="/learning" replace /> : children;
+  return isAdmin(user) ? <Navigate to="/learning" replace /> : children;
 }
 
 export default function App() {
@@ -60,18 +66,18 @@ export default function App() {
       <Route element={<Protected><AppLayout /></Protected>}>
         <Route path="/" element={<Landing />} />
         <Route path="/learn" element={<StudentLearning><LearningPage learner /></StudentLearning>} />
-        <Route path="/dashboard" element={<StudentLearning>{user?.role === 'teacher' ? <TeacherDashboard /> : <StudentDashboard />}</StudentLearning>} />
+        <Route path="/dashboard" element={isAdmin(user) ? <AdminOnly><AdminDashboard /></AdminOnly> : isTeacher(user) ? <StudentLearning><TeacherDashboard /></StudentLearning> : <StudentLearning><StudentDashboard /></StudentLearning>} />
         <Route path="/courses" element={<StudentLearning><CoursesPage /></StudentLearning>} />
         <Route path="/courses/:id" element={<StudentLearning><CourseDetailPage /></StudentLearning>} />
-        <Route path="/learning" element={<OwnerOnly><LearningPage /></OwnerOnly>} />
+        <Route path="/learning" element={<LearningRoute><LearningPage /></LearningRoute>} />
         <Route path="/classes" element={<ClassesPage />} />
         <Route path="/classes/join/:sessionCode" element={<JoinClassPage />} />
         <Route path="/classes/invitations/:token" element={<ClassInvitationPage />} />
         <Route path="/classes/sessions/:sessionId/live" element={<Suspense fallback={<SplashScreen />}><LiveSessionPage /></Suspense>} />
         <Route path="/classes/sessions/:sessionId/report" element={<ClassReportPage />} />
         <Route path="/classes/:id" element={<ClassDetailPage />} />
-        <Route path="/users" element={<OwnerOnly><UsersPage /></OwnerOnly>} />
-        <Route path="/registrations" element={<OwnerOnly><TrainingRegistrationsPage /></OwnerOnly>} />
+        <Route path="/users" element={<AdminOnly><UsersPage /></AdminOnly>} />
+        <Route path="/registrations" element={<AdminOnly><TrainingRegistrationsPage /></AdminOnly>} />
         <Route path="/settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<NotFoundPage />} />

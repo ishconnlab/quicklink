@@ -7,6 +7,7 @@ import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import CourseAssignments from '../components/CourseAssignments.jsx';
+import { isAdmin } from '../lib/roles.js';
 
 export default function CourseDetailPage() {
   const { id } = useParams();
@@ -67,7 +68,7 @@ export default function CourseDetailPage() {
     finally { setCertificateLoading(false); }
   }, [certificatePage, id, toast]);
   useEffect(() => {
-    if (user?.role === 'owner' && course?.id === id) loadCertificateCandidates(certificatePage);
+    if (isAdmin(user) && course?.id === id) loadCertificateCandidates(certificatePage);
   }, [user?.role, course?.id, id, certificatePage, loadCertificateCandidates]);
   const enroll = async () => {
     setEnrolling(true);
@@ -142,7 +143,7 @@ export default function CourseDetailPage() {
         <div className="grid min-w-0 gap-4 lg:grid-cols-3"><article className="min-w-0 lg:col-span-2"><h2 className="mb-2 font-semibold text-slate-900">About this course</h2><p className="break-words whitespace-pre-wrap text-sm leading-6 text-slate-600">{course.description || course.introduction || 'Course information will be provided by the instructor.'}</p></article>
           <aside className="rounded-xl bg-slate-50 p-4"><h2 className="mb-3 font-semibold text-slate-900">Course information</h2><p className="text-sm text-slate-600">Teacher: {course.teachers?.map((teacher) => teacher.name).join(', ') || course.teacher?.name || 'Not assigned'}</p><p className="mt-2 text-sm text-slate-600">{course.enrolledCount} enrolled · {course.seatsAvailable} seats remaining</p><p className="mt-2 text-sm text-slate-600">{course.learningMaterials?.length || 0} learning materials</p></aside></div>
         <section className="mt-7 min-w-0"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="flex items-center gap-2 font-semibold text-slate-900"><BookOpen size={18} />Learning materials</h2>{course.enrolled && course.learningMaterials?.length > 0 && <Badge color={course.readingComplete ? 'green' : 'brand'}>{course.readingProgress || 0}% read</Badge>}</div>{course.enrolled ? course.learningMaterials?.length ? <ul className="space-y-2">{course.learningMaterials.map((material) => <li key={material.id} className="min-w-0 rounded-lg border border-slate-200 p-3"><div className="flex min-w-0 flex-col items-stretch justify-between gap-2 sm:flex-row sm:items-center"><div className="min-w-0"><Link to={`/learn?book=${material.id}&course=${course.id}`} className="break-words font-medium text-brand-700 hover:underline">{material.title}</Link><p className="break-words text-xs text-slate-500">{material.format?.toUpperCase()} · {material.level}{material.progress ? ` · ${material.progress.completed ? 'Complete' : `${Math.round(material.progress.progressPercent || 0)}%`}` : ' · Not started'}</p></div><Link to={`/learn?book=${material.id}&course=${course.id}`} className="btn-secondary w-full sm:w-auto">{material.progress ? 'Continue reading' : 'Start reading'}</Link></div></li>)}</ul> : <p className="text-sm text-slate-500">No materials have been linked to this course yet.</p> : <p className="text-sm text-slate-500">Enroll in this course to access its learning materials.</p>}</section>
-        {course.enrolled || user?.role === 'owner' || user?.role === 'teacher' ? <CourseAssignments course={course} user={user} onCompletionChange={load} /> : <section className="mt-7"><h2 className="font-semibold text-slate-900">Practical Work</h2><p className="mt-2 text-sm text-slate-600">Enroll in this course to view assignments and feedback.</p></section>}
+        {course.enrolled || isAdmin(user) || user?.role === 'teacher' ? <CourseAssignments course={course} user={user} onCompletionChange={load} /> : <section className="mt-7"><h2 className="font-semibold text-slate-900">Practical Work</h2><p className="mt-2 text-sm text-slate-600">Enroll in this course to view assignments and feedback.</p></section>}
         {course.enrolled && user?.role === 'student' && certificationAssessment?.enabled && <section className="mt-8 border-t border-slate-200 pt-6">
           <div className="mb-4"><h2 className="flex items-center gap-2 font-semibold text-slate-900"><Award size={18} />Certification assessment</h2><p className="mt-1 text-sm leading-6 text-slate-600">Answer all 10 multiple-choice questions. You need 80% to pass and have up to three attempts.</p></div>
           {!certificationAssessment.configured && <p role="status" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">The administrator has not finished configuring this assessment yet.</p>}
@@ -161,7 +162,7 @@ export default function CourseDetailPage() {
           </div>}
           {!certificationAssessment.passed && certificationAssessment.configured && certificationAssessment.attemptsRemaining === 0 && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">No attempts remain. Contact the administrator for help.</p>}
         </section>}
-        {user?.role === 'owner' && <section className="mt-8 border-t border-slate-200 pt-6">
+        {isAdmin(user) && <section className="mt-8 border-t border-slate-200 pt-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div><h2 className="flex items-center gap-2 font-semibold text-slate-900"><Award size={18} />Training certificates</h2><p className="mt-1 text-sm text-slate-500">{certificateTotal} enrolled student{certificateTotal === 1 ? '' : 's'} · certificates can only be issued when all configured completion requirements are met.</p></div>
             <button className="btn-primary" disabled={certificateLoading || issuingIds.length > 0 || !certificateCandidates.some((candidate) => candidate.eligible && !candidate.certificate)} onClick={() => issueForStudents(certificateCandidates.filter((candidate) => candidate.eligible && !candidate.certificate).map((candidate) => candidate.studentId))}>

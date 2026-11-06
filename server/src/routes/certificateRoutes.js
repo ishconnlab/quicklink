@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import * as certificates from '../controllers/certificateController.js';
-import { requireAuth, requireOwner } from '../middleware/auth.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 
 const router = Router();
@@ -11,6 +11,7 @@ router.get('/share/:code', validate(z.object({ code: z.string().regex(/^[A-Za-z0
 router.use(requireAuth);
 router.get('/mine', certificates.listMyCertificates);
 router.get('/:id.pdf', validate(z.object({ id: objectId }), 'params'), certificates.downloadCertificate);
-router.patch('/:id/name', requireOwner, validate(z.object({ id: objectId }), 'params'), validate(z.object({ studentName: z.string().trim().min(2).max(120) })), certificates.updateCertificateName);
-router.patch('/:id/revoke', requireOwner, validate(z.object({ id: objectId }), 'params'), validate(z.object({ reason: z.string().trim().min(3).max(1000) })), certificates.revokeCertificate);
+router.patch('/:id/name', requireAdmin, validate(z.object({ id: objectId }), 'params'), validate(z.object({ studentName: z.string().trim().min(2).max(120) })), certificates.updateCertificateName);
+router.patch('/:id/revoke', requireAdmin, validate(z.object({ id: objectId }), 'params'), validate(z.object({ reason: z.string().trim().min(3).max(1000) })), certificates.revokeCertificate);
 export default router;
+

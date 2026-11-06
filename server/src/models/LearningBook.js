@@ -20,7 +20,7 @@ const learningBookSchema = new mongoose.Schema({
   assessmentQuestions: {
     type: [assessmentQuestionSchema],
     default: [],
-    validate: { validator: (questions) => questions.length === 0 || questions.length === 20, message: 'A final assessment must contain exactly 20 questions.' },
+    validate: { validator: (questions) => questions.length <= 50, message: 'A final assessment cannot contain more than 50 questions.' },
   },
   format: { type: String, enum: ['pdf', 'doc', 'docx', 'txt', 'md', 'ppt', 'pptx', 'xls', 'xlsx'], default: 'pdf', index: true },
   mimeType: { type: String, default: 'application/pdf' },
@@ -36,3 +36,4 @@ learningBookSchema.index({ level: 1, category: 1, format: 1, active: 1 });
 
 export const LearningBook = mongoose.model('LearningBook', learningBookSchema);
 export default LearningBook;
+

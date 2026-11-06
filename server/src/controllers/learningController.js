@@ -11,6 +11,8 @@ import { LearningClass } from '../models/LearningClass.js';
 import { LearningAssessmentAttempt } from '../models/LearningAssessmentAttempt.js';
 import { formatAwareProgress } from '../services/learningProgress.js';
 import { gradeAssessment, sanitizeAssessmentQuestions } from '../services/finalAssessment.js';
+import { getLearningSettings } from '../services/settings.js';
+import { findOrIssueBookCertificate, bookCertificateJson } from '../services/bookCertificates.js';
 import { inspectDocument } from '../services/documentFormats.js';
 import { BOOK_ROOT, deleteBookFile, replaceBookFile, resolveBookFile, storeUploadedBook, syncLearningBooks } from '../services/learningLibrary.js';
 import { randomUUID } from 'node:crypto';
@@ -27,7 +29,7 @@ const progressJson = (progress) => progress ? {
   currentPage: progress.currentPage, totalPages: progress.totalPages, positionType: progress.positionType,
   positionIndex: progress.positionIndex, positionLabel: progress.positionLabel,
   furthestPosition: progress.furthestPosition, totalUnits: progress.totalUnits,
-  progressPercent: progress.progressPercent, timeSpentSeconds: progress.timeSpentSeconds, completed: progress.completed,
+  progressPercent: progress.progressPercent, scrollPercent: progress.scrollPercent || 0, timeSpentSeconds: progress.timeSpentSeconds, completed: progress.completed,
   lastReadAt: progress.lastReadAt, lastOpenedAt: progress.lastOpenedAt,
 } : null;
 
@@ -40,7 +42,7 @@ const bookJson = (book, progress) => ({
 });
 
 async function readableBook(req) {
-  const book = await LearningBook.findOne({ _id: req.params.id, ...(req.user.role === 'owner' ? {} : { active: true }) });
+  const book = await LearningBook.findOne({ _id: req.params.id, ...(req.user.role === 'admin' ? {} : { active: true }) });
   if (!book) throw ApiError.notFound('This document is unavailable');
   if (book.processingStatus === 'error') throw ApiError.conflict(`This document failed validation: ${book.processingError || 'retry catalog processing'}`);
   const fullPath = resolveBookFile(book.sourceKey);
@@ -59,7 +61,7 @@ async function readableBook(req) {
 
 export const listBooks = asyncHandler(async (req, res) => {
   const sync = await syncLearningBooks();
-  const owner = req.user.role === 'owner';
+  const owner = req.user.role === 'admin';
   const filter = {};
   if (!(owner && req.query.manage === 'true')) filter.active = true;
   if (!owner || req.query.manage !== 'true') filter.processingStatus = 'ready';
@@ -84,9 +86,10 @@ export const saveProgress = asyncHandler(async (req, res) => {
   const book = await LearningBook.findOne({ _id: req.params.id, active: true, processingStatus: 'ready' });
   if (!book) throw ApiError.notFound('This document is unavailable');
   const existing = await LearningProgress.findOne({ student: req.user._id, book: book._id }).lean();
+  const settings = await getLearningSettings();
   const progress = await LearningProgress.findOneAndUpdate(
     { student: req.user._id, book: book._id },
-    { $set: formatAwareProgress(book.format, req.body, new Date(), existing) },
+    { $set: formatAwareProgress(book.format, req.body, new Date(), existing, { completionThreshold: settings.bookCompletionThreshold }) },
     { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
   );
   res.json({ success: true, data: { progress: progressJson(progress) } });
@@ -101,19 +104,26 @@ export const getBookAssessment = asyncHandler(async (req, res) => {
 export const saveBookAssessment = asyncHandler(async (req, res) => {
   const book = await LearningBook.findById(req.params.id).select('assessmentQuestions');
   if (!book) throw ApiError.notFound('Learning document not found.');
+  const settings = await getLearningSettings();
+  if (req.body.questions.length && req.body.questions.length !== settings.assessmentQuestionCount) {
+    throw ApiError.badRequest(`This assessment must contain exactly ${settings.assessmentQuestionCount} questions. Change the assessment settings to use a different count.`);
+  }
   const changed = JSON.stringify(book.assessmentQuestions.map((question) => question.toObject())) !== JSON.stringify(req.body.questions);
   if (changed && await LearningAssessmentAttempt.exists({ book: book._id })) {
     throw ApiError.conflict('This assessment cannot be changed after students have attempted it.');
   }
   book.assessmentQuestions = req.body.questions;
   await book.save();
-  res.json({ success: true, data: { configured: book.assessmentQuestions.length === 20, questionCount: book.assessmentQuestions.length } });
+  res.json({ success: true, data: { configured: book.assessmentQuestions.length > 0, questionCount: book.assessmentQuestions.length } });
 });
 
 async function getRequiredAssessmentContext(bookId, studentId) {
-  const book = await LearningBook.findOne({ _id: bookId, active: true, processingStatus: 'ready' })
-    .select('title assessmentQuestions')
-    .lean();
+  const [book, settings] = await Promise.all([
+    LearningBook.findOne({ _id: bookId, active: true, processingStatus: 'ready' })
+      .select('title level assessmentQuestions')
+      .lean(),
+    getLearningSettings(),
+  ]);
   if (!book) throw ApiError.notFound('This learning document is unavailable.');
   const courses = await LearningClass.find({
     students: studentId,
@@ -121,7 +131,7 @@ async function getRequiredAssessmentContext(bookId, studentId) {
     learningMaterials: book._id,
     'completionRequirements.requireReading': true,
   }).select('title').lean();
-  const progress = await LearningProgress.findOne({ student: studentId, book: book._id }).select('completed').lean();
+  const progress = await LearningProgress.findOne({ student: studentId, book: book._id }).select('completed progressPercent').lean();
   const attempts = await LearningAssessmentAttempt.find({ student: studentId, book: book._id })
     .sort({ attemptNumber: 1 })
     .select('attemptNumber score passed violation submittedAt')
@@ -129,19 +139,30 @@ async function getRequiredAssessmentContext(bookId, studentId) {
   return {
     book,
     courses,
+    settings,
     readingCompleted: Boolean(progress?.completed),
     attempts,
-    configured: book.assessmentQuestions?.length === 20,
+    configured: (book.assessmentQuestions || []).length > 0,
   };
 }
 
+function shuffledSafeQuestions(questions) {
+  const safe = sanitizeAssessmentQuestions(questions);
+  for (let index = safe.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [safe[index], safe[swapIndex]] = [safe[swapIndex], safe[index]];
+  }
+  return safe;
+}
+
 export const getFinalAssessment = asyncHandler(async (req, res) => {
-  if (req.user.role !== 'student') throw ApiError.forbidden('Final assessments are for enrolled students.');
+  if (req.user.role !== 'student') throw ApiError.forbidden('Final assessments are for student accounts.');
   const state = await getRequiredAssessmentContext(req.params.id, req.user._id);
+  const attemptsRemaining = Math.max(0, state.settings.assessmentAttempts - state.attempts.length);
   const latest = state.attempts.at(-1) || null;
   const passed = state.attempts.some((attempt) => attempt.passed);
-  const attemptsRemaining = Math.max(0, 3 - state.attempts.length);
-  const canStart = state.courses.length > 0 && state.readingCompleted && state.configured && !passed && attemptsRemaining > 0;
+  const canStart = state.readingCompleted && state.configured && !passed && attemptsRemaining > 0;
+  const certificate = passed ? await findOrIssueBookCertificate(state.book, req.user) : null;
   res.json({
     success: true,
     data: {
@@ -149,28 +170,33 @@ export const getFinalAssessment = asyncHandler(async (req, res) => {
       courseTitles: state.courses.map((course) => course.title),
       required: state.courses.length > 0,
       configured: state.configured,
+      questionCount: state.book.assessmentQuestions?.length || 0,
+      passMark: state.settings.assessmentPassMark,
+      attemptLimit: state.settings.assessmentAttempts,
       readingCompleted: state.readingCompleted,
       passed,
       attemptsUsed: state.attempts.length,
       attemptsRemaining,
       latestAttempt: latest ? { score: latest.score, passed: latest.passed, submittedAt: latest.submittedAt } : null,
-      questions: canStart ? sanitizeAssessmentQuestions(state.book.assessmentQuestions) : [],
+      certificate: bookCertificateJson(certificate),
+      questions: canStart ? shuffledSafeQuestions(state.book.assessmentQuestions) : [],
     },
   });
 });
 
 export const submitFinalAssessment = asyncHandler(async (req, res) => {
-  if (req.user.role !== 'student') throw ApiError.forbidden('Final assessments are for enrolled students.');
+  if (req.user.role !== 'student') throw ApiError.forbidden('Final assessments are for student accounts.');
   const state = await getRequiredAssessmentContext(req.params.id, req.user._id);
-  if (!state.courses.length) throw ApiError.forbidden('This final assessment is only available for required course reading.');
-  if (!state.readingCompleted) throw ApiError.conflict('Finish the required reading before taking its final assessment.');
-  if (!state.configured) throw ApiError.conflict('The administrator has not configured this book’s 20-question assessment.');
+  if (!state.readingCompleted) throw ApiError.conflict('Finish reading this document before taking its assessment.');
+  if (!state.configured) throw ApiError.conflict('The administrator has not configured an assessment for this document.');
   if (state.attempts.some((attempt) => attempt.passed)) throw ApiError.conflict('You have already passed this assessment.');
   const attemptNumber = state.attempts.length + 1;
-  if (attemptNumber > 3) throw ApiError.conflict('No assessment attempts remain. Contact your administrator.');
+  if (attemptNumber > state.settings.assessmentAttempts) throw ApiError.conflict('No assessment attempts remain. Contact your administrator.');
   const { answers, violation = '' } = req.body;
-  if (!violation && answers.length !== 20) throw ApiError.badRequest('Answer all 20 questions before submitting.');
-  const { score, passed } = gradeAssessment(state.book.assessmentQuestions, answers);
+  if (!violation && answers.length !== state.book.assessmentQuestions.length) {
+    throw ApiError.badRequest(`Answer all ${state.book.assessmentQuestions.length} questions before submitting.`);
+  }
+  const { score, passed } = gradeAssessment(state.book.assessmentQuestions, answers, state.settings.assessmentPassMark);
   let attempt;
   try {
     attempt = await LearningAssessmentAttempt.create({
@@ -186,19 +212,31 @@ export const submitFinalAssessment = asyncHandler(async (req, res) => {
     if (error?.code === 11000) throw ApiError.conflict('An assessment attempt was submitted at the same time. Refresh the assessment status.');
     throw error;
   }
+  const certificate = passed ? await findOrIssueBookCertificate(state.book, req.user) : null;
   res.status(201).json({
     success: true,
     data: {
       score,
       passed,
       attemptNumber: attempt.attemptNumber,
-      attemptsRemaining: Math.max(0, 3 - attemptNumber),
+      attemptsRemaining: Math.max(0, state.settings.assessmentAttempts - attemptNumber),
+      passMark: state.settings.assessmentPassMark,
       violationRecorded: Boolean(violation),
       reportToAdministrator: Boolean(violation),
+      certificate: bookCertificateJson(certificate),
     },
   });
 });
 
+export const getBookCertificate = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'student') throw ApiError.forbidden('Book certificates are for student accounts.');
+  const book = await LearningBook.findOne({ _id: req.params.id, active: true }).select('title level').lean();
+  if (!book) throw ApiError.notFound('This learning document is unavailable.');
+  const passed = await LearningAssessmentAttempt.exists({ student: req.user._id, book: book._id, passed: true });
+  if (!passed) throw ApiError.conflict('Pass this document assessment to earn its certificate.');
+  const certificate = await findOrIssueBookCertificate(book, req.user);
+  res.json({ success: true, data: { certificate: bookCertificateJson(certificate) } });
+});
 export const listBookAssessmentAttempts = asyncHandler(async (req, res) => {
   const attempts = await LearningAssessmentAttempt.find({ book: req.params.id })
     .populate('student', 'name email')
@@ -354,7 +392,7 @@ export const uploadBookCover = asyncHandler(async (req, res) => {
 });
 
 export const streamBookCover = asyncHandler(async (req, res) => {
-  const book = await LearningBook.findOne({ _id: req.params.id, ...(req.user.role === 'owner' ? {} : { active: true }) }).select('coverFile');
+  const book = await LearningBook.findOne({ _id: req.params.id, ...(req.user.role === 'admin' ? {} : { active: true }) }).select('coverFile');
   if (!book?.coverFile || !/^[0-9a-f-]{36}\.(png|jpg|webp)$/.test(book.coverFile)) throw ApiError.notFound('Book cover not found.');
   let buffer;
   try { buffer = await fs.readFile(path.join(COVER_ROOT, book.coverFile)); }
@@ -436,4 +474,8 @@ export const learningSummary = asyncHandler(async (req, res) => {
   } });
 });
 
-export default { listBooks, saveProgress, getBookAssessment, saveBookAssessment, getFinalAssessment, submitFinalAssessment, listBookAssessmentAttempts, streamBook, streamBookCover, previewBook, updateBook, uploadBook, uploadBookCover, replaceBook, deleteBook, retryBook, learningSummary };
+export default { listBooks, saveProgress, getBookAssessment, saveBookAssessment, getFinalAssessment, submitFinalAssessment, getBookCertificate, listBookAssessmentAttempts, streamBook, streamBookCover, previewBook, updateBook, uploadBook, uploadBookCover, replaceBook, deleteBook, retryBook, learningSummary };
+
+
+
+

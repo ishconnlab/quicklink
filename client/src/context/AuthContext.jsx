@@ -1,7 +1,21 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import api, { getToken, setToken, setUnauthorizedHandler } from '../api/client.js';
+import { isAdminRole, isStudentRole, isTeacherRole, normalizeRole } from '../lib/roles.js';
 
 const AuthContext = createContext(null);
+
+const normalizeUser = (user) => {
+  if (!user) return null;
+  const admin = isAdminRole(user.role);
+  return {
+    ...user,
+    role: normalizeRole(user.role),
+    isAdmin: admin,
+    isOwner: admin,
+    isTeacher: isTeacherRole(user.role),
+    isStudent: isStudentRole(user.role),
+  };
+};
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -21,7 +35,7 @@ export function AuthProvider({ children }) {
     }
     try {
       const res = await api.get('/auth/me');
-      setUser(res.data.data.user);
+      setUser(normalizeUser(res.data.data.user));
     } catch {
       setToken(null);
       setUser(null);
@@ -41,8 +55,9 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const res = await api.post('/auth/login', { email, password }, { timeout: 60000 });
     setToken(res.data.data.token);
-    setUser(res.data.data.user);
-    return res.data.data.user;
+    const account = normalizeUser(res.data.data.user);
+    setUser(account);
+    return account;
   }, []);
 
   const register = useCallback(async (name, email, password, educationLevel) => {

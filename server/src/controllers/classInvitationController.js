@@ -7,22 +7,48 @@ import { User } from '../models/User.js';
 import { LearningClass } from '../models/LearningClass.js';
 import { LiveSession } from '../models/LiveSession.js';
 import { ClassInvitation } from '../models/ClassInvitation.js';
+import { TrainingRegistration } from '../models/TrainingRegistration.js';
+import { TrainingRegistrationForm } from '../models/TrainingRegistrationForm.js';
+import { assertCanManageClass } from '../security/roles.js';
 
 const hashToken = (token) => createHash('sha256').update(token).digest('hex');
 const escapeHtml = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 const inviteJson = (item) => ({ id: item._id.toString(), email: item.email, studentId: item.student.toString(), status: item.status, expiresAt: item.expiresAt, sentAt: item.sentAt, acceptedAt: item.acceptedAt, lastError: item.lastError });
+let invitationTransport;
+
+function getInvitationTransport() {
+  if (!invitationTransport) {
+    const smtp = new URL(config.mail.smtpUrl);
+    if (!['smtp:', 'smtps:'].includes(smtp.protocol)) throw new Error('SMTP_URL must use smtp:// or smtps://.');
+    const secure = smtp.protocol === 'smtps:';
+    invitationTransport = nodemailer.createTransport({
+      host: smtp.hostname,
+      port: Number(smtp.port || (secure ? 465 : 587)),
+      secure,
+      auth: smtp.username || smtp.password ? {
+        user: decodeURIComponent(smtp.username),
+        pass: decodeURIComponent(smtp.password),
+      } : undefined,
+      pool: true,
+      maxConnections: 5,
+      maxMessages: 100,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 20000,
+    });
+  }
+  return invitationTransport;
+}
 
 async function canManage(item, user) {
-  if (!item) throw ApiError.notFound('Class not found');
-  const teacherIds = [item.teacher, ...(item.teachers || [])].map((teacher) => (teacher._id || teacher).toString());
-  if (user.role !== 'owner' && !teacherIds.includes(user._id.toString())) throw ApiError.forbidden('Only an assigned teacher or admin can manage class invitations.');
+  assertCanManageClass(user, item);
 }
 
 function emailContent(classItem, student, url) {
   const teachers = [classItem.teacher, ...(classItem.teachers || [])].map((teacher) => teacher.name).filter(Boolean).join(', ');
   const details = [
     `Training: ${classItem.course || classItem.title}`,
-    `Class: ${classItem.title} (${classItem.level} · ${classItem.subject})`,
+    `Class: ${classItem.title} (${classItem.level} Â· ${classItem.subject})`,
     classItem.startsAt ? `Start: ${new Date(classItem.startsAt).toLocaleString('en', { timeZone: classItem.timezone || 'UTC', timeZoneName: 'short' })}` : '',
     classItem.schedule ? `Schedule: ${classItem.schedule}` : '',
     `Duration: ${classItem.durationMinutes || 60} minutes`,
@@ -51,7 +77,7 @@ async function sendInvitation(invite, classItem, student) {
     return invite;
   }
   try {
-    const transport = nodemailer.createTransport(config.mail.smtpUrl);
+    const transport = getInvitationTransport();
     const url = new URL(`/classes/invitations/${token}`, config.mail.appUrl).toString();
     await transport.sendMail({ from: config.mail.from, ...emailContent(classItem, student, url) });
     invite.status = 'sent';
@@ -63,6 +89,18 @@ async function sendInvitation(invite, classItem, student) {
     await invite.save();
   }
   return invite;
+}
+
+async function markRegistrationInvited(learningClassId, studentId, sentBy) {
+  const formIds = await TrainingRegistrationForm.find({ learningClass: learningClassId }).distinct('_id');
+  if (!formIds.length) return;
+  await TrainingRegistration.updateMany(
+    { form: { $in: formIds }, student: studentId, status: 'ENROLLED' },
+    {
+      $set: { status: 'INVITED', invitedAt: new Date() },
+      $push: { statusHistory: { status: 'INVITED', at: new Date(), by: sentBy, note: 'Class invitation sent.' } },
+    },
+  );
 }
 
 export const listInvitations = asyncHandler(async (req, res) => {
@@ -80,17 +118,16 @@ export const sendInvitations = asyncHandler(async (req, res) => {
   if (ids.some((id) => !enrolled.has(id))) throw ApiError.forbidden('Invitations can only be sent to students enrolled in this class.');
   const students = await User.find({ _id: { $in: ids }, role: 'student', isActive: true }).select('name email');
   if (students.length !== ids.length) throw ApiError.badRequest('One or more students are no longer active.');
-  const invitations = [];
-  for (const student of students) {
+  const invitations = await Promise.all(students.map(async (student) => {
     let invite = await ClassInvitation.findOne({ learningClass: item._id, student: student._id }).sort({ createdAt: -1 });
     if (invite && ['sent', 'pending', 'accepted'].includes(invite.status) && (!invite.expiresAt || invite.expiresAt > new Date())) {
-      invitations.push(inviteJson(invite));
-      continue;
+      return inviteJson(invite);
     }
     if (!invite) invite = new ClassInvitation({ learningClass: item._id, student: student._id, email: student.email, sentBy: req.user._id });
     const sent = await sendInvitation(invite, item, student);
-    invitations.push(inviteJson(sent));
-  }
+    if (sent.status === 'sent' || sent.status === 'accepted') await markRegistrationInvited(item._id, student._id, req.user._id);
+    return inviteJson(sent);
+  }));
   res.status(200).json({ success: true, data: { invitations } });
 });
 
@@ -105,6 +142,7 @@ export const resendInvitation = asyncHandler(async (req, res) => {
   if (!student) throw ApiError.conflict('The student account is no longer active.');
   invite.sentBy = req.user._id;
   const result = await sendInvitation(invite, item, student);
+  if (result.status === 'sent') await markRegistrationInvited(item._id, student._id, req.user._id);
   res.json({ success: true, data: { invitation: inviteJson(result) } });
 });
 
@@ -137,3 +175,5 @@ export const acceptInvitation = asyncHandler(async (req, res) => {
 });
 
 export default { listInvitations, sendInvitations, resendInvitation, revokeInvitation, acceptInvitation };
+
+

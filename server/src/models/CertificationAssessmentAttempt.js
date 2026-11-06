@@ -8,7 +8,7 @@ const answerSchema = new mongoose.Schema({
 const certificationAssessmentAttemptSchema = new mongoose.Schema({
   student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningClass', required: true, index: true },
-  attemptNumber: { type: Number, required: true, min: 1, max: 3 },
+  attemptNumber: { type: Number, required: true, min: 1, max: 20 },
   answers: { type: [answerSchema], default: [] },
   score: { type: Number, required: true, min: 0, max: 100 },
   passed: { type: Boolean, required: true, index: true },
@@ -18,3 +18,4 @@ const certificationAssessmentAttemptSchema = new mongoose.Schema({
 certificationAssessmentAttemptSchema.index({ student: 1, course: 1, attemptNumber: 1 }, { unique: true });
 export const CertificationAssessmentAttempt = mongoose.model('CertificationAssessmentAttempt', certificationAssessmentAttemptSchema);
 export default CertificationAssessmentAttempt;
+

@@ -17,7 +17,9 @@ import config from '../config/env.js';
 function certificateJson(certificate) {
   return {
     id: certificate._id.toString(),
-    courseId: certificate.course.toString(),
+    kind: certificate.kind || (certificate.book ? 'book' : 'course'),
+    courseId: certificate.course?.toString() || null,
+    bookId: certificate.book?.toString() || null,
     code: certificate.code,
     studentName: certificate.studentName,
     courseTitle: certificate.courseTitle,
@@ -47,6 +49,7 @@ async function findOrIssueCertificate(course, student, registeredName = student.
         $setOnInsert: {
           code: randomBytes(24).toString('base64url'),
           student: student._id,
+          kind: 'course',
           course: course._id,
           studentName: registeredName,
           courseTitle: course.title,
@@ -87,7 +90,7 @@ async function requiredAssignmentsComplete(course, studentId) {
 export const getCourseCompletion = asyncHandler(async (req, res) => {
   const course = await LearningClass.findById(req.params.id).select('title level active students learningMaterials completionRequirements certificationAssessmentEnabled certificationQuestions');
   if (!course) throw ApiError.notFound('Course not found.');
-  if (req.user.role !== 'owner' && !course.students.some((student) => student.toString() === req.user._id.toString())) throw ApiError.forbidden('Enroll in this course to view your completion requirements.');
+  if (req.user.role !== 'admin' && !course.students.some((student) => student.toString() === req.user._id.toString())) throw ApiError.forbidden('Enroll in this course to view your completion requirements.');
   const state = await evaluateCourseCompletion(course, req.user._id);
   res.json({ success: true, data: { courseId: course._id.toString(), ...state } });
 });
@@ -113,13 +116,13 @@ export const listCourseCertificates = asyncHandler(async (req, res) => {
   const course = await LearningClass.findById(req.params.id).select('title teacher teachers students');
   if (!course) throw ApiError.notFound('Course not found.');
   const teacherIds = [course.teacher, ...(course.teachers || [])].map((id) => id.toString());
-  if (req.user.role !== 'owner' && !teacherIds.includes(req.user._id.toString())) throw ApiError.forbidden('Only the assigned teacher or admin can view course certificates.');
+  if (req.user.role !== 'admin' && !teacherIds.includes(req.user._id.toString())) throw ApiError.forbidden('Only the assigned teacher or admin can view course certificates.');
   const certificates = await CourseCertificate.find({ course: course._id }).sort({ issuedAt: -1 }).limit(500).lean();
   res.json({ success: true, data: { certificates: certificates.map((certificate) => ({ ...certificateJson(certificate), studentId: certificate.student.toString(), revokedAt: certificate.revokedAt || null, revocationReason: certificate.revocationReason || '' })) } });
 });
 
 export const listCertificateCandidates = asyncHandler(async (req, res) => {
-  if (req.user.role !== 'owner') throw ApiError.forbidden('Only administrators can manage course certificates.');
+  if (req.user.role !== 'admin') throw ApiError.forbidden('Only administrators can manage course certificates.');
   const course = await LearningClass.findById(req.params.id).select('title level active students learningMaterials completionRequirements certificationAssessmentEnabled certificationQuestions');
   if (!course) throw ApiError.notFound('Course not found.');
 
@@ -160,7 +163,7 @@ export const listCertificateCandidates = asyncHandler(async (req, res) => {
 });
 
 export const issueCertificates = asyncHandler(async (req, res) => {
-  if (req.user.role !== 'owner') throw ApiError.forbidden('Only administrators can issue certificates for students.');
+  if (req.user.role !== 'admin') throw ApiError.forbidden('Only administrators can issue certificates for students.');
   const course = await LearningClass.findById(req.params.id).select('title level active students learningMaterials completionRequirements certificationAssessmentEnabled certificationQuestions');
   if (!course) throw ApiError.notFound('Course not found.');
 
@@ -272,7 +275,7 @@ export const submitCertificationAssessment = asyncHandler(async (req, res) => {
     throw ApiError.forbidden('Enroll in this training to take its certification assessment.');
   }
   if (!course.certificationAssessmentEnabled || course.certificationQuestions?.length !== 10) {
-    throw ApiError.conflict('The administrator has not configured this training’s 10-question certification assessment.');
+    throw ApiError.conflict('The administrator has not configured this trainingâ€™s 10-question certification assessment.');
   }
   if (!await requiredAssignmentsComplete(course, req.user._id)) {
     throw ApiError.conflict('Complete all required theory and practical assignments before taking the certification assessment.');
@@ -326,14 +329,14 @@ export const shareCertificate = asyncHandler(async (req, res) => {
   const shareUrl = new URL(`/api/certificates/share/${certificate.code}`, apiUrl).toString();
   const imageUrl = new URL('/SHCONNECT_Corporate_Seal-removeb.png', appUrl).toString();
   const status = certificate.revokedAt ? 'Revoked certificate' : 'Verified certificate';
-  const title = `${status}: ${certificate.studentName} — ${certificate.courseTitle}`;
+  const title = `${status}: ${certificate.studentName} â€” ${certificate.courseTitle}`;
   const description = certificate.revokedAt
     ? 'This IshConnect certificate has been revoked. View its current verification status in the QuickLink Learning Portal.'
     : `${certificate.studentName} completed ${certificate.courseTitle} (${certificate.level}) through the QuickLink Learning Portal. Verify this IshConnect certificate online.`;
   const escapeHtml = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=300');
-  res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}"><meta property="og:type" content="website"><meta property="og:site_name" content="IshConnect · QuickLink Learning Portal"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(shareUrl)}"><meta property="og:image" content="${escapeHtml(imageUrl)}"><meta property="og:image:alt" content="IshConnect corporate seal"><meta name="twitter:card" content="summary"><meta http-equiv="refresh" content="0;url=${escapeHtml(verificationUrl)}"></head><body><p>Opening the <a href="${escapeHtml(verificationUrl)}">certificate verification page</a>…</p><script>window.location.replace(${JSON.stringify(verificationUrl)})</script></body></html>`);
+  res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}"><meta property="og:type" content="website"><meta property="og:site_name" content="IshConnect Â· QuickLink Learning Portal"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(shareUrl)}"><meta property="og:image" content="${escapeHtml(imageUrl)}"><meta property="og:image:alt" content="IshConnect corporate seal"><meta name="twitter:card" content="summary"><meta http-equiv="refresh" content="0;url=${escapeHtml(verificationUrl)}"></head><body><p>Opening the <a href="${escapeHtml(verificationUrl)}">certificate verification page</a>â€¦</p><script>window.location.replace(${JSON.stringify(verificationUrl)})</script></body></html>`);
 });
 
 export const revokeCertificate = asyncHandler(async (req, res) => {
@@ -349,7 +352,7 @@ export const revokeCertificate = asyncHandler(async (req, res) => {
 export const downloadCertificate = asyncHandler(async (req, res) => {
   const certificate = await CourseCertificate.findById(req.params.id);
   if (!certificate || certificate.revokedAt) throw ApiError.notFound('Certificate is unavailable.');
-  if (req.user.role !== 'owner' && certificate.student.toString() !== req.user._id.toString()) throw ApiError.forbidden('You cannot download another student’s certificate.');
+  if (req.user.role !== 'admin' && certificate.student.toString() !== req.user._id.toString()) throw ApiError.forbidden('You cannot download another studentâ€™s certificate.');
   const appUrl = config.mail.appUrl || config.corsOrigin[0];
   if (!appUrl) throw ApiError.conflict('The public application URL is not configured.');
   const verificationUrl = new URL(`/verify/${certificate.code}`, appUrl).toString();
@@ -378,3 +381,4 @@ export default {
   revokeCertificate,
   downloadCertificate,
 };
+

@@ -1,15 +1,119 @@
 import { User } from '../models/User.js';
 import { LearningClass } from '../models/LearningClass.js';
+import { LiveSession } from '../models/LiveSession.js';
+import { CourseCertificate } from '../models/CourseCertificate.js';
+import { TeacherFollow } from '../models/TeacherFollow.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 // Account management is restricted to owners (enforced by route middleware).
 export const listUsers = asyncHandler(async (_req, res) => {
-  const users = await User.find({ role: { $in: ['owner', 'teacher', 'student', 'user'] } }).sort({ createdAt: -1 });
+  const users = await User.find({ role: { $in: ['admin', 'owner', 'teacher', 'student', 'user'] } }).sort({ createdAt: -1 });
   res.json({
     success: true,
     data: { users: users.map((u) => u.toSafeJSON()) },
   });
+});
+
+export const listTeachersToFollow = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'student') throw ApiError.forbidden('Only students can follow teachers.');
+  const [teachers, follows] = await Promise.all([
+    User.find({ role: 'teacher', isActive: true }).select('name email').sort({ name: 1 }).lean(),
+    TeacherFollow.find({ follower: req.user._id }).select('teacher').lean(),
+  ]);
+  const followedIds = new Set(follows.map((follow) => follow.teacher.toString()));
+  res.json({ success: true, data: { teachers: teachers.map((teacher) => ({
+    id: teacher._id.toString(),
+    name: teacher.name,
+    email: teacher.email,
+    following: followedIds.has(teacher._id.toString()),
+  })) } });
+});
+
+export const followTeacher = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'student') throw ApiError.forbidden('Only students can follow teachers.');
+  const teacher = await User.findOne({ _id: req.params.id, role: 'teacher', isActive: true }).select('_id');
+  if (!teacher) throw ApiError.notFound('Active teacher not found.');
+  try {
+    await TeacherFollow.updateOne(
+      { teacher: teacher._id, follower: req.user._id },
+      { $setOnInsert: { teacher: teacher._id, follower: req.user._id } },
+      { upsert: true },
+    );
+  } catch (error) {
+    if (error?.code !== 11000) throw error;
+  }
+  res.json({ success: true, data: { following: true } });
+});
+
+export const unfollowTeacher = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'student') throw ApiError.forbidden('Only students can follow teachers.');
+  await TeacherFollow.deleteOne({ teacher: req.params.id, follower: req.user._id });
+  res.json({ success: true, data: { following: false } });
+});
+
+export const listTeacherFollowers = asyncHandler(async (req, res) => {
+  let teacherId = req.user._id;
+  if (['admin', 'owner'].includes(req.user.role)) {
+    if (!req.query.teacherId) throw ApiError.badRequest('Choose a teacher to view their followers.');
+    teacherId = req.query.teacherId;
+  } else if (req.user.role !== 'teacher') {
+    throw ApiError.forbidden('Follower lists are available to teachers and admins.');
+  }
+  const followers = await TeacherFollow.find({ teacher: teacherId })
+    .populate('follower', 'name email isActive')
+    .sort({ createdAt: -1 })
+    .lean();
+  res.json({ success: true, data: { followers: followers
+    .filter((entry) => entry.follower?.isActive)
+    .map((entry) => ({ id: entry.follower._id.toString(), name: entry.follower.name, email: entry.follower.email, followedAt: entry.createdAt })) } });
+});
+
+export const dashboardSummary = asyncHandler(async (req, res) => {
+  const level = req.query.level && req.query.level !== 'all' ? req.query.level : null;
+  const enrollmentOpen = req.query.enrollment === 'open' ? true : undefined;
+  const classFilter = { active: true, ...(level ? { level } : {}), ...(enrollmentOpen === undefined ? {} : { enrollmentOpen }) };
+  const [activeStudents, activeTeachers, pendingRegistrations, certificatesIssued, classes] = await Promise.all([
+    User.countDocuments({ role: 'student', isActive: true }),
+    User.countDocuments({ role: 'teacher', isActive: true }),
+    User.countDocuments({ role: 'student', registrationStatus: 'pending' }),
+    CourseCertificate.countDocuments({}),
+    LearningClass.find(classFilter).select('_id students').lean(),
+  ]);
+  const classIds = classes.map((item) => item._id);
+  const [liveClasses, followerCounts, teachers, enrolledStudents] = await Promise.all([
+    classIds.length ? LiveSession.countDocuments({ learningClass: { $in: classIds }, status: 'live' }) : 0,
+    TeacherFollow.aggregate([
+      { $lookup: { from: User.collection.name, localField: 'follower', foreignField: '_id', as: 'follower' } },
+      { $unwind: '$follower' },
+      { $match: { 'follower.role': 'student', 'follower.isActive': true } },
+      { $group: { _id: '$teacher', followers: { $sum: 1 } } },
+    ]),
+    User.find({ role: 'teacher', isActive: true }).select('name').sort({ name: 1 }).lean(),
+    classIds.length ? LearningClass.aggregate([
+      { $match: { _id: { $in: classIds } } },
+      { $unwind: '$students' },
+      { $lookup: { from: User.collection.name, localField: 'students', foreignField: '_id', as: 'enrolledStudent' } },
+      { $unwind: '$enrolledStudent' },
+      { $match: { 'enrolledStudent.role': 'student', 'enrolledStudent.isActive': true } },
+      { $count: 'total' },
+    ]) : [],
+  ]);
+  const followerCountByTeacher = new Map(followerCounts.map((entry) => [entry._id.toString(), entry.followers]));
+  res.json({ success: true, data: {
+    activeStudents,
+    activeTeachers,
+    activeClasses: classes.length,
+    currentEnrollments: enrolledStudents[0]?.total || 0,
+    pendingRegistrations,
+    liveClasses,
+    certificatesIssued,
+    teachersByFollowers: teachers.map((teacher) => ({
+      teacherId: teacher._id.toString(),
+      name: teacher.name,
+      followers: followerCountByTeacher.get(teacher._id.toString()) || 0,
+    })).sort((a, b) => b.followers - a.followers || a.name.localeCompare(b.name)),
+  } });
 });
 
 export const createUser = asyncHandler(async (req, res) => {
@@ -35,12 +139,12 @@ export const updateUser = asyncHandler(async (req, res) => {
 
   const user = await User.findById(id).select('+passwordHash');
   if (!user) throw ApiError.notFound('User not found');
-  if (user.role === 'owner') throw ApiError.forbidden('Owner accounts cannot be edited here.');
+  if (['admin', 'owner'].includes(user.role)) throw ApiError.forbidden('Owner accounts cannot be edited here.');
   if (String(req.user._id) === String(user._id) && isActive === false) throw ApiError.badRequest('You cannot deactivate your own account.');
 
   if (name !== undefined) user.name = name;
   if (educationLevel !== undefined) {
-    if (user.role !== 'student' && educationLevel !== null) throw ApiError.badRequest('Education level is only available for student accounts.');
+    if ((role || user.role) !== 'student' && educationLevel !== null) throw ApiError.badRequest('Education level is only available for student accounts.');
     user.educationLevel = educationLevel;
   }
   if (email !== undefined && email !== user.email) {
@@ -48,8 +152,22 @@ export const updateUser = asyncHandler(async (req, res) => {
     user.email = email;
   }
   if (role !== undefined && role !== user.role) {
-    const classMembership = await LearningClass.exists({ $or: [{ teacher: user._id }, { teachers: user._id }, { students: user._id }] });
-    if (classMembership) throw ApiError.conflict('Remove this person from all class rosters before changing their role.');
+    if (user.role === 'student' && role === 'teacher') {
+      await Promise.all([
+        LearningClass.updateMany({ students: user._id }, { $pull: { students: user._id } }),
+        TeacherFollow.deleteMany({ follower: user._id }),
+      ]);
+      if (user.registrationStatus !== 'approved') {
+        user.registrationStatus = 'approved';
+        user.isActive = true;
+      }
+      user.tokenVersion += 1;
+    } else {
+      const assignedClass = await LearningClass.exists({ $or: [{ teacher: user._id }, { teachers: user._id }] });
+      if (assignedClass) throw ApiError.conflict('Reassign this teacherâ€™s classes before changing their role.');
+      await TeacherFollow.deleteMany({ teacher: user._id });
+      user.tokenVersion += 1;
+    }
     user.role = role;
     if (role !== 'student') user.educationLevel = null;
   }
@@ -77,7 +195,7 @@ export const updateUser = asyncHandler(async (req, res) => {
 export const deleteUser = asyncHandler(async (req, res) => {
   const user = await User.findById(req.params.id);
   if (!user) throw ApiError.notFound('User not found');
-  if (user.role === 'owner') throw ApiError.forbidden('Owner accounts cannot be removed here.');
+  if (['admin', 'owner'].includes(user.role)) throw ApiError.forbidden('Owner accounts cannot be removed here.');
   if (String(req.user._id) === String(user._id)) throw ApiError.badRequest('You cannot remove your own account.');
   if (user.isActive) {
     user.isActive = false;
@@ -89,6 +207,12 @@ export const deleteUser = asyncHandler(async (req, res) => {
 
 export default {
   listUsers,
+  listTeachersToFollow,
+  followTeacher,
+  unfollowTeacher,
+  listTeacherFollowers,
+  dashboardSummary,
   createUser,
   updateUser,
 };
+

@@ -15,7 +15,8 @@
     "smoke:learning": "node scripts/learning-smoke.js",
     "smoke:library-lifecycle": "node scripts/library-lifecycle-smoke.js",
     "smoke:courses": "node scripts/course-smoke.js",
-    "smoke:classroom": "node scripts/classroom-smoke.js"
+    "smoke:classroom": "node scripts/classroom-smoke.js",
+    "migrate": "node scripts/migrate-platform.js"
   },
   "dependencies": {
     "@pdf-lib/fontkit": "^1.1.1",
@@ -43,3 +44,4 @@
     "zod": "^4.6.7"
   }
 }
+

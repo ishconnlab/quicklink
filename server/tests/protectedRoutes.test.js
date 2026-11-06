@@ -3,6 +3,28 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { createApp } from '../src/app.js';
 
+test('liveness health responds while API requests wait for startup readiness', async () => {
+  const app = createApp();
+  app.locals.startupReady = false;
+  const server = createServer(app);
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const root = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const [health, apiHealth, readiness, apiRequest] = await Promise.all([
+      fetch(`${root}/health`),
+      fetch(`${root}/api/health`),
+      fetch(`${root}/health/ready`),
+      fetch(`${root}/api/auth/login`, { method: 'POST' }),
+    ]);
+    assert.equal(health.status, 200);
+    assert.equal(apiHealth.status, 200);
+    assert.equal(readiness.status, 503);
+    assert.equal(apiRequest.status, 503);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
 test('certificate completion and issuance endpoints reject unauthenticated requests', async () => {
   const server = createServer(createApp());
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -28,6 +50,11 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     const saveCertificationSettings = await fetch(`${root}/api/courses/0123456789abcdef01234567/certification-assessment/settings`, { method: 'PUT' });
     const certificationAssessment = await fetch(`${root}/api/courses/0123456789abcdef01234567/certification-assessment`);
     const submitCertificationAssessment = await fetch(`${root}/api/courses/0123456789abcdef01234567/certification-assessment`, { method: 'POST' });
+    const adminDashboard = await fetch(`${root}/api/users/dashboard-summary`);
+    const teacherList = await fetch(`${root}/api/users/teachers`);
+    const teacherFollowers = await fetch(`${root}/api/users/followers`);
+    const permanentClassDelete = await fetch(`${root}/api/classes/0123456789abcdef01234567/permanent`, { method: 'DELETE' });
+    const assignmentDelete = await fetch(`${root}/api/assignments/0123456789abcdef01234567`, { method: 'DELETE' });
     assert.equal(completion.status, 401);
     assert.equal(issue.status, 401);
     assert.equal(download.status, 400);
@@ -43,6 +70,11 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     assert.equal(saveCertificationSettings.status, 401);
     assert.equal(certificationAssessment.status, 401);
     assert.equal(submitCertificationAssessment.status, 401);
+    assert.equal(adminDashboard.status, 401);
+    assert.equal(teacherList.status, 401);
+    assert.equal(teacherFollowers.status, 401);
+    assert.equal(permanentClassDelete.status, 401);
+    assert.equal(assignmentDelete.status, 401);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

@@ -9,6 +9,7 @@ import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatDateTime } from '../lib/format.js';
+import { isAdmin } from '../lib/roles.js';
 
 const layouts = [
   ['auto', 'Auto layout'], ['grid', 'Grid view'], ['speaker', 'Speaker view'],
@@ -102,7 +103,7 @@ export default function LiveSessionPage() {
   const shouldAutoScroll = useRef(true);
   panelRef.current = panel;
 
-  const isTeacher = user?.role === 'owner' || (user?.role === 'teacher' && (data?.class?.teacher?.id === user.id || data?.class?.teachers?.some((teacher) => teacher.id === user.id)));
+  const isTeacher = isAdmin(user) || (user?.role === 'teacher' && (data?.class?.teacher?.id === user.id || data?.class?.teachers?.some((teacher) => teacher.id === user.id)));
   const socketBase = useMemo(() => (import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://quicklink-3eng.onrender.com' : window.location.origin)).replace(/\/$/, ''), []);
 
   const refreshParticipants = useCallback((room) => {

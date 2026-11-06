@@ -12,13 +12,14 @@ export async function ensureOwnerAccount() {
   const user = new User({
     name: config.owner.name,
     email: config.owner.email,
-    role: 'owner',
+    role: 'admin',
   });
   await user.setPassword(config.owner.password);
   await user.save();
 
-  console.log(`[bootstrap] Created initial owner account: ${user.email}`);
+  console.log(`[bootstrap] Created initial admin account: ${user.email}`);
   return user;
 }
 
 export default ensureOwnerAccount;
+

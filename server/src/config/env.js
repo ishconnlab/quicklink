@@ -1,4 +1,4 @@
-﻿import dotenv from 'dotenv';
+import dotenv from 'dotenv';
 
 dotenv.config();
 
@@ -65,11 +65,15 @@ export const config = {
   },
   publicApiUrl: process.env.PUBLIC_API_URL || '',
   cloudinary: {
-    cloudName: process.env.CLOUDINARY_CLOUD_NAME || '',
-    apiKey: process.env.CLOUDINARY_API_KEY || '',
-    apiSecret: process.env.CLOUDINARY_API_SECRET || '',
-    enabled: Boolean(process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET),
-    folderPrefix: process.env.CLOUDINARY_FOLDER_PREFIX || 'quicklink',
+    cloudName: (process.env.CLOUDINARY_CLOUD_NAME || '').trim(),
+    apiKey: (process.env.CLOUDINARY_API_KEY || '').trim(),
+    apiSecret: (process.env.CLOUDINARY_API_SECRET || '').trim(),
+    enabled: Boolean(
+      (process.env.CLOUDINARY_CLOUD_NAME || '').trim()
+      && (process.env.CLOUDINARY_API_KEY || '').trim()
+      && (process.env.CLOUDINARY_API_SECRET || '').trim(),
+    ),
+    folderPrefix: (process.env.CLOUDINARY_FOLDER_PREFIX || '').trim() || 'quicklink',
   },
   learning: {
     supportedFormats: learningFormats.length ? learningFormats : ALLOWED_LEARNING_FORMATS,

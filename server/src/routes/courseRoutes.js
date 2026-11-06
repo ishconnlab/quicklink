@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import * as courses from '../controllers/classController.js';
-import { requireAuth, requireOwner } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, requireTeacher } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import multer from 'multer';
 import * as certificates from '../controllers/certificateController.js';
@@ -47,17 +47,18 @@ const certificationAnswers = z.object({
 router.get('/:id/thumbnail', validate(idParams, 'params'), courses.getCourseThumbnail);
 router.use(requireAuth);
 router.get('/', validate(listQuery, 'query'), courses.listCourses);
-router.post('/:id/thumbnail', validate(idParams, 'params'), uploadThumbnail.single('thumbnail'), courses.updateCourseThumbnail);
+router.post('/:id/thumbnail', requireTeacher, validate(idParams, 'params'), uploadThumbnail.single('thumbnail'), courses.updateCourseThumbnail);
 router.get('/:id/completion', validate(idParams, 'params'), certificates.getCourseCompletion);
-router.get('/:id/certification-assessment/settings', requireOwner, validate(idParams, 'params'), certificates.getCertificationAssessmentSettings);
-router.put('/:id/certification-assessment/settings', requireOwner, validate(idParams, 'params'), validate(certificationSettings), certificates.saveCertificationAssessmentSettings);
+router.get('/:id/certification-assessment/settings', requireAdmin, validate(idParams, 'params'), certificates.getCertificationAssessmentSettings);
+router.put('/:id/certification-assessment/settings', requireAdmin, validate(idParams, 'params'), validate(certificationSettings), certificates.saveCertificationAssessmentSettings);
 router.get('/:id/certification-assessment', validate(idParams, 'params'), certificates.getCertificationAssessment);
 router.post('/:id/certification-assessment', validate(idParams, 'params'), validate(certificationAnswers), certificates.submitCertificationAssessment);
 router.get('/:id/certificates', validate(idParams, 'params'), certificates.listCourseCertificates);
-router.get('/:id/certificate-candidates', requireOwner, validate(idParams, 'params'), validate(candidateQuery, 'query'), certificates.listCertificateCandidates);
-router.post('/:id/certificates/issue', requireOwner, validate(idParams, 'params'), validate(issueCertificatesBody), certificates.issueCertificates);
+router.get('/:id/certificate-candidates', requireAdmin, validate(idParams, 'params'), validate(candidateQuery, 'query'), certificates.listCertificateCandidates);
+router.post('/:id/certificates/issue', requireAdmin, validate(idParams, 'params'), validate(issueCertificatesBody), certificates.issueCertificates);
 router.post('/:id/certificate', validate(idParams, 'params'), certificates.issueCertificate);
 router.get('/:id', validate(idParams, 'params'), courses.getCourse);
 router.post('/:id/enroll', validate(idParams, 'params'), courses.enrollInCourse);
 
 export default router;
+

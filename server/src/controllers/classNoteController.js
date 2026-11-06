@@ -8,9 +8,9 @@ async function access(sessionId, user) {
   if (!session) throw ApiError.notFound('Class session not found');
   const item = session.learningClass;
   const teachers = [item.teacher, ...(item.teachers || [])].map((teacher) => (teacher._id || teacher).toString());
-  const allowed = user.role === 'owner' || teachers.includes(user._id.toString()) || item.students.some((student) => student.toString() === user._id.toString());
+  const allowed = user.role === 'admin' || teachers.includes(user._id.toString()) || item.students.some((student) => student.toString() === user._id.toString());
   if (!allowed) throw ApiError.forbidden('You are not enrolled in this class.');
-  return { session, canEdit: user.role === 'owner' || teachers.includes(user._id.toString()) };
+  return { session, canEdit: user.role === 'admin' || teachers.includes(user._id.toString()) };
 }
 
 export const getNotes = asyncHandler(async (req, res) => {
@@ -40,3 +40,4 @@ export const saveNotes = asyncHandler(async (req, res) => {
 });
 
 export default { getNotes, saveNotes };
+

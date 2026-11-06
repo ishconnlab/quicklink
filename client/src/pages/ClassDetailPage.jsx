@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Archive, ArrowLeft, Copy, FileText, Mail, Pencil, Play, Radio, Users, ChevronLeft, ChevronRight, PhoneOff } from 'lucide-react';
+import { Archive, ArrowLeft, Copy, FileText, Mail, Pencil, Play, Radio, Users, ChevronLeft, ChevronRight, PhoneOff, Trash2 } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { PageHeader, Badge, Modal } from '../components/layout.jsx';
 import PagedCheckboxList from '../components/PagedCheckboxList.jsx';
@@ -8,6 +8,7 @@ import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatDateTime } from '../lib/format.js';
+import { isAdmin } from '../lib/roles.js';
 
 export default function ClassDetailPage() {
   const { id } = useParams();
@@ -66,7 +67,7 @@ export default function ClassDetailPage() {
     };
   }, [id, item?.id, item?.liveSession?.id]);
 
-  const canTeach = user?.role === 'owner' || (user?.role === 'teacher' && (item?.teacher.id === user.id || item?.teachers?.some((teacher) => teacher.id === user.id)));
+  const canTeach = isAdmin(user) || (user?.role === 'teacher' && (item?.teacher.id === user.id || item?.teachers?.some((teacher) => teacher.id === user.id)));
   const sessionLink = item?.liveSession ? `${window.location.origin}/classes/join/${item.liveSession.sessionCode}` : '';
 
   const startClass = async () => {
@@ -168,6 +169,16 @@ export default function ClassDetailPage() {
     catch (error) { toast.error(apiError(error).message); }
   };
 
+  const permanentlyDeleteClass = async () => {
+    const confirmation = window.prompt(`This permanently deletes ${item.title}, its registrations, sessions, attendance, assignments, invitations, and certificates. Type DELETE to continue.`);
+    if (confirmation !== 'DELETE') return;
+    try {
+      await api.delete(`/classes/${id}/permanent`);
+      toast.success('Class and its related records were permanently deleted.');
+      navigate('/classes', { replace: true });
+    } catch (error) { toast.error(apiError(error).message); }
+  };
+
   const invitationAction = async (invite, action) => {
     try {
       if (action === 'resend') await api.post(`/classes/${id}/invitations/${invite.id}/resend`);
@@ -183,7 +194,7 @@ export default function ClassDetailPage() {
 
   return <div className="min-w-0">
     <Link to="/classes" className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"><ArrowLeft size={16} />All classes</Link>
-    <PageHeader title={item.title} subtitle={`${item.course ? `${item.course} · ` : ''}${item.subject} · ${item.level}`} actions={<div className="flex flex-wrap gap-2">{canTeach && item.active && <button onClick={openInvitations} className="btn-secondary"><Mail size={16} />Invite students</button>}{user?.role === 'owner' && <><button onClick={openEdit} className="btn-secondary"><Pencil size={16} />Edit class</button><button onClick={archiveClass} className={item.active ? 'btn-ghost text-red-600' : 'btn-secondary'}><Archive size={16} />{item.active ? 'Archive' : 'Restore class'}</button></>}{canTeach && item.active && !item.liveSession && <button onClick={startClass} disabled={starting} className="btn-primary">{starting ? <Spinner size={16} /> : <Play size={16} />}Start live class</button>}</div>} />
+    <PageHeader title={item.title} subtitle={`${item.course ? `${item.course} · ` : ''}${item.subject} · ${item.level}`} actions={<div className="flex flex-wrap gap-2">{canTeach && item.active && <button onClick={openInvitations} className="btn-secondary"><Mail size={16} />Invite students</button>}{isAdmin(user) && <><button onClick={openEdit} className="btn-secondary"><Pencil size={16} />Edit class</button><button onClick={archiveClass} className={item.active ? 'btn-ghost text-red-600' : 'btn-secondary'}><Archive size={16} />{item.active ? 'Archive' : 'Restore class'}</button><button onClick={permanentlyDeleteClass} className="btn-ghost text-red-700"><Trash2 size={16} />Delete permanently</button></>}{canTeach && item.active && !item.liveSession && <button onClick={startClass} disabled={starting} className="btn-primary">{starting ? <Spinner size={16} /> : <Play size={16} />}Start live class</button>}</div>} />
     {item.description && <p className="mb-4 text-sm text-slate-600">{item.description}</p>}
 
     {item.liveSession ? <section className="card mb-4 border-red-200 bg-red-50/40">
@@ -202,7 +213,7 @@ export default function ClassDetailPage() {
           {editStep === 0 && <div className="grid gap-3 sm:grid-cols-2">{[['Full course title','title'],['Subject','subject'],['Trade','trade'],['Short introduction','introduction'],['Course or training program','course']].map(([label,key]) => <label key={key}><span className="label">{label}</span><input className="input" required={key === 'title' || key === 'subject'} maxLength={key === 'title' ? 160 : key === 'subject' ? 120 : undefined} value={editForm[key]} onChange={(event) => setEditForm({ ...editForm, [key]: event.target.value })} /></label>)}<label><span className="label">Level</span><select className="input" value={editForm.level} onChange={(event) => { const level = event.target.value; const validIds = new Set(books.filter((book) => book.level === level).map((book) => book.id)); setEditForm((current) => ({ ...current, level, learningMaterials: current.learningMaterials.filter((bookId) => validIds.has(bookId)) })); }}><option>L3</option><option>L4</option><option>L5</option><option>Bootcamp</option><option>Training</option></select></label><label className="sm:col-span-2"><span className="label">Detailed course description</span><textarea className="input min-h-20" maxLength={12000} value={editForm.description} onChange={(event) => setEditForm({ ...editForm, description: event.target.value })} /></label><label className="sm:col-span-2"><span className="label">Replace thumbnail image (PNG, JPEG, WebP, max 3 MB)</span><input type="file" accept="image/png,image/jpeg,image/webp" className="input" onChange={(event) => setThumbnail(event.target.files?.[0] || null)} />{thumbnail && <span className="mt-1 block truncate text-xs text-slate-500">Selected: {thumbnail.name}</span>}</label></div>}
           {editStep === 1 && <div className="grid gap-4 sm:grid-cols-2"><PagedCheckboxList title="Assigned teachers" items={people.teachers} selectedIds={editForm.teacherIds} onChange={(teacherIds) => setEditForm({ ...editForm, teacherIds })} emptyLabel="No active teachers match this search." pageSize={6} /><div className="space-y-3"><label className="block"><span className="label">Start date and time</span><input type="datetime-local" className="input" value={editForm.startsAt} onChange={(event) => setEditForm({ ...editForm, startsAt: event.target.value })} /></label><label className="block"><span className="label">Timezone</span><input required className="input" value={editForm.timezone} onChange={(event) => setEditForm({ ...editForm, timezone: event.target.value })} /></label><label className="block"><span className="label">Schedule</span><input maxLength={500} className="input" value={editForm.schedule} onChange={(event) => setEditForm({ ...editForm, schedule: event.target.value })} /></label><div className="grid grid-cols-2 gap-3"><label><span className="label">Duration (minutes)</span><input type="number" min="5" max="1440" className="input" value={editForm.durationMinutes} onChange={(event) => setEditForm({ ...editForm, durationMinutes: event.target.value })} /></label><label><span className="label">Maximum students</span><input type="number" min={item.students.length || 1} max="10000" className="input" value={editForm.maxStudents} onChange={(event) => setEditForm({ ...editForm, maxStudents: event.target.value })} /></label></div></div></div>}
           {editStep === 2 && <div className="grid gap-4 lg:grid-cols-2"><div><PagedCheckboxList title={`Learning materials · ${editForm.level}`} items={books.filter((book) => book.level === editForm.level)} selectedIds={editForm.learningMaterials} onChange={(learningMaterials) => setEditForm({ ...editForm, learningMaterials })} emptyLabel={`No active ${editForm.level} documents match this search.`} pageSize={6} /><p className="mt-1 text-xs text-slate-500">Only active documents at the selected class level are shown.</p></div><div><PagedCheckboxList title="Enrolled students" items={people.students} selectedIds={editForm.studentIds} onChange={(studentIds) => setEditForm({ ...editForm, studentIds })} emptyLabel="No active students match this search." pageSize={6} /><p className="mt-1 text-xs text-slate-500">The class limit is {editForm.maxStudents} students.</p></div></div>}
-          {editStep === 3 && <div className="space-y-4"><fieldset className="rounded-xl border border-slate-200 p-4"><legend className="px-1 text-sm font-semibold">Completion requirements</legend><div className="grid gap-2 sm:grid-cols-2">{[['requireReading','Require reading'],['requireTheory','Require theory assessment'],['requirePractical','Require practical work'],['requireAttendance','Require class attendance']].map(([key,label]) => <label key={key} className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={editForm.completionRequirements[key]} onChange={(event) => setEditForm({ ...editForm, completionRequirements: { ...editForm.completionRequirements, [key]: event.target.checked } })} />{label}</label>)}</div></fieldset><label className="flex min-h-11 items-center gap-2 rounded-lg bg-slate-50 px-3 text-sm"><input type="checkbox" checked={editForm.published} onChange={(event) => setEditForm({ ...editForm, published: event.target.checked })} />Published in course catalog</label><label className="flex min-h-11 items-center gap-2 rounded-lg bg-slate-50 px-3 text-sm"><input type="checkbox" checked={editForm.enrollmentOpen} onChange={(event) => setEditForm({ ...editForm, enrollmentOpen: event.target.checked })} />Enrollment open</label></div>}
+          {editStep === 3 && <div className="space-y-4"><fieldset className="rounded-xl border border-slate-200 p-4"><legend className="px-1 text-sm font-semibold">Completion requirements</legend><p className="mb-2 text-xs text-slate-500">Published theory and practical assignments are automatically included; students must pass every assigned item.</p><div className="grid gap-2 sm:grid-cols-2">{[['requireReading','Require reading'],['requireAttendance','Require class attendance']].map(([key,label]) => <label key={key} className="flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm hover:bg-slate-50"><input type="checkbox" checked={editForm.completionRequirements[key]} onChange={(event) => setEditForm({ ...editForm, completionRequirements: { ...editForm.completionRequirements, [key]: event.target.checked } })} />{label}</label>)}</div></fieldset><label className="flex min-h-11 items-center gap-2 rounded-lg bg-slate-50 px-3 text-sm"><input type="checkbox" checked={editForm.published} onChange={(event) => setEditForm({ ...editForm, published: event.target.checked })} />Published in course catalog</label><label className="flex min-h-11 items-center gap-2 rounded-lg bg-slate-50 px-3 text-sm"><input type="checkbox" checked={editForm.enrollmentOpen} onChange={(event) => setEditForm({ ...editForm, enrollmentOpen: event.target.checked })} />Enrollment open</label></div>}
           {editStep === 4 && <div className="space-y-4">
             <section className="rounded-xl border border-brand-100 bg-brand-50 p-4">
               <label className="flex items-start gap-3 text-sm font-semibold text-slate-800">

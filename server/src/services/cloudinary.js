@@ -1,16 +1,21 @@
-﻿import { randomUUID } from 'node:crypto';
+import { randomUUID } from 'node:crypto';
 import { v2 as cloudinary } from 'cloudinary';
 import config from '../config/env.js';
 
 export function validateCloudinaryConfig({ required = false } = {}) {
-  const missing = ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET']
-    .filter((name) => !process.env[name]);
+  const missing = [
+    ['CLOUDINARY_CLOUD_NAME', config.cloudinary.cloudName],
+    ['CLOUDINARY_API_KEY', config.cloudinary.apiKey],
+    ['CLOUDINARY_API_SECRET', config.cloudinary.apiSecret],
+  ]
+    .filter(([, value]) => !value)
+    .map(([name]) => name);
 
   if (missing.length > 0 && required) {
     throw new Error(`Missing required Cloudinary environment variables: ${missing.join(', ')}`);
   }
 
-  if (missing.length > 0 && process.env.CLOUDINARY_CLOUD_NAME) {
+  if (missing.length > 0 && config.cloudinary.cloudName) {
     console.warn('[storage] Cloudinary is only partially configured; uploads will fall back to the local filesystem.');
   }
 
@@ -28,22 +33,21 @@ export function getCloudinarySdk() {
   return cloudinary;
 }
 
-export async function uploadCloudinaryBuffer({ buffer, folder, resourceType = 'auto', publicId, overwrite = false }) {
+export async function uploadCloudinaryBuffer({ buffer, folder, resourceType = 'auto', publicId }) {
+  if (!buffer) return null;
   const sdk = getCloudinarySdk();
-  if (!sdk || !buffer) return null;
+  if (!sdk) return null;
 
   const resolvedFolder = folder || config.cloudinary.folderPrefix || 'quicklink';
   const resolvedPublicId = publicId || `${Date.now()}-${randomUUID()}`;
 
   return new Promise((resolve, reject) => {
-    const uploadStream = sdk.uploader.upload_stream({
+    const options = {
       folder: resolvedFolder,
       public_id: resolvedPublicId,
       resource_type: resourceType,
-      overwrite,
-      unique_filename: true,
-      invalidate: true,
-    }, (error, result) => {
+    };
+    const callback = (error, result) => {
       if (error) return reject(error);
       resolve({
         publicId: result?.public_id ?? resolvedPublicId,
@@ -55,9 +59,8 @@ export async function uploadCloudinaryBuffer({ buffer, folder, resourceType = 'a
         version: result?.version,
         folder: result?.folder ?? resolvedFolder,
       });
-    });
-
-    uploadStream.end(buffer);
+    };
+    sdk.uploader.upload_stream(options, callback).end(buffer);
   });
 }
 

@@ -5,7 +5,7 @@ import * as notes from '../controllers/classNoteController.js';
 import * as invitations from '../controllers/classInvitationController.js';
 import * as attendanceReports from '../controllers/attendanceReportController.js';
 import * as assignments from '../controllers/assignmentController.js';
-import { requireAuth, requireOwner } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, requireTeacher } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 
 const router = Router();
@@ -57,6 +57,9 @@ const classFields = {
   teacherIds: z.array(objectId).min(1).max(20).optional(),
   studentIds: z.array(objectId).max(300).default([]),
   startsAt: z.string().datetime().nullable().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
+  enrollmentOpensAt: z.string().datetime().nullable().optional(),
+  enrollmentClosesAt: z.string().datetime().nullable().optional(),
   schedule: z.string().trim().max(500).optional().default(''),
   durationMinutes: z.number().int().min(5).max(1440).optional().default(60),
   lateThresholdMinutes: z.number().int().min(0).max(240).optional().default(15),
@@ -66,7 +69,7 @@ const classFields = {
   enrollmentOpen: z.boolean().optional().default(true),
   published: z.boolean().optional().default(true),
 };
-const createClassSchema = z.object(classFields).refine((body) => Boolean(body.teacherId || body.teacherIds?.length), { message: 'Assign at least one teacher.' });
+const createClassSchema = z.object(classFields);
 const updateClassSchema = z.object({
   ...Object.fromEntries(Object.entries(classFields).map(([key, value]) => [key, value.optional()])),
   active: z.boolean().optional(),
@@ -75,7 +78,7 @@ const updateClassSchema = z.object({
 router.use(requireAuth);
 router.get('/:classId/assignments', validate(classIdParams, 'params'), assignments.listClassAssignments);
 router.post('/:classId/assignments', validate(classIdParams, 'params'), validate(z.object(assignmentFields).refine((body) => body.passMark <= body.maxPoints, { message: 'Pass mark cannot exceed the assignment maximum.' })), assignments.createAssignment);
-router.get('/people/:role(teachers|students)', requireOwner, classes.listPeople);
+router.get('/people/:role(teachers|students)', requireTeacher, classes.listPeople);
 router.post('/invitations/:token/accept', validate(invitationTokenParams, 'params'), invitations.acceptInvitation);
 router.get('/join/:sessionCode', validate(codeParams, 'params'), classes.joinByCode);
 router.get('/sessions/:sessionId/report', validate(sessionParams, 'params'), classes.getSessionReport);
@@ -92,10 +95,13 @@ router.post('/:id/invitations', validate(idParams, 'params'), validate(z.object(
 router.post('/:id/invitations/:invitationId/resend', validate(invitationParams, 'params'), invitations.resendInvitation);
 router.delete('/:id/invitations/:invitationId', validate(invitationParams, 'params'), invitations.revokeInvitation);
 router.get('/:id/sessions', validate(idParams, 'params'), classes.listClassSessions);
-router.post('/', requireOwner, validate(createClassSchema), classes.createClass);
-router.patch('/:id', requireOwner, validate(idParams, 'params'), validate(updateClassSchema), classes.updateClass);
-router.delete('/:id', requireOwner, validate(idParams, 'params'), classes.archiveClass);
+router.post('/', requireTeacher, validate(createClassSchema), classes.createClass);
+router.patch('/:id', requireTeacher, validate(idParams, 'params'), validate(updateClassSchema), classes.updateClass);
+router.delete('/:id/permanent', requireAdmin, validate(idParams, 'params'), classes.permanentlyDeleteClass);
+router.delete('/:id', requireTeacher, validate(idParams, 'params'), classes.archiveClass);
 router.get('/:id', validate(idParams, 'params'), classes.getClass);
 router.post('/:id/sessions', validate(idParams, 'params'), validate(z.object({ title: z.string().trim().max(180).optional().default('') })), classes.startSession);
 
 export default router;
+
+

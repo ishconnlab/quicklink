@@ -11,6 +11,7 @@ const learningProgressSchema = new mongoose.Schema({
   furthestPosition: { type: Number, default: 1, min: 0 },
   totalUnits: { type: Number, default: 0, min: 0 },
   progressPercent: { type: Number, default: 0, min: 0, max: 100 },
+  scrollPercent: { type: Number, default: 0, min: 0, max: 100 },
   timeSpentSeconds: { type: Number, default: 0, min: 0 },
   completed: { type: Boolean, default: false, index: true },
   lastOpenedAt: { type: Date, default: Date.now, index: true },
@@ -20,3 +21,4 @@ const learningProgressSchema = new mongoose.Schema({
 learningProgressSchema.index({ student: 1, book: 1 }, { unique: true });
 export const LearningProgress = mongoose.model('LearningProgress', learningProgressSchema);
 export default LearningProgress;
+

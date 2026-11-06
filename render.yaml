@@ -33,6 +33,15 @@ services:
         value: https://quicklink.ishconnect.rw
       - key: APP_URL
         value: https://quicklink.ishconnect.rw
+      # Cloudinary account credentials; set them in Render's environment.
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER_PREFIX
+        value: quicklink
       - key: OWNER_NAME
         value: QuickLink Owner
       - key: OWNER_EMAIL

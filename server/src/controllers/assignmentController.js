@@ -12,7 +12,7 @@ import JSZip from 'jszip';
 import { notifyUsers } from '../services/notifications.js';
 
 const teacherIdsFor = (item) => [item.teacher, ...(item.teachers || [])].map((person) => (person._id || person).toString());
-const isTeacher = (item, user) => user.role === 'owner' || teacherIdsFor(item).includes(user._id.toString());
+const isTeacher = (item, user) => user.role === 'admin' || teacherIdsFor(item).includes(user._id.toString());
 const SUBMISSION_DIR = path.resolve(process.env.SUBMISSIONS_DIR || fileURLToPath(new URL('../../private-submissions/', import.meta.url)));
 
 function validateSubmissionFile(file) {
@@ -68,7 +68,7 @@ async function assignmentAccess(assignmentId, user) {
   if (!assignment) throw ApiError.notFound('Assignment not found');
   const item = await LearningClass.findById(assignment.learningClass).select('teacher teachers students active title');
   if (!item) throw ApiError.notFound('Class not found');
-  const member = user.role === 'owner' || isTeacher(item, user) || item.students.some((id) => id.toString() === user._id.toString());
+  const member = user.role === 'admin' || isTeacher(item, user) || item.students.some((id) => id.toString() === user._id.toString());
   if (!member) throw ApiError.forbidden('You are not enrolled in this class.');
   return { assignment, item, teacher: isTeacher(item, user), student: item.students.some((id) => id.toString() === user._id.toString()) };
 }
@@ -76,6 +76,7 @@ async function assignmentAccess(assignmentId, user) {
 function assignmentJson(item, submission, includeAnswers = false) {
   return {
     id: item._id.toString(), classId: item.learningClass.toString(), title: item.title, instructions: item.instructions,
+    ...(includeAnswers && item.createdBy ? { createdBy: item.createdBy.toString() } : {}),
     type: item.type, dueAt: item.dueAt, maxPoints: item.maxPoints, allowLate: item.allowLate,
     objectives: item.objectives || '', toolsAndMaterials: item.toolsAndMaterials || '', tasks: item.tasks || [],
     submissionRequirements: item.submissionRequirements || '', submissionTypes: item.submissionTypes || [],
@@ -91,7 +92,7 @@ export const listClassAssignments = asyncHandler(async (req, res) => {
   if (!item) throw ApiError.notFound('Class not found');
   const teacher = isTeacher(item, req.user);
   const student = item.students.some((id) => id.toString() === req.user._id.toString());
-  if (req.user.role !== 'owner' && !teacher && !student) throw ApiError.forbidden('You are not enrolled in this class.');
+  if (req.user.role !== 'admin' && !teacher && !student) throw ApiError.forbidden('You are not enrolled in this class.');
   const filter = { learningClass: item._id, ...(teacher ? {} : { published: true }) };
   const assignments = await Assignment.find(filter).sort({ dueAt: 1, createdAt: -1 }).limit(100).lean();
   const submissions = student ? await AssignmentSubmission.find({ assignment: { $in: assignments.map((a) => a._id) }, student: req.user._id }).sort({ attempt: -1 }).lean() : [];
@@ -130,6 +131,27 @@ export const updateAssignment = asyncHandler(async (req, res) => {
   const saved = await Assignment.findByIdAndUpdate(assignment._id, { $set: req.body }, { new: true, runValidators: true });
   if (!wasPublished && saved.published) await notifyUsers(item.students, { type: 'assignment', title: `New ${saved.type}: ${saved.title}`, message: item.title, href: '/assignments' });
   res.json({ success: true, data: { assignment: assignmentJson(saved, null, true) } });
+});
+
+export const deleteAssignment = asyncHandler(async (req, res) => {
+  const { assignment, teacher } = await assignmentAccess(req.params.id, req.user);
+  if (!teacher) throw ApiError.forbidden('Only an assigned teacher or admin can delete an assignment.');
+  if (!['practical', 'assignment'].includes(assignment.type)) {
+    throw ApiError.badRequest('Only practical assignments can be deleted from this page.');
+  }
+  if (req.user.role !== 'admin' && String(assignment.createdBy || '') !== req.user._id.toString()) {
+    throw ApiError.forbidden('You can delete only practical assignments you created.');
+  }
+
+  const submissions = await AssignmentSubmission.find({ assignment: assignment._id }).select('files').lean();
+  await AssignmentSubmission.deleteMany({ assignment: assignment._id });
+  await Assignment.deleteOne({ _id: assignment._id });
+  await Promise.all(submissions.flatMap((submission) => (submission.files || []).map(async (file) => {
+    if (!file.storageKey || path.basename(file.storageKey) !== file.storageKey) return;
+    try { await fs.unlink(path.join(SUBMISSION_DIR, file.storageKey)); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+  })));
+  res.json({ success: true, data: { assignment: { id: assignment._id.toString(), deleted: true } } });
 });
 
 export const submitAssignment = asyncHandler(async (req, res) => {
@@ -206,7 +228,7 @@ export const gradeSubmission = asyncHandler(async (req, res) => {
   submission.gradedAt = new Date();
   submission.gradingHistory.push({ score: submission.score, feedback: submission.feedback, status: decision, gradedBy: req.user._id, gradedAt: submission.gradedAt });
   await submission.save();
-  await notifyUsers([submission.student], { type: 'grade', title: `Grade posted: ${assignment.title}`, message: `${submission.score}/${assignment.maxPoints}${submission.feedback ? ` — ${submission.feedback}` : ''}`, href: '/assignments' });
+  await notifyUsers([submission.student], { type: 'grade', title: `Grade posted: ${assignment.title}`, message: `${submission.score}/${assignment.maxPoints}${submission.feedback ? ` â€” ${submission.feedback}` : ''}`, href: '/assignments' });
   res.json({ success: true, data: { submission: { id: submission._id.toString(), status: submission.status, score: submission.score, feedback: submission.feedback, gradedAt: submission.gradedAt, gradingHistory: submission.gradingHistory } } });
 });
 
@@ -229,4 +251,5 @@ export const downloadSubmissionFile = asyncHandler(async (req, res) => {
   res.end(buffer);
 });
 
-export default { listClassAssignments, createAssignment, updateAssignment, submitAssignment, listSubmissions, gradeSubmission };
+export default { listClassAssignments, createAssignment, updateAssignment, deleteAssignment, submitAssignment, listSubmissions, gradeSubmission };
+

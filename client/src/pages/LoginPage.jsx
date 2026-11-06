@@ -5,6 +5,7 @@ import { LogIn, Mail, Lock, AlertCircle, Wifi, WifiOff, RefreshCw } from 'lucide
 import { useAuth } from '../context/AuthContext.jsx';
 import api, { apiError } from '../api/client.js';
 import { Spinner } from '../components/ui.jsx';
+import { isAdmin, isTeacher } from '../lib/roles.js';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -50,7 +51,7 @@ export default function LoginPage() {
     try {
       const account = await login(email.trim(), password);
       const destination = location.state?.from;
-      navigate(destination ? `${destination.pathname}${destination.search || ''}` : account.role === 'owner' ? '/learning' : account.role === 'teacher' ? '/classes' : '/dashboard', { replace: true });
+      navigate(destination ? `${destination.pathname}${destination.search || ''}` : isAdmin(account) ? '/learning' : isTeacher(account) ? '/classes' : '/dashboard', { replace: true });
     } catch (err) {
       const failure = apiError(err);
       setError(failure.message);

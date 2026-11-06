@@ -14,6 +14,7 @@ import { TrainingRegistrationForm } from './TrainingRegistrationForm.js';
 import { TrainingRegistration } from './TrainingRegistration.js';
 import { LearningAssessmentAttempt } from './LearningAssessmentAttempt.js';
 import { CertificationAssessmentAttempt } from './CertificationAssessmentAttempt.js';
+import { TeacherFollow } from './TeacherFollow.js';
 
 export async function syncAllIndexes() {
   await Promise.all([
@@ -33,6 +34,7 @@ export async function syncAllIndexes() {
     TrainingRegistration.syncIndexes(),
     LearningAssessmentAttempt.syncIndexes(),
     CertificationAssessmentAttempt.syncIndexes(),
+    TeacherFollow.syncIndexes(),
   ]);
 }
 

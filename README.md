@@ -33,7 +33,10 @@ The maximum upload size is capped at 100 MiB. For production uploads, set `LEARN
 ## Classes and live teaching
 
 - Admins create, edit, archive, restore, and schedule classes; set course/program, level, timezone, duration, capacity, enrollment state, multiple active teachers, and student rosters.
+- The admin dashboard summarizes active students and teachers, active classes, current enrollments, pending registrations, live classes, certificates, and teacher followers. Class-level and enrollment-status filters are arranged together and apply to class-specific counts.
+- Admins can permanently delete a class and its related sessions, attendance, assignments/submissions, invitations, training registrations, and certificates. This action cannot be undone.
 - Teachers see their assigned classes. Students see the classes they are enrolled in.
+- Students can follow or unfollow active teachers from their dashboard. Teachers see their follower list and admins can review each teacher's followers from the admin dashboard.
 - An assigned teacher or admin starts a live class. QuickLink creates a join link that can be copied and shared with enrolled students.
 - Teachers can email individual or bulk invitations to enrolled student accounts. Each message is private to one recipient and contains a single use, expiring link. Invitation delivery status is tracked; invitations fail clearly until SMTP is configured.
 - The live room uses LiveKit Cloud through LiveKit's WebRTC client and server SDKs. Server issued short lived tokens are restricted to authenticated class members. The QuickLink session uses an SFU; users stay on the QuickLink domain.
@@ -64,10 +67,10 @@ Admins assign active teachers and enroll active students through **Courses and c
 ## Courses, practical work, and certificates
 
 - Published courses reuse the existing class records and teacher/student rosters. Student pages support course search, L3/L4/L5, subject and trade filters, enrollment state, pagination, learning materials, and progress.
-- Admins manage course title, introduction, detailed description, subject/trade, level, learning materials, enrollment capacity, publication, completion rules, and an optional validated PNG/JPEG/WebP thumbnail (maximum 3 MB). Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` to store course and registration-form images in Cloudinary. Existing local images remain readable, and local storage remains the fallback when Cloudinary is not configured.
-- Assigned teachers and admins can publish practical assignments with objectives, materials, tasks, due dates, score limits, pass marks, and submission requirements. Students can save drafts, submit text, links, or supported files (PDF, PNG/JPEG, ZIP, and UTF-8 text/source; up to five files at 10 MB each), and resubmit when enabled. Student code is stored as a file and never executed by the application server.
+- Admins manage course title, introduction, detailed description, subject/trade, level, learning materials, enrollment capacity, publication, completion rules, and an optional validated PNG/JPEG/WebP thumbnail (maximum 3 MB). Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, and `CLOUDINARY_FOLDER_PREFIX` on the backend to store course and registration-form images in Cloudinary using signed server-side uploads. Existing local images remain readable, and local storage remains the fallback when Cloudinary credentials are not configured.
+- Assigned teachers and admins can publish practical assignments with objectives, materials, tasks, due dates, score limits, pass marks, and submission requirements. Teachers can permanently delete practical assignments they created; admins can delete any practical assignment. Deletion also removes student submissions and uploaded submission files. Students can save drafts, submit text, links, or supported files (PDF, PNG/JPEG, ZIP, and UTF-8 text/source; up to five files at 10 MB each), and resubmit when enabled. Student code is stored as a file and never executed by the application server.
 - Assigned teachers and admins can review and grade submissions, leave feedback, request a revision, or mark work passed/failed. Grading history is retained. Students cannot grade their own work.
-- Course completion requirements can include reading, theory quizzes, practical assignments, attendance, and a minimum score. A student can issue a certificate only after all configured requirements pass. Admins can review enrolled students and issue certificates individually or in batches from a course page; the same completion checks apply. Certificates use the IshConnect completion template, retain its printed signature without adding it a second time, and overlay the corporate seal beside the signature. Server-generated PDFs have unique IDs and a QR verification link at `/verify/:code`. Students can download and share issued certificates from their account; the public share link includes social preview metadata, and admins can revoke certificates.
+- Course completion requirements can include reading, attendance, and a minimum score. Every published theory quiz and practical assignment is automatically included: students need to pass all assignments that exist, while an unassigned category does not block certification. A student can issue a certificate only after all configured requirements pass. Admins can review enrolled students and issue certificates individually or in batches from a course page; the same completion checks apply. Certificates use the IshConnect completion template, retain its printed signature without adding it a second time, and overlay the corporate seal beside the signature. Server-generated PDFs have unique IDs and a QR verification link at `/verify/:code`. Students can download and share issued certificates from their account; the public share link includes social preview metadata, and admins can revoke certificates.
 - The certificate template, seal, Noto Sans fonts (licensed under SIL OFL), and their license are bundled under `server/assets/certificates` so PDF generation works when the backend is deployed with `server` as its root directory and supports accented names. The template's signature is retained, with the seal and verification QR beside it. Set `APP_URL` to the public frontend origin and `PUBLIC_API_URL` to the public backend origin for share previews; verification links use `APP_URL`.
 
 ## Technology
@@ -111,7 +114,12 @@ These routes require a valid bearer token and an admin role.
 | --- | --- | --- | --- |
 | `GET` | `/api/users` | Admin | List teacher, student, and owner accounts |
 | `POST` | `/api/users` | Admin | Create a teacher or student account |
-| `PATCH` | `/api/users/:id` | Admin | Update name, email, password, role, or active status |
+| `GET` | `/api/users/dashboard-summary` | Admin | Read admin dashboard enrollment and activity statistics |
+| `GET` | `/api/users/teachers` | Student | List active teachers and follow status |
+| `POST` | `/api/users/teachers/:id/follow` | Student | Follow a teacher |
+| `DELETE` | `/api/users/teachers/:id/follow` | Student | Unfollow a teacher |
+| `GET` | `/api/users/followers` | Teacher or admin | View a teacher's followers |
+| `PATCH` | `/api/users/:id` | Admin | Update name, email, password, role, or active status; changing a student to a teacher removes their student enrollments |
 | `DELETE` | `/api/users/:id` | Admin | Deactivate an account and invalidate sessions; preserves class history |
 
 ## Learning API
@@ -144,6 +152,7 @@ Every route below requires authentication. Admin only routes are marked.
 | `POST` | `/api/classes` | Admin | Create a class and assign its teacher and students |
 | `PATCH` | `/api/classes/:id` | Admin | Update class details and roster |
 | `DELETE` | `/api/classes/:id` | Admin | Archive a class while preserving history |
+| `DELETE` | `/api/classes/:id/permanent` | Admin | Permanently delete the class and its related records |
 | `GET` | `/api/classes/:id` | Class member or admin | View class details and live/recent session |
 | `GET` | `/api/classes/:id/sessions` | Class member or admin | List class session history |
 | `GET` | `/api/classes/:id/invitations` | Assigned teacher or admin | List invitation delivery statuses |
@@ -168,7 +177,7 @@ Socket.IO handles authenticated room membership, chat, and attendance presence. 
 
 Admins can create one public registration form for each active class/training from **Registrations**. Forms support a description, custom placeholders, up to 10 optional or required text fields, and an optional PNG/JPEG/WebP header image (maximum 3 MB). The public URL can be shared directly. Registrations are stored as contact records only; they do not create accounts or enroll students. Admins can view the submitted contact details, start the training's live class, send a class link by configured email, or open a prefilled WhatsApp message.
 
-Email invitations require `SMTP_URL`, `MAIL_FROM`, and `APP_URL`. WhatsApp invitations open WhatsApp for the admin to send manually. Live-class join links continue to require an existing enrolled student account; collecting a registration does not grant class access. Registration-form images use Cloudinary when its credentials are configured; otherwise they use the local filesystem, which requires persistent storage.
+Email invitations require `SMTP_URL`, `MAIL_FROM`, and `APP_URL`. Invitations are sent separately using a bounded SMTP connection pool. WhatsApp invitations open WhatsApp for the admin to send manually. Live-class join links continue to require an existing enrolled student account; collecting a registration does not grant class access. Registration-form images use Cloudinary when its credentials are configured; otherwise they use the local filesystem, which requires persistent storage.
 
 | Method | Endpoint | Access | Description |
 | --- | --- | --- | --- |

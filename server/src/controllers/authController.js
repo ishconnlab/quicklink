@@ -2,6 +2,7 @@ import { User } from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { signToken } from '../utils/token.js';
+import { normalizeRole } from '../security/roles.js';
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -12,9 +13,11 @@ export const login = asyncHandler(async (req, res) => {
   if ((user.registrationStatus || 'approved') === 'pending') throw ApiError.forbidden('Your student registration is waiting for admin approval.');
   if (user.registrationStatus === 'rejected') throw ApiError.forbidden('This student registration was not approved. Contact the QuickLink administrator.');
   if (!user.isActive) throw ApiError.forbidden('This account is disabled. Contact the QuickLink administrator.');
-  if (!['owner', 'teacher', 'student', 'user'].includes(user.role)) {
+  if (user.role === 'user') user.role = 'student';
+  if (!['admin', 'owner', 'teacher', 'student'].includes(user.role)) {
     throw ApiError.forbidden('This account does not have access to QuickLink Learning.');
   }
+  user.role = normalizeRole(user.role);
 
   user.lastLoginAt = new Date();
   await user.save();
@@ -55,3 +58,4 @@ export const logout = asyncHandler(async (req, res) => {
 });
 
 export default { login, me, changePassword };
+

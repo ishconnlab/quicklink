@@ -10,7 +10,10 @@ import { LearningBook } from '../models/LearningBook.js';
 import { LearningProgress } from '../models/LearningProgress.js';
 import { LiveSession } from '../models/LiveSession.js';
 import { emitClassSessionEnded } from '../services/classRealtime.js';
+import { permanentlyDeleteClass as deleteClassRecords } from '../services/permanentlyDeleteClass.js';
 import { deleteCloudinaryAsset, uploadCloudinaryBuffer, validateCloudinaryConfig } from '../services/cloudinary.js';
+import { isAdmin, canManageClass, assertCanManageClass, canAccessClass } from '../security/roles.js';
+import { recordActivity } from '../services/activityLog.js';
 import { AccessToken, TrackSource } from 'livekit-server-sdk';
 import config from '../config/env.js';
 
@@ -45,12 +48,7 @@ async function validateLearningMaterials(ids = [], level) {
 
 async function assertClassAccess(learningClass, user) {
   if (!learningClass) throw ApiError.notFound('Class not found');
-  const teacherIds = [learningClass.teacher, ...(learningClass.teachers || [])].map((teacher) => (teacher._id || teacher).toString());
-  const isTeacher = teacherIds.includes(user._id.toString());
-  const isStudent = learningClass.students.some((student) =>
-    (student._id || student).toString() === user._id.toString()
-  );
-  if (user.role !== 'owner' && !isTeacher && !isStudent) {
+  if (!canAccessClass(user, learningClass)) {
     throw ApiError.forbidden('You are not enrolled in this class.');
   }
 }
@@ -73,6 +71,9 @@ function classJson(item, liveSession = null, recentSession = null) {
     completionRequirements: item.completionRequirements || { requireReading: false, requireTheory: false, requirePractical: false, requireAttendance: false, minimumScore: 0 },
     archivedAt: item.archivedAt || null,
     startsAt: item.startsAt,
+    endsAt: item.endsAt || null,
+    enrollmentOpensAt: item.enrollmentOpensAt || null,
+    enrollmentClosesAt: item.enrollmentClosesAt || null,
     schedule: item.schedule || '',
     durationMinutes: item.durationMinutes || 60,
     lateThresholdMinutes: item.lateThresholdMinutes ?? 15,
@@ -113,8 +114,9 @@ export const listPeople = asyncHandler(async (req, res) => {
 });
 
 export const listClasses = asyncHandler(async (req, res) => {
-  const includeArchived = req.user.role === 'owner' && req.query.includeArchived === 'true';
-  const filter = req.user.role === 'owner'
+  const admin = isAdmin(req.user);
+  const includeArchived = admin && req.query.includeArchived === 'true';
+  const filter = admin
     ? (includeArchived ? {} : { active: true })
     : req.user.role === 'teacher'
       ? { $or: [{ teacher: req.user._id }, { teachers: req.user._id }], active: true }
@@ -165,13 +167,25 @@ function courseJson(item, user, progressByBook = new Map()) {
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+function validateClassDates(body) {
+  const start = body.startsAt ? new Date(body.startsAt) : null;
+  const end = body.endsAt ? new Date(body.endsAt) : null;
+  const enrollOpen = body.enrollmentOpensAt ? new Date(body.enrollmentOpensAt) : null;
+  const enrollClose = body.enrollmentClosesAt ? new Date(body.enrollmentClosesAt) : null;
+  if (start && end && end <= start) throw ApiError.badRequest('The class end date must be after its start date.');
+  if (enrollOpen && enrollClose && enrollClose <= enrollOpen) throw ApiError.badRequest('Enrollment must close after it opens.');
+  if (start && enrollClose && enrollClose > start) throw ApiError.badRequest('Enrollment must close before the class starts.');
+}
+
 export const listCourses = asyncHandler(async (req, res) => {
-  const owner = req.user.role === 'owner';
-  const manage = owner && req.query.manage === 'true';
+  const admin = isAdmin(req.user);
+  const manage = req.query.manage === 'true' && (admin || req.user.role === 'teacher');
   const enrolledOnly = req.query.enrolled === 'true';
-  const filter = manage ? {} : enrolledOnly
-    ? { students: req.user._id, active: true }
-    : { active: true, $or: [{ published: true }, { published: { $exists: false } }] };
+  const filter = manage
+    ? (admin ? {} : { $or: [{ teacher: req.user._id }, { teachers: req.user._id }] })
+    : enrolledOnly
+      ? { students: req.user._id, active: true }
+      : { active: true, $or: [{ published: true }, { published: { $exists: false } }] };
   if (req.query.level) filter.level = req.query.level;
   else if (req.user.role === 'student' && req.user.educationLevel && !enrolledOnly) filter.level = req.user.educationLevel;
   if (req.query.subject) filter.subject = { $regex: escapeRegex(req.query.subject), $options: 'i' };
@@ -202,7 +216,7 @@ export const getCourse = asyncHandler(async (req, res) => {
   const enrolled = (item.students || []).some((person) => person._id.toString() === req.user._id.toString());
   const teacherIds = [item.teacher, ...(item.teachers || [])].map((teacher) => teacher._id.toString());
   const assignedTeacher = req.user.role === 'teacher' && teacherIds.includes(req.user._id.toString());
-  if (req.user.role !== 'owner' && !assignedTeacher && (!item.active || (item.published === false && !enrolled))) throw ApiError.notFound('Course not found.');
+  if (!isAdmin(req.user) && !assignedTeacher && (!item.active || (item.published === false && !enrolled))) throw ApiError.notFound('Course not found.');
   const progress = req.user.role === 'student' ? await LearningProgress.find({ student: req.user._id, book: { $in: item.learningMaterials.map((book) => book._id) } }).lean() : [];
   res.json({ success: true, data: { course: courseJson(item, req.user, new Map(progress.map((record) => [record.book.toString(), record]))) } });
 });
@@ -211,6 +225,7 @@ export const enrollInCourse = asyncHandler(async (req, res) => {
   if (req.user.role !== 'student') throw ApiError.forbidden('Only student accounts can enroll in courses.');
   const id = req.params.id;
   const studentId = req.user._id;
+  const now = new Date();
   const item = await LearningClass.findOneAndUpdate(
     {
       _id: id,
@@ -218,35 +233,42 @@ export const enrollInCourse = asyncHandler(async (req, res) => {
       published: { $ne: false },
       enrollmentOpen: true,
       students: { $ne: studentId },
+      $and: [
+        { $or: [{ enrollmentOpensAt: null }, { enrollmentOpensAt: { $lte: now } }] },
+        { $or: [{ enrollmentClosesAt: null }, { enrollmentClosesAt: { $gte: now } }] },
+      ],
       $expr: { $lt: [{ $size: { $ifNull: ['$students', []] } }, { $ifNull: ['$maxStudents', 300] }] },
     },
     { $addToSet: { students: studentId } },
     { new: true },
   ).populate('teacher', 'name email').populate('teachers', 'name email').populate('students', 'name email').populate('learningMaterials', 'title level format active');
   if (!item) {
-    const current = await LearningClass.findById(id).select('active published enrollmentOpen maxStudents students');
+    const current = await LearningClass.findById(id).select('active published enrollmentOpen enrollmentOpensAt enrollmentClosesAt maxStudents students');
     if (!current || !current.active || current.published === false) throw ApiError.notFound('This course is not available for enrollment.');
     if (current.students.some((person) => person.toString() === studentId.toString())) throw ApiError.conflict('You are already enrolled in this course.');
     if (!current.enrollmentOpen) throw ApiError.conflict('Enrollment is closed for this course.');
+    if (current.enrollmentOpensAt && current.enrollmentOpensAt > now) throw ApiError.conflict('Enrollment has not opened for this course yet.');
+    if (current.enrollmentClosesAt && current.enrollmentClosesAt < now) throw ApiError.conflict('Enrollment has closed for this course.');
     if (current.students.length >= current.maxStudents) throw ApiError.conflict('This course has reached its enrollment capacity.');
     throw ApiError.conflict('Course enrollment could not be completed. Please retry.');
   }
+  await recordActivity(req, { action: 'course.enrolled', resourceType: 'class', resourceId: item._id, message: `Enrolled in ${item.title}.` });
   res.status(201).json({ success: true, data: { course: courseJson(item, req.user), enrollment: { status: 'enrolled', enrolledAt: new Date() } } });
 });
 
 export const updateCourseThumbnail = asyncHandler(async (req, res) => {
-  if (req.user.role !== 'owner') throw ApiError.forbidden('Only administrators can change course thumbnails.');
   if (!req.file?.buffer) throw ApiError.badRequest('Choose a PNG, JPEG, or WebP thumbnail.');
   if (req.file.size > 3 * 1024 * 1024) throw ApiError.badRequest('Course thumbnails must be 3 MB or smaller.');
   const format = IMAGE_FORMATS.find((item) => item.mime === req.file.mimetype && item.matches(req.file.buffer));
   if (!format) throw ApiError.badRequest('Thumbnail content must match a PNG, JPEG, or WebP image.');
   const item = await LearningClass.findById(req.params.id);
   if (!item) throw ApiError.notFound('Course not found.');
+  assertCanManageClass(req.user, item);
   const previousFile = item.thumbnailFile;
   const previousPublicId = item.thumbnailPublicId;
   let uploaded;
   let localPath;
-  if (validateCloudinaryConfig()) {
+  if (config.cloudinary.enabled) {
     uploaded = await uploadCloudinaryBuffer({
       buffer: req.file.buffer,
       folder: `${config.cloudinary.folderPrefix}/course-thumbnails`,
@@ -271,13 +293,13 @@ export const updateCourseThumbnail = asyncHandler(async (req, res) => {
     throw error;
   }
   if (previousFile) await fs.unlink(path.join(COURSE_IMAGE_DIR, path.basename(previousFile))).catch(() => {});
-  if (previousPublicId) await deleteCloudinaryAsset({ publicId: previousPublicId, resourceType: 'image' }).catch((error) => console.warn('[storage] Could not remove replaced course thumbnail from Cloudinary:', error.message));
+  if (previousPublicId && config.cloudinary.enabled) await deleteCloudinaryAsset({ publicId: previousPublicId, resourceType: 'image' }).catch((error) => console.warn('[storage] Could not remove replaced course thumbnail from Cloudinary:', error.message));
   res.json({ success: true, data: { thumbnailUrl: item.thumbnailUrl || `/api/courses/${item._id}/thumbnail` } });
 });
 
 export const getCourseThumbnail = asyncHandler(async (req, res) => {
   const item = await LearningClass.findById(req.params.id).select('active published thumbnailFile thumbnailUrl');
-  if (!item || (!item.thumbnailFile && !item.thumbnailUrl) || (req.user?.role !== 'owner' && (!item.active || item.published === false))) throw ApiError.notFound('Course thumbnail not found.');
+  if (!item || (!item.thumbnailFile && !item.thumbnailUrl) || (!isAdmin(req.user) && (!item.active || item.published === false))) throw ApiError.notFound('Course thumbnail not found.');
   if (item.thumbnailUrl) return res.redirect(302, item.thumbnailUrl);
   const name = path.basename(item.thumbnailFile);
   if (name !== item.thumbnailFile) throw ApiError.notFound('Course thumbnail not found.');
@@ -295,10 +317,32 @@ export const getCourseThumbnail = asyncHandler(async (req, res) => {
 });
 
 export const createClass = asyncHandler(async (req, res) => {
-  const { teachers, students } = await resolveRoster(req.body.teacherIds || req.body.teacherId, req.body.studentIds);
+  const requestId = req.get('Idempotency-Key');
+  if (requestId && !/^[a-f\d]{24}$/i.test(requestId)) {
+    throw ApiError.badRequest('Class creation request ID is invalid.');
+  }
+  if (requestId) {
+    const existing = await LearningClass.findById(requestId);
+    if (existing) {
+      if (existing.createdBy.toString() !== req.user._id.toString()) {
+        throw ApiError.conflict('This class creation request ID is already in use.');
+      }
+      await existing.populate('teacher', 'name email');
+      await existing.populate('teachers', 'name email');
+      await existing.populate('students', 'name email');
+      return res.status(200).json({ success: true, data: { class: classJson(existing) } });
+    }
+  }
+
+  const { teachers, students } = await resolveRoster(
+    req.user.role === 'teacher' ? [req.user._id] : (req.body.teacherIds || req.body.teacherId),
+    req.body.studentIds,
+  );
+  validateClassDates(req.body);
   const learningMaterials = await validateLearningMaterials(req.body.learningMaterials || [], req.body.level);
   if (students.length > (req.body.maxStudents || 300)) throw ApiError.badRequest('The selected roster exceeds the class capacity.');
   const item = new LearningClass({
+    ...(requestId ? { _id: requestId } : {}),
     title: req.body.title,
     subject: req.body.subject,
     trade: req.body.trade || '',
@@ -312,6 +356,9 @@ export const createClass = asyncHandler(async (req, res) => {
     teachers: teachers.map((teacher) => teacher._id),
     students: students.map((student) => student._id),
     startsAt: req.body.startsAt || null,
+    endsAt: req.body.endsAt || null,
+    enrollmentOpensAt: req.body.enrollmentOpensAt || null,
+    enrollmentClosesAt: req.body.enrollmentClosesAt || null,
     schedule: req.body.schedule,
     durationMinutes: req.body.durationMinutes,
     lateThresholdMinutes: req.body.lateThresholdMinutes,
@@ -322,28 +369,47 @@ export const createClass = asyncHandler(async (req, res) => {
     published: req.body.published !== false,
     createdBy: req.user._id,
   });
-  await item.save();
+  try {
+    await item.save();
+  } catch (error) {
+    if (requestId && error?.code === 11000) {
+      const existing = await LearningClass.findById(requestId);
+      if (existing?.createdBy.toString() === req.user._id.toString()) {
+        await existing.populate('teacher', 'name email');
+        await existing.populate('teachers', 'name email');
+        await existing.populate('students', 'name email');
+        return res.status(200).json({ success: true, data: { class: classJson(existing) } });
+      }
+    }
+    throw error;
+  }
   await item.populate('teacher', 'name email');
   await item.populate('teachers', 'name email');
   await item.populate('students', 'name email');
+  await recordActivity(req, { action: 'class.created', resourceType: 'class', resourceId: item._id, message: `Created class ${item.title}.` });
   res.status(201).json({ success: true, data: { class: classJson(item) } });
 });
 
 export const updateClass = asyncHandler(async (req, res) => {
   const item = await LearningClass.findById(req.params.id);
   if (!item) throw ApiError.notFound('Class not found');
+  assertCanManageClass(req.user, item);
   if (await LiveSession.exists({ learningClass: item._id, status: 'live' })) {
     throw ApiError.conflict('End the live session before changing the class roster.');
   }
-  const teacherIds = req.body.teacherIds || req.body.teacherId || item.teachers.map(String).concat(item.teachers.length ? [] : [item.teacher.toString()]);
+  const canReassignTeachers = isAdmin(req.user);
+  const teacherIds = canReassignTeachers
+    ? (req.body.teacherIds || req.body.teacherId || item.teachers.map(String).concat(item.teachers.length ? [] : [item.teacher.toString()]))
+    : item.teachers.map(String).concat(item.teachers.length ? [] : [item.teacher.toString()]);
   const studentIds = req.body.studentIds || item.students.map(String);
   const { teachers, students } = await resolveRoster(teacherIds, studentIds);
   const learningMaterials = await validateLearningMaterials(req.body.learningMaterials || item.learningMaterials.map(String), req.body.level || item.level);
   if (students.length > (req.body.maxStudents ?? item.maxStudents)) throw ApiError.badRequest('The selected roster exceeds the class capacity.');
-  for (const field of ['title', 'subject', 'trade', 'introduction', 'learningMaterials', 'completionRequirements', 'course', 'level', 'description', 'active', 'published', 'startsAt', 'schedule', 'durationMinutes', 'lateThresholdMinutes', 'earlyThresholdPercent', 'timezone', 'maxStudents', 'enrollmentOpen']) {
+  for (const field of ['title', 'subject', 'trade', 'introduction', 'learningMaterials', 'completionRequirements', 'course', 'level', 'description', 'active', 'published', 'startsAt', 'endsAt', 'enrollmentOpensAt', 'enrollmentClosesAt', 'schedule', 'durationMinutes', 'lateThresholdMinutes', 'earlyThresholdPercent', 'timezone', 'maxStudents', 'enrollmentOpen']) {
     if (req.body[field] !== undefined) item[field] = req.body[field];
   }
   if (req.body.active === true) item.archivedAt = null;
+  validateClassDates({ ...item.toObject(), ...req.body });
   item.teacher = teachers[0]._id;
   item.teachers = teachers.map((teacher) => teacher._id);
   item.students = students.map((student) => student._id);
@@ -352,6 +418,7 @@ export const updateClass = asyncHandler(async (req, res) => {
   await item.populate('teacher', 'name email');
   await item.populate('teachers', 'name email');
   await item.populate('students', 'name email');
+  await recordActivity(req, { action: 'class.updated', resourceType: 'class', resourceId: item._id, message: `Updated class ${item.title}.` });
   res.json({ success: true, data: { class: classJson(item) } });
 });
 
@@ -463,7 +530,7 @@ export const endSession = asyncHandler(async (req, res) => {
   if (!session) throw ApiError.notFound('Class session not found');
   await assertClassAccess(session.learningClass, req.user);
   const assignedTeacher = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].some((teacher) => (teacher._id || teacher).toString() === req.user._id.toString());
-  if (req.user.role !== 'owner' && !assignedTeacher) throw ApiError.forbidden('Only the assigned teacher or an admin can end this class.');
+  if (!isAdmin(req.user) && !assignedTeacher) throw ApiError.forbidden('Only the assigned teacher or an admin can end this class.');
   if (session.status === 'ended') return res.json({ success: true, data: { session: sessionJson(session) } });
 
   const now = new Date();
@@ -517,7 +584,7 @@ export const getSessionReport = asyncHandler(async (req, res) => {
   if (!session) throw ApiError.notFound('Class session not found');
   await assertClassAccess(session.learningClass, req.user);
   const teacherIds = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].map((teacher) => (teacher._id || teacher).toString());
-  if (req.user.role !== 'owner' && !teacherIds.includes(req.user._id.toString())) throw ApiError.forbidden('Attendance reports are available to the assigned teacher and admin.');
+  if (!isAdmin(req.user) && !teacherIds.includes(req.user._id.toString())) throw ApiError.forbidden('Attendance reports are available to the assigned teacher and admin.');
   if (session.status !== 'ended') throw ApiError.conflict('The report is available after the teacher ends the session.');
   res.json({ success: true, data: { session: sessionJson(session), class: classJson(session.learningClass) } });
 });
@@ -530,7 +597,7 @@ export const correctAttendance = asyncHandler(async (req, res) => {
   await assertClassAccess(session.learningClass, req.user);
   if (session.status !== 'ended') throw ApiError.conflict('Attendance can be corrected after the session ends.');
   const teachers = [session.learningClass.teacher, ...(session.learningClass.teachers || [])].map((person) => person._id.toString());
-  if (req.user.role !== 'owner' && !teachers.includes(req.user._id.toString())) throw ApiError.forbidden('Only an assigned teacher or admin can correct attendance.');
+  if (!isAdmin(req.user) && !teachers.includes(req.user._id.toString())) throw ApiError.forbidden('Only an assigned teacher or admin can correct attendance.');
   const entry = session.report.attendance.find((person) => person.user?.toString() === req.params.studentId);
   if (!entry || entry.role !== 'student') throw ApiError.notFound('Student attendance record not found.');
   entry.correctionHistory.push({ fromStatus: entry.status, toStatus: req.body.status, reason: req.body.reason, updatedBy: req.user._id, updatedAt: new Date() });
@@ -548,12 +615,23 @@ export const correctAttendance = asyncHandler(async (req, res) => {
 export const archiveClass = asyncHandler(async (req, res) => {
   const item = await LearningClass.findById(req.params.id);
   if (!item) throw ApiError.notFound('Class not found');
+  assertCanManageClass(req.user, item);
   if (await LiveSession.exists({ learningClass: item._id, status: 'live' })) throw ApiError.conflict('End the live session before archiving this class.');
   item.active = false;
   item.enrollmentOpen = false;
   item.archivedAt = new Date();
   await item.save();
+  await recordActivity(req, { action: 'class.archived', resourceType: 'class', resourceId: item._id, message: `Archived class ${item.title}.` });
   res.json({ success: true, data: { class: { id: item.id, active: false, archivedAt: item.archivedAt } } });
 });
 
-export default { listPeople, listClasses, createClass, updateClass, archiveClass, getClass, listClassSessions, startSession, joinByCode, getSession, createLiveKitToken, endSession, getSessionReport, correctAttendance };
+export const permanentlyDeleteClass = asyncHandler(async (req, res) => {
+  const item = await deleteClassRecords(req.params.id);
+  await recordActivity(req, { action: 'class.deleted', resourceType: 'class', resourceId: item._id, message: `Permanently deleted class ${item.title}.` });
+  res.json({ success: true, data: { class: { id: item._id.toString(), deleted: true } } });
+});
+
+export default { listPeople, listClasses, createClass, updateClass, archiveClass, permanentlyDeleteClass, getClass, listClassSessions, startSession, joinByCode, getSession, createLiveKitToken, endSession, getSessionReport, correctAttendance };
+
+
+

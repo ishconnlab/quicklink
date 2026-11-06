@@ -36,6 +36,9 @@ const learningClassSchema = new mongoose.Schema({
   teachers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   startsAt: { type: Date, default: null },
+  endsAt: { type: Date, default: null },
+  enrollmentOpensAt: { type: Date, default: null },
+  enrollmentClosesAt: { type: Date, default: null },
   schedule: { type: String, default: '', trim: true, maxlength: 500 },
   durationMinutes: { type: Number, default: 60, min: 5, max: 1440 },
   lateThresholdMinutes: { type: Number, default: 15, min: 0, max: 240 },
@@ -56,3 +59,4 @@ learningClassSchema.index({ published: 1, active: 1, level: 1, subject: 1, trade
 
 export const LearningClass = mongoose.model('LearningClass', learningClassSchema);
 export default LearningClass;
+

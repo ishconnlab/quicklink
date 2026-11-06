@@ -7,6 +7,7 @@ import { EmptyState, PageLoader } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDateTime } from '../lib/format.js';
+import { isAdmin } from '../lib/roles.js';
 
 const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 const duration = (seconds) => `${Math.floor(seconds / 60)} min`;
@@ -69,7 +70,7 @@ export default function ClassReportPage() {
   if (!data) return <EmptyState title="Report unavailable" description="The session may still be live or you may not have access." />;
   const { session, class: classInfo } = data;
   const report = session.report;
-  const canManage = user?.role === 'owner' || (user?.role === 'teacher' && (classInfo.teacher.id === user.id || classInfo.teachers?.some((teacher) => teacher.id === user.id)));
+  const canManage = isAdmin(user) || (user?.role === 'teacher' && (classInfo.teacher.id === user.id || classInfo.teachers?.some((teacher) => teacher.id === user.id)));
   return <div>
     <Link to={`/classes/${classInfo.id}`} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"><ArrowLeft size={16} />Back to class</Link>
     <PageHeader title="Class attendance report" subtitle={`${classInfo.title} · ${classInfo.subject} · ${classInfo.level}`} actions={<div className="flex gap-2"><button className="btn-secondary" onClick={downloadCsv}><Download size={17} />CSV</button><button className="btn-primary" onClick={downloadPdf}><FileText size={17} />Download PDF</button></div>} />

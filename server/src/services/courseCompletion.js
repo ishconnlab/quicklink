@@ -5,12 +5,51 @@ import { LearningProgress } from '../models/LearningProgress.js';
 import { LearningAssessmentAttempt } from '../models/LearningAssessmentAttempt.js';
 import { CertificationAssessmentAttempt } from '../models/CertificationAssessmentAttempt.js';
 import { LiveSession } from '../models/LiveSession.js';
+import { getLearningSettings } from './settings.js';
+
+export function evaluateAssignmentRequirements(assignments, submissions) {
+  const latest = new Map();
+  for (const submission of [...submissions].sort((a, b) => b.attempt - a.attempt)) {
+    const assignmentId = submission.assignment.toString();
+    if (!latest.has(assignmentId)) latest.set(assignmentId, submission);
+  }
+  const categories = [
+    { key: 'theory', label: 'Pass theory assessments', types: new Set(['quiz']) },
+    { key: 'practical', label: 'Pass practical assignments', types: new Set(['practical', 'assignment']) },
+  ];
+  return categories.flatMap(({ key, label, types }) => {
+    const required = assignments.filter((assignment) => types.has(assignment.type));
+    if (!required.length) return [];
+    const completed = required.filter((assignment) => {
+      const submission = latest.get(assignment._id.toString());
+      return Boolean(submission && (
+        submission.status === 'passed'
+        || (submission.score !== null && submission.score >= assignment.passMark)
+      ));
+    });
+    return [{
+      key,
+      label,
+      complete: completed.length === required.length,
+      detail: `${completed.length} of ${required.length} passed`,
+    }];
+  });
+}
 
 export async function evaluateCourseCompletion(course, studentId) {
+  const settings = await getLearningSettings();
   const enrolled = (course.students || []).some((student) => (student._id || student).toString() === studentId.toString());
   const rules = course.completionRequirements || {};
   const certificationAssessmentEnabled = Boolean(course.certificationAssessmentEnabled);
-  const requirementsConfigured = Boolean(rules.requireReading || rules.requireTheory || rules.requirePractical || rules.requireAttendance || rules.minimumScore > 0 || certificationAssessmentEnabled);
+  const assignments = await Assignment.find({
+    learningClass: course._id,
+    published: true,
+    type: { $in: ['quiz', 'practical', 'assignment'] },
+  }).select('_id type passMark maxPoints').lean();
+  const requirementsConfigured = Boolean(
+    rules.requireReading || rules.requireAttendance || rules.minimumScore > 0
+    || certificationAssessmentEnabled || assignments.length,
+  );
   const checks = [];
 
   if (certificationAssessmentEnabled) {
@@ -33,7 +72,7 @@ export async function evaluateCourseCompletion(course, studentId) {
       LearningBook.find({ _id: { $in: ids } }).select('_id assessmentQuestions').lean(),
       LearningAssessmentAttempt.find({ student: studentId, book: { $in: ids }, passed: true }).select('book').lean(),
     ]) : [[], []];
-    const configured = new Set(books.filter((book) => book.assessmentQuestions?.length === 20).map((book) => book._id.toString()));
+    const configured = new Set(books.filter((book) => (book.assessmentQuestions?.length || 0) > 0).map((book) => book._id.toString()));
     const passed = new Set(passedAttempts.map((attempt) => attempt.book.toString()));
     const passedRequired = ids.filter((book) => configured.has(book.toString()) && passed.has(book.toString())).length;
     const unconfigured = ids.length - configured.size;
@@ -43,24 +82,15 @@ export async function evaluateCourseCompletion(course, studentId) {
       complete: ids.length > 0 && unconfigured === 0 && passedRequired === ids.length,
       detail: unconfigured
         ? `${unconfigured} assessment${unconfigured === 1 ? ' needs' : 's need'} administrator setup; ${passedRequired} of ${ids.length} passed`
-        : `${passedRequired} of ${ids.length} passed (80% required)`,
+        : `${passedRequired} of ${ids.length} passed (${settings.assessmentPassMark}% required)`,
     });
   }
 
-  const assignmentTypes = [];
-  if (rules.requireTheory) assignmentTypes.push(['theory', ['quiz']]);
-  if (rules.requirePractical) assignmentTypes.push(['practical', ['practical', 'assignment']]);
-  for (const [key, types] of assignmentTypes) {
-    const assignments = await Assignment.find({ learningClass: course._id, published: true, type: { $in: types } }).select('title passMark maxPoints').lean();
-    const submissions = assignments.length ? await AssignmentSubmission.find({ assignment: { $in: assignments.map((assignment) => assignment._id) }, student: studentId }).sort({ attempt: -1 }).lean() : [];
-    const latest = new Map();
-    for (const submission of submissions) if (!latest.has(submission.assignment.toString())) latest.set(submission.assignment.toString(), submission);
-    const completed = assignments.filter((assignment) => {
-      const submission = latest.get(assignment._id.toString());
-      return Boolean(submission && (submission.status === 'passed' || (submission.score !== null && submission.score >= assignment.passMark)));
-    });
-    checks.push({ key, label: key === 'theory' ? 'Pass theory assessments' : 'Pass practical assignments', complete: assignments.length > 0 && completed.length === assignments.length, detail: `${completed.length} of ${assignments.length} passed` });
-  }
+  const submissions = assignments.length ? await AssignmentSubmission.find({
+    assignment: { $in: assignments.map((assignment) => assignment._id) },
+    student: studentId,
+  }).sort({ attempt: -1 }).select('assignment attempt status score').lean() : [];
+  checks.push(...evaluateAssignmentRequirements(assignments, submissions));
 
   if (rules.requireAttendance) {
     const sessions = await LiveSession.find({ learningClass: course._id, status: 'ended' }).select('report.attendance').lean();
