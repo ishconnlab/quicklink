@@ -3,5 +3,25 @@
   "framework": null,
   "buildCommand": "npm --prefix client ci && npm --prefix client run build",
   "outputDirectory": "client/dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/sitemap.xml", "destination": "https://quicklink-3eng.onrender.com/api/public/sitemap.xml" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/login", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/register", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/dashboard", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/courses", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/courses/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/classes/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/classes", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/enrollments", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/certificates", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/students", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/users", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/registrations", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/training-registration/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/settings", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] },
+    { "source": "/verify/:path*", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, nofollow, nosnippet" }] }
+  ]
 }

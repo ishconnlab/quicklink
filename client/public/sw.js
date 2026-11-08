@@ -1,6 +1,6 @@
 /* QuickLink QuickLink service worker: app-shell caching. */
-const CACHE = 'ishconnect-shell-v4';
-const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon.svg'];
+const CACHE = 'quicklink-shell-v5';
+const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon.svg', '/robots.txt', '/og-quicklink.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

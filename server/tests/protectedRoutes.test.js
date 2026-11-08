@@ -63,6 +63,7 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     const deleteCertificate = await fetch(`${root}/api/certificates/0123456789abcdef01234567`, { method: 'DELETE' });
     const deleteRegistration = await fetch(`${root}/api/registrations/0123456789abcdef01234567/entries/0123456789abcdef01234567`, { method: 'DELETE' });
     assert.equal(completion.status, 401);
+    assert.equal(completion.headers.get('x-robots-tag'), 'noindex, nofollow, nosnippet');
     assert.equal(issue.status, 401);
     assert.equal(download.status, 400);
     assert.equal(downloadByCode.status, 401);
