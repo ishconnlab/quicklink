@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarClock, GraduationCap, PlusCircle, Search, SlidersHorizontal, Users, Wallet } from 'lucide-react';
+import { ArrowRight, CalendarClock, GraduationCap, PlusCircle, Search, SlidersHorizontal, Trash2, Users, Wallet } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader } from '../components/layout.jsx';
-import { EmptyState, PageLoader } from '../components/ui.jsx';
+import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useDialog } from '../context/DialogContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { formatDateTime, formatMoney } from '../lib/format.js';
 import { isAdmin } from '../lib/roles.js';
@@ -13,7 +14,7 @@ import { isAdmin } from '../lib/roles.js';
 const paymentTone = { not_required: 'slate', unpaid: 'amber', pending: 'brand', paid: 'green', rejected: 'red', waived: 'green' };
 const paymentLabel = { not_required: 'No payment', unpaid: 'Payment due', pending: 'Under review', paid: 'Paid', rejected: 'Needs attention', waived: 'Waived' };
 
-function CourseCard({ course, admin }) {
+function CourseCard({ course, admin, onDelete, deleting }) {
   const action = admin ? 'Manage training' : course.enrolled ? 'Open training' : course.enrollmentStatus === 'open' ? 'View and enroll' : 'View details';
   const payment = course.enrollment?.payment;
   return <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03] transition duration-200 hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
@@ -38,18 +39,20 @@ function CourseCard({ course, admin }) {
           {course.payment?.enabled && <Badge color="amber">Paid training</Badge>}
         </> : payment ? <Badge color={paymentTone[payment.status] || 'slate'}>{paymentLabel[payment.status] || payment.status}</Badge> : null}
       </div>
-      <div className="mt-auto pt-4"><Link to={admin ? `/courses/${course.id}/edit` : `/courses/${course.id}`} className={admin ? 'btn-secondary w-full' : 'btn-primary w-full'}>{action}<ArrowRight size={15} /></Link></div>
+      <div className="mt-auto flex gap-2 pt-4"><Link to={admin ? `/courses/${course.id}/edit` : `/courses/${course.id}`} className={`${admin ? 'btn-secondary' : 'btn-primary'} min-w-0 flex-1`}>{action}<ArrowRight size={15} /></Link>{admin && <button type="button" className="btn-ghost shrink-0 px-3 text-red-700" onClick={() => onDelete(course)} disabled={deleting} aria-label={`Delete ${course.title}`} title="Delete training">{deleting ? <Spinner size={16} /> : <Trash2 size={16} />}</button>}</div>
     </div>
   </article>;
 }
 
 export default function CoursesPage() {
   const toast = useToast();
+  const dialog = useDialog();
   const { user } = useAuth();
   const admin = isAdmin(user);
   const [filters, setFilters] = useState({ search: '', level: '', subject: '', sort: 'newest' });
   const [result, setResult] = useState({ courses: [], subjects: [], trades: [], page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState('');
 
   const load = useCallback(async (page = 1) => {
     setLoading(true);
@@ -60,6 +63,23 @@ export default function CoursesPage() {
     } catch (error) { toast.error(apiError(error).message); }
     finally { setLoading(false); }
   }, [filters, admin, toast]);
+
+  const deleteTraining = async (course) => {
+    const approved = await dialog.confirm({
+      title: 'Delete this training permanently?',
+      message: `Permanently delete “${course.title}” and its enrollment, payment, submission, certificate, registration and attendance records? This cannot be undone. End any live class first.`,
+      confirmLabel: 'Delete training',
+      tone: 'danger',
+    });
+    if (!approved) return;
+    setDeletingId(course.id);
+    try {
+      await api.delete(`/classes/${course.id}/permanent`);
+      toast.success('Training deleted.');
+      await load(result.page);
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setDeletingId(''); }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => load(1), 250);
@@ -86,7 +106,7 @@ export default function CoursesPage() {
     </div>
 
     {loading ? <PageLoader label="Loading trainings…" /> : !result.courses.length ? <EmptyState icon={GraduationCap} title={admin ? 'No trainings found' : 'No enrolled trainings'} description={admin ? 'Create the first training or adjust your filters.' : 'Your trainings will appear here after enrollment.'} action={admin ? <Link to="/courses/new" className="btn-primary">Create training</Link> : null} /> : <>
-      <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">{result.courses.map((course) => <CourseCard key={course.id} course={course} admin={admin} />)}</div>
+      <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">{result.courses.map((course) => <CourseCard key={course.id} course={course} admin={admin} onDelete={deleteTraining} deleting={deletingId === course.id} />)}</div>
       {result.pages > 1 && <div className="mt-5 flex items-center justify-center gap-3"><button className="btn-secondary" disabled={result.page <= 1} onClick={() => load(result.page - 1)}>Previous</button><span className="text-sm text-slate-500">Page {result.page} of {result.pages}</span><button className="btn-secondary" disabled={result.page >= result.pages} onClick={() => load(result.page + 1)}>Next</button></div>}
     </>}
   </div>;

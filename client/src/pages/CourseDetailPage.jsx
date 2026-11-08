@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle, ArrowLeft, Award, BadgeCheck, CalendarClock, CheckCircle2, ClipboardCheck, Clock3, Download,
   ExternalLink, FileCheck2, GraduationCap, Link2, Loader2, LockKeyhole, Pencil, PlayCircle, Send, Share2,
-  ShieldCheck, Target, Users, Video, Wallet,
+  ShieldCheck, Target, Trash2, Users, Video, Wallet,
 } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, Modal, PageHeader, ProgressBar } from '../components/layout.jsx';
@@ -219,6 +219,24 @@ export default function CourseDetailPage() {
     }
   };
 
+  const deleteTraining = async () => {
+    if (!course) return;
+    const approved = await dialog.confirm({
+      title: 'Delete this training permanently?',
+      message: 'This removes the training and its enrollments, submissions, certificates, registration records, attendance, and learning materials. This cannot be undone. End any live class first.',
+      confirmLabel: 'Delete training',
+      tone: 'danger',
+    });
+    if (!approved) return;
+    setBusy('delete');
+    try {
+      await api.delete(`/classes/${id}/permanent`);
+      toast.success('Training deleted.');
+      navigate('/courses', { replace: true });
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setBusy(''); }
+  };
+
   if (loading && !course) return <PageLoader label="Opening training…" />;
   if (!course) return <EmptyState title="Training not found" description="It may have been removed or is unavailable." action={<Link to="/courses" className="btn-primary">Back to trainings</Link>} />;
 
@@ -247,6 +265,7 @@ export default function CourseDetailPage() {
               <Link to={`/classes/${id}`} className="btn-secondary"><Video size={16} />Live classroom</Link>
               <button className="btn-secondary" onClick={() => setSettingsOpen(true)}><Target size={16} />Assessment setup</button>
               <button className="btn-secondary" onClick={toggleArchive} disabled={busy === 'archive'}>{busy === 'archive' ? <Spinner size={15} /> : course.active ? <LockKeyhole size={15} /> : <PlayCircle size={15} />}{course.active ? 'Archive' : 'Restore'}</button>
+              <button className="btn-ghost text-red-700" onClick={deleteTraining} disabled={busy === 'delete'}>{busy === 'delete' ? <Spinner size={15} /> : <Trash2 size={15} />}Delete permanently</button>
             </> : course.enrolled ? <>
               <Link to={`/classes/${id}`} className="btn-primary"><Video size={16} />Open classroom</Link>
               {course.allowCancellation && <button className="btn-secondary" onClick={leaveTraining} disabled={busy === 'leave'}>{busy === 'leave' ? <Spinner size={15} /> : null}Leave training</button>}

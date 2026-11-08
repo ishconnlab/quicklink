@@ -9,7 +9,7 @@
 
 The application is a React single-page learning portal. Before this change, its root route redirected into the authenticated dashboard, the HTML shell had generic platform metadata, and the training catalogue endpoint required authentication. The student catalogue was intentionally restricted to each student's enrollments, so search engines could not read a public catalogue. There was no root robots file or sitemap. The learning product itself supports training enrolment, live sessions, study documents and saved progress, practical assignments, assessments, certificates and public certificate verification.
 
-The site now has public routes for the homepage, programme catalogue and published programme details, QuickLink and IshConnect information, learning instructions, contact and ten educational guides. Programme details are read from active, published `LearningClass` records. Draft and archived items are omitted. The public API returns a limited field allowlist: it does not return student rosters, internal payment codes, student progress, assessments' answer keys, private class sessions or personal records. A public registration link is included only when the programme has an active registration form.
+The site has public routes for the programme catalogue and published programme details, QuickLink and IshConnect information, learning instructions, contact and ten educational guides. The root path now redirects visitors to sign in, per product direction, and is noindex; it is excluded from the sitemap. Programme details are read from active, published `LearningClass` records. Draft and archived items are omitted. The public API returns a limited field allowlist: it does not return student rosters, internal payment codes, student progress, assessments' answer keys, private class sessions or personal records. A public registration link is included only when the programme has an active registration form.
 
 Public content uses per-route titles, descriptions, canonical links, Open Graph and Twitter metadata. Organization and WebSite JSON-LD describe IshConnect and QuickLink; programme pages emit BreadcrumbList markup, and emit Course markup only when the record has a description, an assigned instructor and an enrolled learner; the catalogue emits an ItemList only when it contains at least three such courses. The guides emit Article markup. The organization is marked as `Organization`, not `EducationalOrganization`, because no evidence of that specific status was supplied.
 
@@ -23,13 +23,13 @@ Search-result research for Rwanda-oriented course terms showed list and comparis
 
 | Query group | Search intent | Target page | Use and limits |
 |---|---|---|---|
-| Online learning platform Rwanda; online courses Rwanda; online IT training Rwanda | Compare available providers/programmes | `/` and `/programmes` | Explain the platform and link to the live catalogue. Avoid unsupported “free” claims. |
+| Online learning platform Rwanda; online courses Rwanda; online IT training Rwanda | Compare available providers/programmes | `/about` and `/programmes` | Explain the platform and link to the live catalogue. Avoid unsupported “free” claims. |
 | Technology training Rwanda; practical programming courses; software development training | Find a locally relevant training provider | `/programmes` and published programme details | Programme titles and subjects come from published records. Add location terms to a course title only if its schedule or delivery genuinely supports that location. |
 | Learn Python online; Python programming for beginners | Learn a subject / compare a course | `/resources/python-for-artificial-intelligence` and relevant published programme detail | The guide is informational. Do not imply a Python programme is open unless it appears in the public catalogue. |
 | Machine learning training Rwanda; artificial intelligence courses; AI training for beginners | Compare subject training | Matching published programme page; otherwise `/resources/machine-learning-for-beginners` | The resource article does not claim that a matching intake is currently open. |
 | Full stack development training; web development courses; programming for beginners | Compare training or learn a path | Matching published programme page; `/resources/full-stack-developer-path` | Use real course names, requirements, schedule and registration status. |
 | Cybersecurity training Rwanda; cloud computing; DevOps training | Subject-specific training research | Matching published programme page; `/resources/cybersecurity-introduction` | Do not create programme landing pages for subjects that are not currently published. |
-| IT skills development; online technology bootcamps | General learning/provider research | Homepage, “How learning works”, and live programmes | Keep “bootcamp” usage tied to actual programme level/type, not generic promotional text. |
+| IT skills development; online technology bootcamps | General learning/provider research | `/how-learning-works` and live programmes | Keep “bootcamp” usage tied to actual programme level/type, not generic promotional text. |
 | Certificate verification QuickLink IshConnect | Validate a credential | `/verify` and `/verify/:code` | The lookup page and personal certificate records are noindex; share the specific public verification URL with its recipient. |
 
 The terms “free online technology courses” and “free courses Rwanda” are intentionally not promoted as blanket claims. The course payment setting varies by programme. A page may mention price only from the verified programme record and must make the amount and currency clear.
@@ -40,7 +40,7 @@ Google's current Course list documentation requires real educational courses and
 
 | URL | Page title | Main heading / topic |
 |---|---|---|
-| `/` | QuickLink by IshConnect \| Online Learning & Tech Training | Learn Technology. Build Real Skills. Create Your Future. |
+| `/` | Redirects to `/login` | Noindex sign-in route |
 | `/programmes` | Technology Training Programmes in Rwanda \| QuickLink | Technology training programmes |
 | `/programmes/:slug` | Actual programme name \| QuickLink by IshConnect | Actual published programme name |
 | `/about` | About QuickLink \| IshConnect Online Learning Platform | About QuickLink |
@@ -49,7 +49,7 @@ Google's current Course list documentation requires real educational courses and
 | `/contact` | Contact IshConnect about QuickLink Training | Contact IshConnect |
 | `/resources` and `/resources/:slug` | Topic-specific titles and descriptions | Topic-specific article heading |
 
-The homepage states that IshConnect operates QuickLink. Individual training pages explain only stored information: subject, level, description, dates, schedule, session length, configured learning checks, current enrolment and linked registration availability. Duration is labelled **live session length**, not total course duration, because the data field records a session length. Prerequisites or outcomes are not invented where the training record has no such fields.
+The About pages state that IshConnect operates QuickLink. Individual training pages explain only stored information: subject, level, description, dates, schedule, session length, configured learning checks, current enrolment and linked registration availability. Duration is labelled **live session length**, not total course duration, because the data field records a session length. Prerequisites or outcomes are not invented where the training record has no such fields.
 
 ## Educational guides published
 
@@ -70,7 +70,7 @@ They link back to the currently published programme catalogue rather than invent
 
 ## Technical SEO and privacy controls
 
-- `client/index.html` includes the homepage title, description, social tags and useful initial HTML copy. Route-specific canonical URLs are added by `SeoMeta` after each public route renders.
+- `/` redirects to `/login`; the sign-in route is marked noindex. `client/index.html` contains only a brief sign-in loading message before the app renders.
 - `SeoMeta` updates each public route's title, description, canonical URL, social cards and structured data.
 - `robots.txt` advertises `https://quicklink.ishconnect.rw/sitemap.xml`.
 - `/sitemap.xml` is routed to the API sitemap endpoint, which reads active, published training records at request time.
@@ -83,7 +83,7 @@ They link back to the currently published programme catalogue rather than invent
 
 ## Performance report
 
-The React routes are lazy-loaded so public pages do not eagerly import each dashboard feature. The homepage has a small initial HTML shell; the current learning portal still carries its existing application code and global CSS, and the live course catalogue needs an API request. Public course thumbnails are lazy-loaded. The service worker cache version was incremented so deployed clients discard the previous shell.
+The React routes are lazy-loaded so public pages do not eagerly import each dashboard feature. The current learning portal still carries its existing application code and global CSS, and the live course catalogue needs an API request. Public course thumbnails are lazy-loaded. The service worker cache version was incremented so deployed clients discard the previous shell.
 
 **Measured Lighthouse scores:** not measured in this code-only environment. No 95+ score is claimed. A production Lighthouse run and field data from PageSpeed Insights/Search Console are still required. Google evaluates Core Web Vitals using real-user field data at the 75th percentile; the current “good” targets are LCP ≤ 2.5 s, INP ≤ 200 ms and CLS ≤ 0.1. See [web.dev Core Web Vitals](https://web.dev/articles/vitals?hl=en).
 
@@ -92,7 +92,7 @@ The React routes are lazy-loaded so public pages do not eagerly import each dash
 1. Ask the IshConnect domain owner to create a Search Console property. A **Domain** property for `ishconnect.rw` covers its subdomains and protocols; use `quicklink.ishconnect.rw` if the owner wants to verify only the QuickLink subdomain. Domain properties require DNS verification. The owner must add the exact TXT/CNAME value Google supplies; no verification token is committed to this repository.
 2. Keep the verification DNS record in place after verification. Google notes that removing the token can remove ownership verification. See [verify site ownership](https://support.google.com/webmasters/answer/9008080) and [property types](https://support.google.com/webmasters/answer/34592).
 3. In Search Console's Sitemaps report, submit `https://quicklink.ishconnect.rw/sitemap.xml`. A sitemap is a discovery hint, not a promise of indexing.
-4. Inspect the homepage, `/programmes`, and several genuinely published programme URLs with URL Inspection. Confirm the rendered page, canonical, robots state and selected page text. Do not request indexing for login, student records, private course materials or API URLs.
+4. Inspect `/programmes`, `/about`, and several genuinely published programme URLs with URL Inspection. Confirm the rendered page, canonical, robots state and selected page text. The root redirects to noindex login. Do not request indexing for login, student records, private course materials or API URLs.
 5. Monitor Page indexing, Sitemaps, Core Web Vitals and Search results reports. Use queries/pages/countries to identify impressions and CTR; use the query report to decide which programme descriptions or resource pages need better answers.
 6. Request indexing only after the deployment is live and publicly accessible. Google controls crawling and ranking timelines; do not promise inclusion or a ranking.
 

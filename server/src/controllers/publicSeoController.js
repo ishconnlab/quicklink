@@ -85,7 +85,7 @@ export const getPublicProgramme = asyncHandler(async (req, res) => {
 export const sitemap = asyncHandler(async (_req, res) => {
   const base = (config.appUrl || 'https://quicklink.ishconnect.rw').replace(/\/$/, '');
   const fixed = [
-    ['', 'weekly', '1.0'], ['/about', 'monthly', '0.6'], ['/about-ishconnect', 'monthly', '0.5'],
+    ['/about', 'monthly', '0.6'], ['/about-ishconnect', 'monthly', '0.5'],
     ['/programmes', 'daily', '0.9'], ['/how-learning-works', 'monthly', '0.6'], ['/resources', 'weekly', '0.7'], ['/contact', 'monthly', '0.4'],
   ];
   const courses = await LearningClass.find({ active: true, published: { $ne: false } }).select('_id title updatedAt').sort({ updatedAt: -1 }).limit(50000).lean();

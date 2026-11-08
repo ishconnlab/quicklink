@@ -48,7 +48,7 @@ function AdminOnly({ children }) {
 function PrivateRobots() {
   const { pathname } = useLocation();
   useEffect(() => {
-    const publicPage = pathname === '/' || ['/about', '/about-ishconnect', '/programmes', '/how-learning-works', '/resources', '/contact'].includes(pathname) || /^\/(programmes|resources)\/[^/]+$/.test(pathname);
+    const publicPage = ['/about', '/about-ishconnect', '/programmes', '/how-learning-works', '/resources', '/contact'].includes(pathname) || /^\/(programmes|resources)\/[^/]+$/.test(pathname);
     if (publicPage) return;
     document.head.querySelector('link[rel="canonical"]')?.remove();
     document.head.querySelector('script[data-quicklink-schema]')?.remove();
@@ -65,7 +65,7 @@ export default function App() {
     <PrivateRobots />
     <Suspense fallback={<SplashScreen />}>
       <Routes>
-        <Route path="/" element={<PublicRoute kind="home" />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/about" element={<PublicRoute kind="about" />} />
         <Route path="/about-ishconnect" element={<PublicRoute kind="about-ishconnect" />} />
         <Route path="/programmes" element={<PublicRoute kind="programmes" />} />
