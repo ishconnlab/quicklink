@@ -33,13 +33,36 @@ export async function createCertificatePdf(certificate, verificationUrl) {
     const textWidth = font.widthOfTextAtSize(text, fittedSize);
     page.drawText(text, { x: (width - textWidth) / 2, y, size: fittedSize, font, color });
   };
+  const drawCenteredWrapped = (text, y, font, size, color, maxWidth = width - 140, lineHeight = 12) => {
+    const lines = [];
+    let line = '';
+    let truncated = false;
+    for (const word of text.trim().split(/\s+/).filter(Boolean)) {
+      const candidate = line ? `${line} ${word}` : word;
+      if (line && font.widthOfTextAtSize(candidate, size) > maxWidth) {
+        if (lines.length === 2) { truncated = true; break; }
+        lines.push(line);
+        line = word;
+      } else line = candidate;
+    }
+    if (line && lines.length < 3) lines.push(line);
+    if (truncated && lines.length) {
+      let last = lines[lines.length - 1].trimEnd();
+      while (last && font.widthOfTextAtSize(`${last}…`, size) > maxWidth) last = last.slice(0, -1).trimEnd();
+      lines[lines.length - 1] = `${last}…`;
+    }
+    lines.forEach((value, index) => {
+      const fittedSize = Math.min(size, maxWidth / Math.max(1, font.widthOfTextAtSize(value, size)) * size);
+      const textWidth = font.widthOfTextAtSize(value, fittedSize);
+      page.drawText(value, { x: (width - textWidth) / 2, y: y - index * lineHeight, size: fittedSize, font, color });
+    });
+  };
 
   drawCentered(certificate.studentName, height - 292, bold, 26, BRAND_COLOR, width - 200);
-  drawCentered('has successfully completed', height - 350, regular, 12, BRAND_COLOR);
+  drawCenteredWrapped(certificate.description?.trim() || 'has successfully completed', height - 330, regular, 11, BRAND_COLOR);
   drawCentered(certificate.courseTitle, height - 383, bold, 20, ACCENT_COLOR, width - 200);
   drawCentered(`${certificate.level}  ·  Issued ${new Date(certificate.issuedAt).toLocaleDateString('en-GB')}`, height - 407, regular, 11, BRAND_COLOR);
   drawCentered('QuickLink · QuickLink Learning Portal', height - 427, regular, 10, BRAND_COLOR);
-  if (certificate.description) drawCentered(certificate.description, height - 450, regular, 9, BRAND_COLOR, width - 180);
 
   const stampWidth = 76;
   const stampHeight = stamp.height * stampWidth / stamp.width;

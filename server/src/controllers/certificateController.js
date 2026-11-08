@@ -297,6 +297,17 @@ export const updateCertificateName = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { certificate: certificateJson(certificate) } });
 });
 
+export const updateCertificatePrintDetails = asyncHandler(async (req, res) => {
+  const certificate = await CourseCertificate.findById(req.params.id);
+  if (!certificate) throw ApiError.notFound('Certificate not found.');
+  if (certificate.revokedAt) throw ApiError.conflict('A revoked certificate cannot be edited.');
+  certificate.studentName = req.body.studentName.trim();
+  certificate.courseTitle = req.body.courseTitle.trim();
+  certificate.description = req.body.description.trim();
+  await certificate.save();
+  res.json({ success: true, data: { certificate: certificateJson(certificate) } });
+});
+
 export const updateCertificateDescription = asyncHandler(async (req, res) => {
   const certificate = await CourseCertificate.findById(req.params.id);
   if (!certificate) throw ApiError.notFound('Certificate not found.');

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Award, BadgeCheck, ChevronLeft, ChevronRight, Download, ExternalLink, FilePenLine, RefreshCcw,
+  Award, BadgeCheck, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FilePenLine, RefreshCcw,
   Search, Share2, ShieldCheck, ShieldX, SlidersHorizontal, Sparkles, Trash2,
 } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
@@ -29,13 +29,15 @@ export default function CertificatesPage() {
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [busyId, setBusyId] = useState('');
-  const [renameTarget, setRenameTarget] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [descriptionTarget, setDescriptionTarget] = useState(null);
-  const [descriptionValue, setDescriptionValue] = useState('');
+  const [printTarget, setPrintTarget] = useState(null);
+  const [printDetails, setPrintDetails] = useState({ studentName: '', courseTitle: '', description: '' });
+  const [previewTarget, setPreviewTarget] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
   const [revokeTarget, setRevokeTarget] = useState(null);
   const [revokeReason, setRevokeReason] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -77,18 +79,25 @@ export default function CertificatesPage() {
 
   const verifyUrl = (certificate) => `${window.location.origin}${certificate.verificationPath || `/verify/${certificate.code}`}`;
 
-  const download = async (certificate) => {
+  const openPreview = async (certificate) => {
     setBusyId(certificate.id);
     try {
       const response = await api.get(`/certificates/${certificate.code}.pdf`, { responseType: 'blob' });
-      const url = URL.createObjectURL(response.data);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `ishconnect-certificate-${certificate.code}.pdf`;
-      anchor.click();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      setPreviewUrl(url);
+      setPreviewTarget(certificate);
     } catch (error) { toast.error(apiError(error).message); }
     finally { setBusyId(''); }
+  };
+
+  const closePreview = () => { setPreviewTarget(null); setPreviewUrl(''); };
+
+  const downloadPreview = () => {
+    if (!previewUrl || !previewTarget) return;
+    const anchor = document.createElement('a');
+    anchor.href = previewUrl;
+    anchor.download = `ishconnect-certificate-${previewTarget.code}.pdf`;
+    anchor.click();
   };
 
   const share = async (certificate) => {
@@ -99,31 +108,23 @@ export default function CertificatesPage() {
     } catch (error) { if (error.name !== 'AbortError') toast.error('Could not share the certificate link.'); }
   };
 
-  const openRename = (certificate) => {
-    setRenameTarget(certificate);
-    setRenameValue(certificate.studentName || '');
+  const openPrintEditor = (certificate) => {
+    setPrintTarget(certificate);
+    setPrintDetails({ studentName: certificate.studentName || '', courseTitle: certificate.courseTitle || '', description: certificate.description || '' });
   };
 
-  const saveRename = async () => {
-    if (!renameTarget || renameValue.trim().length < 2) return;
+  const savePrintDetails = async () => {
+    if (!printTarget || printDetails.studentName.trim().length < 2 || printDetails.courseTitle.trim().length < 2) return;
     setSaving(true);
     try {
-      const response = await api.patch(`/certificates/${renameTarget.id}/name`, { studentName: renameValue.trim() });
-      setCertificates((current) => current.map((item) => item.id === renameTarget.id ? response.data.data.certificate : item));
-      toast.success('Certificate name updated.');
-      setRenameTarget(null);
-    } catch (error) { toast.error(apiError(error).message); }
-    finally { setSaving(false); }
-  };
-
-  const saveDescription = async () => {
-    if (!descriptionTarget) return;
-    setSaving(true);
-    try {
-      const response = await api.patch(`/certificates/${descriptionTarget.id}/description`, { description: descriptionValue.trim() });
-      setCertificates((current) => current.map((item) => item.id === descriptionTarget.id ? response.data.data.certificate : item));
-      setDescriptionTarget(null);
-      toast.success('Certificate description updated.');
+      const response = await api.patch(`/certificates/${printTarget.id}/print-details`, {
+        studentName: printDetails.studentName.trim(),
+        courseTitle: printDetails.courseTitle.trim(),
+        description: printDetails.description.trim(),
+      });
+      setCertificates((current) => current.map((item) => item.id === printTarget.id ? response.data.data.certificate : item));
+      setPrintTarget(null);
+      toast.success('Certificate print details updated. Preview before downloading.');
     } catch (error) { toast.error(apiError(error).message); }
     finally { setSaving(false); }
   };
@@ -218,14 +219,13 @@ export default function CertificatesPage() {
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
-              {!certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <button className="btn-primary" onClick={() => download(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <Download size={15} />}PDF</button>}
+              {!certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <button className="btn-primary" onClick={() => openPreview(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <Eye size={15} />}Preview & print</button>}
               {!certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button>}
               {['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <a className="btn-secondary" href={verifyUrl(certificate)} target="_blank" rel="noreferrer"><ExternalLink size={15} />Verify</a>}
               {admin && <>
                 <Link to={`/courses/${certificate.courseId}`} className="btn-secondary"><Award size={15} />Training</Link>
                 {certificate.paymentStatus === 'pending' && <><button className="btn-primary" onClick={() => reviewPayment(certificate, 'paid')} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <BadgeCheck size={15} />}Approve payment</button><button className="btn-secondary text-red-700" onClick={() => reviewPayment(certificate, 'rejected')} disabled={busyId === certificate.id}>Reject payment</button></>}
-                {!certificate.revoked && <button className="btn-secondary" onClick={() => openRename(certificate)}><FilePenLine size={15} />Name</button>}
-                {!certificate.revoked && <button className="btn-secondary" onClick={() => { setDescriptionTarget(certificate); setDescriptionValue(certificate.description || ''); }}>Description</button>}
+                {!certificate.revoked && <button className="btn-secondary" onClick={() => openPrintEditor(certificate)}><FilePenLine size={15} />Edit print details</button>}
                 {!certificate.revoked && <button className="btn-ghost text-red-600" onClick={() => { setRevokeTarget(certificate); setRevokeReason(''); }}>Revoke</button>}
                 {certificate.revoked && <button className="btn-secondary" onClick={() => reissue(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <RefreshCcw size={15} />}Reissue</button>}
                 <button className="btn-ghost text-red-700" onClick={() => deleteCertificate(certificate)} disabled={busyId === certificate.id} aria-label="Delete certificate record">{busyId === certificate.id ? <Spinner size={15} /> : <Trash2 size={15} />}Delete</button>
@@ -237,13 +237,19 @@ export default function CertificatesPage() {
       {admin && pages > 1 && <nav className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3" aria-label="Certificate pagination"><p className="text-xs text-slate-500">{total} certificate{total === 1 ? '' : 's'} · Page {page} of {pages}</p><div className="flex gap-2"><button className="btn-secondary min-h-9 px-3 text-xs" disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={15} />Previous</button><button className="btn-secondary min-h-9 px-3 text-xs" disabled={page >= pages || loading} onClick={() => setPage((value) => value + 1)}>Next<ChevronRight size={15} /></button></div></nav>}
     </>}
 
-    {admin && <Modal open={Boolean(renameTarget)} onClose={() => !saving && setRenameTarget(null)} title="Correct certificate name" footer={<><button className="btn-secondary" onClick={() => setRenameTarget(null)} disabled={saving}>Cancel</button><button className="btn-primary" onClick={saveRename} disabled={saving || renameValue.trim().length < 2}>{saving ? <Spinner size={16} /> : <FilePenLine size={16} />}Save name</button></>}>
-      <div className="space-y-3"><p className="text-sm leading-6 text-slate-600">Use the student’s full legal name as it should appear on the printed certificate. The verification page and PDF update immediately.</p><label className="block"><span className="label">Printed student name</span><input className="input" minLength={2} maxLength={120} value={renameValue} onChange={(event) => setRenameValue(event.target.value)} autoFocus /></label></div>
+    {admin && <Modal open={Boolean(printTarget)} onClose={() => !saving && setPrintTarget(null)} title="Edit certificate before printing" footer={<><button className="btn-secondary" onClick={() => setPrintTarget(null)} disabled={saving}>Cancel</button><button className="btn-primary" onClick={savePrintDetails} disabled={saving || printDetails.studentName.trim().length < 2 || printDetails.courseTitle.trim().length < 2}>{saving ? <Spinner size={16} /> : <FilePenLine size={16} />}Save print details</button></>}>
+      <div className="space-y-4">
+        <p className="text-sm leading-6 text-slate-600">These edits apply to this certificate only. Save them, then preview the PDF before downloading.</p>
+        <label className="block"><span className="label">Student name on certificate</span><input className="input" minLength={2} maxLength={120} value={printDetails.studentName} onChange={(event) => setPrintDetails((current) => ({ ...current, studentName: event.target.value }))} autoFocus /></label>
+        <label className="block"><span className="label">Course name on certificate</span><input className="input" minLength={2} maxLength={160} value={printDetails.courseTitle} onChange={(event) => setPrintDetails((current) => ({ ...current, courseTitle: event.target.value }))} /></label>
+        <label className="block"><span className="label">Completion statement</span><textarea className="input min-h-20" maxLength={240} value={printDetails.description} onChange={(event) => setPrintDetails((current) => ({ ...current, description: event.target.value }))} placeholder="has successfully completed" /><span className="mt-1 block text-xs leading-5 text-slate-500">Printed above the course name. Leave blank to use “has successfully completed”. Maximum 240 characters.</span></label>
+        <div className="rounded-xl border border-green-100 bg-green-50 p-3"><p className="eyebrow text-green-800">Certificate text preview</p><p className="mt-2 break-words text-sm font-semibold text-slate-900">{printDetails.studentName || 'Student name'}</p><p className="mt-1 break-words text-sm text-slate-600">{printDetails.description.trim() || 'has successfully completed'}</p><p className="mt-1 break-words text-base font-bold text-green-900">{printDetails.courseTitle || 'Course name'}</p></div>
+      </div>
     </Modal>}
 
-    {admin && <Modal open={Boolean(descriptionTarget)} onClose={() => !saving && setDescriptionTarget(null)} title="Edit certificate description" footer={<><button className="btn-secondary" onClick={() => setDescriptionTarget(null)} disabled={saving}>Cancel</button><button className="btn-primary" onClick={saveDescription} disabled={saving}>{saving ? <Spinner size={16} /> : <FilePenLine size={16} />}Save description</button></>}>
-      <label className="block"><span className="label">Printed description (up to 500 characters)</span><textarea className="input min-h-24" maxLength={500} value={descriptionValue} onChange={(event) => setDescriptionValue(event.target.value)} placeholder="Recognizing the learner's achievement and demonstrated skills." /></label>
-    </Modal>}
+    <Modal open={Boolean(previewTarget && previewUrl)} onClose={closePreview} title={`Certificate preview · ${previewTarget?.studentName || ''}`} size="reader" footer={<><button className="btn-secondary" onClick={closePreview}>Close preview</button><button className="btn-primary" onClick={downloadPreview}><Download size={16} />Download PDF</button></>}>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100"><iframe title={`Certificate preview for ${previewTarget?.studentName || 'student'}`} src={previewUrl} className="h-[70dvh] min-h-[420px] w-full bg-white" /></div>
+    </Modal>
 
     {admin && <Modal open={Boolean(revokeTarget)} onClose={() => !saving && setRevokeTarget(null)} title="Revoke certificate" footer={<><button className="btn-secondary" onClick={() => setRevokeTarget(null)} disabled={saving}>Cancel</button><button className="btn-danger" onClick={revoke} disabled={saving || revokeReason.trim().length < 3}>{saving ? <Spinner size={16} /> : <ShieldX size={16} />}Revoke certificate</button></>}>
       <div className="space-y-3"><p className="text-sm leading-6 text-slate-600">Revoking immediately marks <strong>{revokeTarget?.courseTitle}</strong> invalid on the public verification page and prevents the student from downloading it. The record is retained for audit.</p><label className="block"><span className="label">Reason for revocation</span><textarea className="input min-h-24" minLength={3} maxLength={1000} value={revokeReason} onChange={(event) => setRevokeReason(event.target.value)} placeholder="Explain why this certificate is being revoked." autoFocus /></label></div>
