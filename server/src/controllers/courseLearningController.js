@@ -4,6 +4,7 @@ import ApiError from '../utils/ApiError.js';
 import { LearningClass } from '../models/LearningClass.js';
 import { CourseLearningProgress } from '../models/CourseLearningProgress.js';
 import { isAdmin } from '../security/roles.js';
+import { isLessonAccessible } from '../services/lessonAccess.js';
 
 const idString = (value) => String(value?._id || value || '');
 function allLessons(course) {
@@ -12,14 +13,14 @@ function allLessons(course) {
 function safeCourse(course, progress, reveal = false) {
   const completed = new Set((progress?.completedLessons || []).map(idString));
   const entries = allLessons(course);
-  let unlocked = true;
+  let lessonIndex = 0;
+  const accessMode = course.lessonAccessMode || 'sequential';
   const modules = (course.modules || []).map((module) => ({
     id: idString(module._id), title: module.title,
     lessons: (module.lessons || []).map((lesson) => {
       const id = idString(lesson._id);
-      const isUnlocked = unlocked;
       const done = completed.has(id);
-      unlocked = unlocked && done;
+      const isUnlocked = isLessonAccessible(lesson, lessonIndex++, entries, accessMode, completed);
       const latest = [...(progress?.assessmentAttempts || [])].reverse().find((attempt) => idString(attempt.lessonId) === id);
       const assessmentAttempts = (progress?.assessmentAttempts || []).filter((attempt) => idString(attempt.lessonId) === id).length;
       return {
@@ -36,6 +37,7 @@ function safeCourse(course, progress, reveal = false) {
         assessmentAttempts: lesson.assessmentAttempts || 3,
         attemptsUsed: assessmentAttempts,
         unlocked: isUnlocked || done || reveal,
+        availableAt: lesson.availableAt || null,
         completed: done,
         lastScore: latest?.score ?? null,
         lastPassed: latest?.passed ?? false,
@@ -46,7 +48,16 @@ function safeCourse(course, progress, reveal = false) {
   const validIds = new Set(entries.map(({ lesson }) => idString(lesson._id)));
   const done = [...completed].filter((id) => validIds.has(id)).length;
   const currentLesson = progress?.currentLesson ? idString(progress.currentLesson) : entries.find(({ lesson }) => !completed.has(idString(lesson._id)))?.lesson?._id?.toString() || null;
-  return { modules, progress: { totalLessons: total, completedLessons: done, percent: total ? Math.round(done / total * 100) : 0, currentLesson } };
+  return { modules, lessonAccessMode: accessMode, progress: { totalLessons: total, completedLessons: done, percent: total ? Math.round(done / total * 100) : 0, currentLesson } };
+}
+
+function assertLessonAccessible(course, progress, index, entries) {
+  const completed = new Set((progress?.completedLessons || []).map(idString));
+  if (!isLessonAccessible(entries[index].lesson, index, entries, course.lessonAccessMode || 'sequential', completed)) {
+    const availableAt = entries[index].lesson.availableAt;
+    if (availableAt && new Date(availableAt) > new Date()) throw ApiError.forbidden(`This lesson is scheduled to open on ${new Date(availableAt).toLocaleString()}.`);
+    throw ApiError.forbidden('Complete the previous lesson before opening this lesson.');
+  }
 }
 
 async function courseAndProgress(req) {
@@ -70,8 +81,8 @@ export const completeLesson = asyncHandler(async (req, res) => {
   const lessons = allLessons(course);
   const index = lessons.findIndex(({ lesson }) => idString(lesson._id) === req.params.lessonId);
   if (index < 0) throw ApiError.notFound('Lesson not found.');
+  assertLessonAccessible(course, existing, index, lessons);
   const progress = existing || new CourseLearningProgress({ student: req.user._id, course: course._id });
-  if (index > 0 && !(progress.completedLessons || []).some((id) => idString(id) === idString(lessons[index - 1].lesson._id))) throw ApiError.conflict('Complete the previous lesson first.');
   if ((lessons[index].lesson.knowledgeCheck || []).length) throw ApiError.conflict('Pass this lesson assessment to complete the lesson.');
   if (!(progress.completedLessons || []).some((id) => idString(id) === req.params.lessonId)) progress.completedLessons.push(new mongoose.Types.ObjectId(req.params.lessonId));
   const next = lessons[index + 1];
@@ -86,10 +97,10 @@ export const submitLessonAssessment = asyncHandler(async (req, res) => {
   const lessons = allLessons(course);
   const index = lessons.findIndex(({ lesson }) => idString(lesson._id) === req.params.lessonId);
   if (index < 0) throw ApiError.notFound('Lesson not found.');
+  assertLessonAccessible(course, existing, index, lessons);
   const lesson = lessons[index].lesson;
   if (!(lesson.knowledgeCheck || []).length) throw ApiError.conflict('This lesson has no assessment.');
   const progress = existing || new CourseLearningProgress({ student: req.user._id, course: course._id });
-  if (index > 0 && !(progress.completedLessons || []).some((id) => idString(id) === idString(lessons[index - 1].lesson._id))) throw ApiError.conflict('Complete the previous lesson first.');
   const attemptCount = (progress.assessmentAttempts || []).filter((attempt) => idString(attempt.lessonId) === req.params.lessonId).length;
   const attemptLimit = lesson.assessmentAttempts || 3;
   if (attemptCount >= attemptLimit) throw ApiError.forbidden('The attempt limit for this assessment has been reached.');
@@ -108,7 +119,10 @@ export const submitLessonAssessment = asyncHandler(async (req, res) => {
 export const logAssessmentEvent = asyncHandler(async (req, res) => {
   const { course, progress: existing, admin } = await courseAndProgress(req);
   if (admin) throw ApiError.forbidden('Administrator accounts do not have student assessments.');
-  if (!allLessons(course).some(({ lesson }) => idString(lesson._id) === req.params.lessonId)) throw ApiError.notFound('Lesson not found.');
+  const lessons = allLessons(course);
+  const index = lessons.findIndex(({ lesson }) => idString(lesson._id) === req.params.lessonId);
+  if (index < 0) throw ApiError.notFound('Lesson not found.');
+  assertLessonAccessible(course, existing, index, lessons);
   const progress = existing || new CourseLearningProgress({ student: req.user._id, course: course._id });
   progress.securityEvents.push({ lessonId: new mongoose.Types.ObjectId(req.params.lessonId), type: req.body.type });
   if (progress.securityEvents.length > 500) progress.securityEvents.splice(0, progress.securityEvents.length - 500);

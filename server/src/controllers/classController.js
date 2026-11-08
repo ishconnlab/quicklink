@@ -91,6 +91,7 @@ function classJson(item, options = {}) {
     language: item.language || 'English',
     instructorName: item.instructorName || '',
     instructorBio: item.instructorBio || '',
+    lessonAccessMode: item.lessonAccessMode || 'sequential',
     modules: (item.modules || []).map((module) => ({ id: module._id?.toString(), title: module.title, lessons: (module.lessons || []).map((lesson) => ({ id: lesson._id?.toString(), title: lesson.title })) })),
     thumbnailUrl: item.thumbnailUrl || (item.thumbnailFile ? `/api/courses/${item._id}/thumbnail` : ''),
     course: item.course || '',
@@ -502,6 +503,7 @@ export const createClass = asyncHandler(async (req, res) => {
     language: req.body.language || 'English',
     instructorName: req.body.instructorName || '',
     instructorBio: req.body.instructorBio || '',
+    lessonAccessMode: req.body.lessonAccessMode || 'sequential',
     modules: req.body.modules || [],
     completionRequirements: req.body.completionRequirements || {},
     course: req.body.course || '',
@@ -557,7 +559,7 @@ export const updateClass = asyncHandler(async (req, res) => {
   }
   const fields = [
     'title', 'subject', 'trade', 'introduction', 'completionRequirements', 'course', 'level', 'description',
-    'slug', 'difficulty', 'courseDuration', 'learningObjectives', 'prerequisites', 'language', 'instructorName', 'instructorBio', 'modules',
+    'slug', 'difficulty', 'courseDuration', 'learningObjectives', 'prerequisites', 'language', 'instructorName', 'instructorBio', 'lessonAccessMode', 'modules',
     'active', 'published', 'startsAt', 'endsAt', 'enrollmentOpensAt', 'enrollmentClosesAt', 'schedule',
     'durationMinutes', 'lateThresholdMinutes', 'earlyThresholdPercent', 'timezone', 'maxStudents',
     'enrollmentOpen', 'allowCancellation', 'certificatePayment', 'certificationAssessmentEnabled', 'assessmentAttempts',

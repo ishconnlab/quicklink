@@ -72,6 +72,7 @@ const completionSchema = z.object({
 const lessonQuestion = z.object({ prompt: z.string().trim().min(1).max(1200), options: z.array(z.string().trim().min(1).max(500)).length(4), correctOption: z.number().int().min(0).max(3), explanation: z.string().max(2000).optional().default('') });
 const lesson = z.object({
   _id: objectId.optional(), title: z.string().trim().min(2).max(180), content: z.string().max(30000).optional().default(''),
+  availableAt: z.string().datetime().nullable().optional(),
   videoUrl: z.string().max(2000).optional().default(''),
   imageUrl: z.string().max(1000).optional().default(''),
   imagePublicId: z.string().max(255).optional().default(''),
@@ -96,6 +97,7 @@ const classFields = {
   language: z.string().trim().max(80).optional(),
   instructorName: z.string().trim().max(160).optional(),
   instructorBio: z.string().trim().max(3000).optional(),
+  lessonAccessMode: z.enum(['sequential', 'scheduled']).optional(),
   modules: modulesSchema.optional(),
   completionRequirements: completionSchema.optional(),
   course: z.string().trim().max(160).optional().default(''),

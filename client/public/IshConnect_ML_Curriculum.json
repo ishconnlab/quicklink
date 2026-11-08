@@ -1,0 +1,842 @@
+{
+  "course": {
+    "id": "ishconnect-ml-beginner-10day",
+    "title": "IshConnect Machine Learning Training",
+    "subtitle": "From Zero to Building Real ML Projects in 10 Days",
+    "version": "2.0",
+    "language": "en",
+    "duration_days": 10,
+    "estimated_hours_per_day": 2.5,
+    "theory_practice_ratio": "20:80",
+    "level": "Beginner",
+    "target_audience": "Complete beginners with little or no prior Machine Learning experience. Basic computer literacy required.",
+    "prerequisites": [
+      "Ability to use a web browser",
+      "Basic English reading",
+      "Willingness to type and experiment with code"
+    ],
+    "primary_tools": [
+      "Google Colab (main coding environment for Days 1-8)",
+      "Python 3",
+      "Pandas",
+      "Scikit-learn",
+      "Matplotlib / Seaborn",
+      "Joblib",
+      "Streamlit (Day 9-10)",
+      "Kaggle (datasets + community)",
+      "Hugging Face (models & datasets discovery)"
+    ],
+    "learning_outcomes": [
+      "Explain what AI and Machine Learning are in simple terms",
+      "Load, explore, clean and prepare real datasets",
+      "Train both regression and classification models",
+      "Evaluate models correctly and detect overfitting",
+      "Perform basic feature engineering",
+      "Save and load trained models",
+      "Build and deploy a simple interactive ML web app with Streamlit",
+      "Complete an end-to-end real-world style ML project independently"
+    ],
+    "global_resources": {
+      "kaggle": {
+        "url": "https://www.kaggle.com",
+        "why": "Best place for free real-world datasets, notebooks, and competitions for beginners",
+        "recommended_datasets": [
+          "Titanic - Machine Learning from Disaster",
+          "House Prices - Advanced Regression Techniques",
+          "Student Performance / Exam Scores datasets",
+          "Heart Disease / Diabetes prediction datasets",
+          "Agricultural / Crop yield datasets"
+        ]
+      },
+      "huggingface": {
+        "url": "https://huggingface.co",
+        "why": "Discover pre-trained models, datasets, and modern ML tools. Useful for inspiration and later learning",
+        "beginner_use": "Browse datasets and models. Later you can load simple models for comparison."
+      },
+      "google_colab": {
+        "url": "https://colab.research.google.com",
+        "why": "Free cloud notebook – no installation needed for Days 1-8"
+      },
+      "streamlit": {
+        "url": "https://streamlit.io",
+        "docs": "https://docs.streamlit.io"
+      },
+      "scikit_learn": {
+        "url": "https://scikit-learn.org/stable/",
+        "why": "Official documentation and user guide"
+      }
+    },
+    "teaching_philosophy": {
+      "principle": "Learn by building. Every concept is immediately practised with code and real or realistic data.",
+      "daily_structure": [
+        "10 min – Quick revision + motivation",
+        "20-25 min – Focused theory (only what is needed)",
+        "15 min – Instructor live coding demonstration",
+        "60-75 min – Hands-on practical + exercises",
+        "15-20 min – Checkpoint + assignment discussion"
+      ]
+    },
+    "days": [
+      {
+        "day": 1,
+        "title": "Introduction to AI, Machine Learning & First Python",
+        "theme": "Mindset + Environment + First Code",
+        "objectives": [
+          "Explain AI vs Machine Learning in plain language",
+          "Identify features and labels",
+          "Open Google Colab and run basic Python",
+          "Create and print variables"
+        ],
+        "theory_minutes": 25,
+        "practice_minutes": 100,
+        "theory": {
+          "key_concepts": [
+            {
+              "name": "Artificial Intelligence",
+              "explanation": "AI is when computers do tasks that normally need human intelligence (understanding language, recognising images, making recommendations)."
+            },
+            {
+              "name": "Machine Learning",
+              "explanation": "A part of AI where the computer learns patterns from data instead of being given fixed rules. Example: learning the relationship between house size and price."
+            },
+            {
+              "name": "Feature vs Label",
+              "explanation": "Features = the input information (size, bedrooms). Label = the answer we want to predict (price)."
+            },
+            {
+              "name": "Supervised Learning",
+              "explanation": "We give the computer examples that already have the correct answers so it can learn."
+            }
+          ],
+          "types_of_ml": [
+            {
+              "type": "Supervised Learning",
+              "simple": "Learn from examples that already have answers",
+              "example": "Predict house prices"
+            },
+            {
+              "type": "Unsupervised Learning",
+              "simple": "Find patterns without given answers",
+              "example": "Group similar customers"
+            },
+            {
+              "type": "Reinforcement Learning",
+              "simple": "Learn by rewards and penalties",
+              "example": "Train a game-playing agent"
+            }
+          ]
+        },
+        "practicals": [
+          {
+            "id": "d1-p1",
+            "title": "Open Google Colab and run your first code",
+            "steps": [
+              "Go to https://colab.research.google.com",
+              "Sign in with Google account",
+              "Click 'New notebook'",
+              "Type the code below and press Shift+Enter"
+            ],
+            "code": "print(\"Welcome to IshConnect Machine Learning!\")\nprint(\"Today is Day 1\")\nprint(2 + 3)",
+            "expected_output": "Welcome to IshConnect Machine Learning!\nToday is Day 1\n5",
+            "why": "Confirms your environment works."
+          },
+          {
+            "id": "d1-p2",
+            "title": "Variables and basic data types",
+            "steps": [
+              "Create variables for your name, age, city and course",
+              "Print them in different ways"
+            ],
+            "code": "name = \"Your Name\"\nage = 22\ncity = \"Kigali\"\ncourse = \"Machine Learning\"\n\nprint(\"My name is\", name)\nprint(f\"I am {age} years old and I live in {city}\")\nprint(\"I am learning:\", course)",
+            "expected_output": "Readable sentences using your values",
+            "exercise": "Change the values to your real information and run again."
+          },
+          {
+            "id": "d1-p3",
+            "title": "First mini dataset in pure Python",
+            "steps": [
+              "Create a list of house sizes and a list of prices",
+              "Print them and calculate a simple average price"
+            ],
+            "code": "sizes = [50, 70, 90, 110]\nprices = [150000, 220000, 280000, 350000]\n\nprint(\"House sizes:\", sizes)\nprint(\"House prices:\", prices)\nprint(\"Average price:\", sum(prices) / len(prices))",
+            "expected_output": "Lists printed + average price calculated",
+            "exercise": "Add two more houses to both lists and recalculate the average."
+          }
+        ],
+        "exercises": [
+          {
+            "id": "d1-e1",
+            "type": "coding",
+            "instruction": "Create variables for 5 students: name, hours_studied, and result (Pass/Fail). Print a clear report for each student."
+          },
+          {
+            "id": "d1-e2",
+            "type": "thinking",
+            "instruction": "Write in your own words: What is the difference between Artificial Intelligence and Machine Learning? Give one real-life example of each."
+          }
+        ],
+        "resources": [
+          "Google Colab: https://colab.research.google.com",
+          "Kaggle Learn - Intro to Python (optional free micro-course)"
+        ],
+        "checkpoint": "You can open Colab, create variables, and print meaningful output.",
+        "assignment": "Prepare a short paragraph (5-7 sentences) explaining what Machine Learning is to a friend who has never heard of it."
+      },
+      {
+        "day": 2,
+        "title": "Datasets, Pandas & First Real Data Exploration",
+        "theme": "Working with Tables of Data",
+        "objectives": [
+          "Understand what a dataset is (rows, columns, features, labels)",
+          "Create a DataFrame with Pandas",
+          "Explore a dataset using head(), shape, info(), describe()",
+          "Identify features and target for a prediction problem"
+        ],
+        "theory_minutes": 20,
+        "practice_minutes": 110,
+        "theory": {
+          "key_concepts": [
+            {
+              "name": "Dataset",
+              "explanation": "A table of information. Rows = examples (students, houses). Columns = features + the label."
+            },
+            {
+              "name": "DataFrame",
+              "explanation": "Pandas object that represents a dataset as a table you can easily work with."
+            },
+            {
+              "name": "Feature",
+              "explanation": "Input columns the model will use to make predictions."
+            },
+            {
+              "name": "Label / Target",
+              "explanation": "The column we want the model to predict."
+            }
+          ]
+        },
+        "practicals": [
+          {
+            "id": "d2-p1",
+            "title": "Create your first student performance dataset",
+            "steps": [
+              "Import pandas",
+              "Create a dictionary of student data",
+              "Convert it to a DataFrame",
+              "Display the table"
+            ],
+            "code": "import pandas as pd\n\ndata = {\n    \"Hours_Studied\": [2, 5, 7, 1, 6, 4, 8, 3, 9, 2.5],\n    \"Attendance\": [60, 85, 95, 50, 90, 75, 98, 65, 99, 55],\n    \"Previous_Score\": [45, 65, 80, 30, 75, 55, 90, 48, 95, 35],\n    \"Result\": [\"Fail\", \"Pass\", \"Pass\", \"Fail\", \"Pass\", \"Pass\", \"Pass\", \"Fail\", \"Pass\", \"Fail\"]\n}\n\ndf = pd.DataFrame(data)\nprint(df)",
+            "expected_output": "A clean table with 10 students",
+            "exercise": "Add 5 more realistic students to the dictionary and recreate the DataFrame."
+          },
+          {
+            "id": "d2-p2",
+            "title": "Explore the dataset properly",
+            "steps": [
+              "Look at the first rows",
+              "Check shape (rows, columns)",
+              "Check data types and missing values",
+              "Get basic statistics"
+            ],
+            "code": "print(\"=== First 5 rows ===\")\nprint(df.head())\n\nprint(\"\\n=== Shape (rows, columns) ===\")\nprint(df.shape)\n\nprint(\"\\n=== Info ===\")\nprint(df.info())\n\nprint(\"\\n=== Describe (numbers only) ===\")\nprint(df.describe())\n\nprint(\"\\n=== Value counts for Result ===\")\nprint(df[\"Result\"].value_counts())",
+            "expected_output": "Clear understanding of the size and content of the data",
+            "exercise": "Write 3 observations about this dataset (e.g. average study hours, how many students passed, etc.)."
+          },
+          {
+            "id": "d2-p3",
+            "title": "Identify features and label",
+            "steps": [
+              "Decide which columns will be features (X)",
+              "Decide which column is the label (y)",
+              "Create X and y"
+            ],
+            "code": "features = [\"Hours_Studied\", \"Attendance\", \"Previous_Score\"]\nX = df[features]\ny = df[\"Result\"]\n\nprint(\"Features (X):\")\nprint(X.head())\nprint(\"\\nLabel (y):\")\nprint(y.head())",
+            "expected_output": "X is a table of 3 columns, y is a series of Pass/Fail",
+            "exercise": "Imagine we also had a column 'Sleep_Hours'. Would it be a feature or a label? Why?"
+          }
+        ],
+        "exercises": [
+          {
+            "id": "d2-e1",
+            "type": "coding",
+            "instruction": "Create a second dataset about 8 houses (Size, Bedrooms, Location_Score, Rent). Convert to DataFrame and explore it with head, shape, describe."
+          },
+          {
+            "id": "d2-e2",
+            "type": "real_data",
+            "instruction": "Go to Kaggle, search for a simple 'Student Performance' or 'Exam Score' dataset. Download the CSV (or open in Kaggle Notebook). Load it into a DataFrame and write the first 5 observations you notice."
+          }
+        ],
+        "resources": [
+          "Pandas 10-minute guide: https://pandas.pydata.org/docs/user_guide/10min.html",
+          "Kaggle Datasets: https://www.kaggle.com/datasets",
+          "Recommended starter dataset: any clean 'Student Performance' CSV on Kaggle"
+        ],
+        "checkpoint": "You can create a DataFrame, explore it, and correctly identify features vs label.",
+        "assignment": "Prepare your own small dataset (minimum 12 rows) on any topic you care about (sports, business, health, agriculture...). Bring it tomorrow."
+      },
+      {
+        "day": 3,
+        "title": "Data Cleaning & Preprocessing (The Most Important Skill)",
+        "theme": "Garbage In → Garbage Out",
+        "objectives": [
+          "Detect missing values, duplicates and wrong data types",
+          "Clean a messy dataset",
+          "Convert categorical labels into numbers",
+          "Understand why data preparation is 60-70% of real ML work"
+        ],
+        "theory_minutes": 20,
+        "practice_minutes": 110,
+        "theory": {
+          "key_concepts": [
+            {
+              "name": "Data Preprocessing",
+              "explanation": "Cleaning and preparing data so the model can learn correctly. Most real projects spend more time here than on the model itself."
+            },
+            {
+              "name": "Common problems",
+              "explanation": "Missing values, duplicates, inconsistent labels (Pass / pass / PASS), wrong data types, outliers."
+            }
+          ]
+        },
+        "practicals": [
+          {
+            "id": "d3-p1",
+            "title": "Create a deliberately messy dataset",
+            "steps": [
+              "Create a dataset that has missing values, a duplicate row, and inconsistent labels"
+            ],
+            "code": "import pandas as pd\nimport numpy as np\n\nmessy = {\n    \"Name\": [\"Alice\", \"Bob\", \"Charlie\", \"Diana\", \"Eve\", \"Bob\", \"Frank\"],\n    \"Hours_Studied\": [5, 2, 8, np.nan, 6, 2, 7],\n    \"Attendance\": [90, 55, 95, 80, 88, 55, 92],\n    \"Previous_Score\": [70, 40, 85, 65, np.nan, 40, 78],\n    \"Result\": [\"Pass\", \"Fail\", \"Pass\", \"pass\", \"Pass\", \"Fail\", \"PASS\"]\n}\ndf = pd.DataFrame(messy)\nprint(df)",
+            "expected_output": "A table with visible problems",
+            "exercise": "List all the problems you can see in this dataset."
+          },
+          {
+            "id": "d3-p2",
+            "title": "Detect problems systematically",
+            "code": "print(\"Missing values per column:\")\nprint(df.isnull().sum())\n\nprint(\"\\nNumber of duplicate rows:\")\nprint(df.duplicated().sum())\n\nprint(\"\\nUnique values in Result:\")\nprint(df[\"Result\"].unique())\n\nprint(\"\\nData types:\")\nprint(df.dtypes)",
+            "expected_output": "Clear report of missing values, duplicates and inconsistent labels"
+          },
+          {
+            "id": "d3-p3",
+            "title": "Clean the dataset step by step",
+            "code": "# 1. Fix inconsistent labels\ndf[\"Result\"] = df[\"Result\"].str.title()   # Pass / Fail\n\n# 2. Remove exact duplicates\ndf = df.drop_duplicates()\n\n# 3. Fill missing numerical values with the mean\ndf[\"Hours_Studied\"] = df[\"Hours_Studied\"].fillna(df[\"Hours_Studied\"].mean())\ndf[\"Previous_Score\"] = df[\"Previous_Score\"].fillna(df[\"Previous_Score\"].mean())\n\nprint(\"Cleaned dataset:\")\nprint(df)\nprint(\"\\nMissing values remaining:\")\nprint(df.isnull().sum())",
+            "expected_output": "Clean table with no missing values and consistent labels",
+            "exercise": "Also convert Result into numbers: Fail → 0, Pass → 1 using .map()"
+          }
+        ],
+        "exercises": [
+          {
+            "id": "d3-e1",
+            "type": "coding",
+            "instruction": "Take the house rental dataset from Day 2 (or create one). Intentionally introduce 2 missing values and 1 duplicate. Then clean it completely and show before/after."
+          },
+          {
+            "id": "d3-e2",
+            "type": "real_data",
+            "instruction": "On Kaggle, open any dataset that has missing values (search 'missing values'). Load it and count missing values per column. Practise filling or dropping them."
+          }
+        ],
+        "resources": [
+          "Pandas missing data guide",
+          "Kaggle: 'Data Cleaning' micro-course (highly recommended)"
+        ],
+        "checkpoint": "You can detect and fix missing values, duplicates and inconsistent categories.",
+        "assignment": "Clean the personal dataset you created yesterday. Document every cleaning decision you made."
+      },
+      {
+        "day": 4,
+        "title": "Supervised Learning – Regression (Predict Numbers)",
+        "theme": "Predict continuous values",
+        "objectives": [
+          "Understand when to use regression",
+          "Train a Linear Regression model",
+          "Make predictions on new data",
+          "Interpret the result of a regression model"
+        ],
+        "theory_minutes": 20,
+        "practice_minutes": 110,
+        "theory": {
+          "key_concepts": [
+            {
+              "name": "Regression",
+              "explanation": "Predicting a continuous number (price, temperature, yield, score)."
+            },
+            {
+              "name": "Linear Regression",
+              "explanation": "Finds the best straight-line relationship between features and the target."
+            }
+          ]
+        },
+        "practicals": [
+          {
+            "id": "d4-p1",
+            "title": "Create and explore a house rental dataset",
+            "code": "import pandas as pd\n\ndata = {\n    \"Size_m2\": [30, 40, 50, 60, 70, 80, 90, 100, 110, 120],\n    \"Bedrooms\": [1, 1, 2, 2, 3, 3, 3, 4, 4, 4],\n    \"Location_Score\": [3, 4, 5, 5, 6, 7, 7, 8, 9, 9],\n    \"Rent_RWF\": [85000, 110000, 140000, 160000, 195000, 230000, 260000, 310000, 360000, 400000]\n}\ndf = pd.DataFrame(data)\nprint(df)\nprint(df.describe())",
+            "exercise": "Add 4 more realistic houses and recalculate."
+          },
+          {
+            "id": "d4-p2",
+            "title": "Train a Linear Regression model (full pipeline)",
+            "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.linear_model import LinearRegression\nfrom sklearn.metrics import mean_absolute_error\n\nX = df[[\"Size_m2\", \"Bedrooms\", \"Location_Score\"]]\ny = df[\"Rent_RWF\"]\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.25, random_state=42\n)\n\nmodel = LinearRegression()\nmodel.fit(X_train, y_train)\n\nprint(\"Model trained successfully!\")\nprint(\"Coefficients:\", model.coef_)\nprint(\"Intercept:\", model.intercept_)",
+            "expected_output": "Model trained + coefficients shown"
+          },
+          {
+            "id": "d4-p3",
+            "title": "Make predictions and evaluate",
+            "code": "predictions = model.predict(X_test)\nmae = mean_absolute_error(y_test, predictions)\n\nprint(\"Actual rents:    \", list(y_test.values))\nprint(\"Predicted rents: \", [round(p) for p in predictions])\nprint(\"Mean Absolute Error:\", round(mae), \"RWF\")\n\n# Predict a new house\nnew_house = [[85, 3, 7]]\nprint(\"Estimated rent for 85m², 3 bedrooms, location 7:\", round(model.predict(new_house)[0]), \"RWF\")",
+            "exercise": "Change the new house values 5 times and observe how the predicted rent changes. Write down the pattern you notice."
+          }
+        ],
+        "exercises": [
+          {
+            "id": "d4-e1",
+            "type": "coding",
+            "instruction": "Train a second model using only Size_m2 as feature. Compare its MAE with the full model. Which is better?"
+          },
+          {
+            "id": "d4-e2",
+            "type": "real_data",
+            "instruction": "On Kaggle, find the 'House Prices' competition or any simple house price dataset. Load it, select 3-4 numerical features, train a Linear Regression and report the MAE."
+          }
+        ],
+        "resources": [
+          "Scikit-learn LinearRegression documentation",
+          "Kaggle: House Prices - Advanced Regression Techniques (start with simple features)"
+        ],
+        "checkpoint": "You can train a Linear Regression model, make predictions, and interpret Mean Absolute Error.",
+        "assignment": "Find or create a regression dataset related to your interest (agriculture, business, health, transport) and train a first model."
+      },
+      {
+        "day": 5,
+        "title": "Supervised Learning – Classification (Predict Categories)",
+        "theme": "Pass/Fail, Yes/No, Spam/Not Spam",
+        "objectives": [
+          "Understand classification vs regression",
+          "Train a Decision Tree Classifier",
+          "Convert labels to numbers",
+          "Make class predictions and interpret them"
+        ],
+        "theory_minutes": 20,
+        "practice_minutes": 110,
+        "theory": {
+          "key_concepts": [
+            {
+              "name": "Classification",
+              "explanation": "Predicting a category (Pass/Fail, Yes/No, Type A/B/C)."
+            },
+            {
+              "name": "Decision Tree",
+              "explanation": "Asks a series of simple yes/no questions about the features to reach a decision."
+            }
+          ]
+        },
+        "practicals": [
+          {
+            "id": "d5-p1",
+            "title": "Prepare the student classification dataset",
+            "code": "import pandas as pd\n\ndata = {\n    \"Hours_Studied\": [2, 5, 7, 1, 6, 4, 8, 3, 9, 2, 7.5, 1.5],\n    \"Attendance\": [60, 85, 95, 50, 90, 75, 98, 65, 99, 55, 92, 48],\n    \"Previous_Score\": [45, 65, 80, 30, 75, 55, 90, 48, 95, 35, 88, 28],\n    \"Result\": [\"Fail\", \"Pass\", \"Pass\", \"Fail\", \"Pass\", \"Pass\", \"Pass\", \"Fail\", \"Pass\", \"Fail\", \"Pass\", \"Fail\"]\n}\ndf = pd.DataFrame(data)\n\n# Convert label to numbers\ndf[\"Result_Num\"] = df[\"Result\"].map({\"Fail\": 0, \"Pass\": 1})\nprint(df[[\"Hours_Studied\", \"Attendance\", \"Previous_Score\", \"Result\", \"Result_Num\"]])",
+            "exercise": "Add 4 more students with realistic values."
+          },
+          {
+            "id": "d5-p2",
+            "title": "Train Decision Tree Classifier",
+            "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import accuracy_score, classification_report\n\nX = df[[\"Hours_Studied\", \"Attendance\", \"Previous_Score\"]]\ny = df[\"Result_Num\"]\n\nX_train, X_test, y_train, y_test = train_test_split(\n    X, y, test_size=0.25, random_state=42\n)\n\nmodel = DecisionTreeClassifier(random_state=42)\nmodel.fit(X_train, y_train)\n\nprint(\"Classification model trained!\")",
+            "expected_output": "Model trained message"
+          },
+          {
+            "id": "d5-p3",
+            "title": "Predict and evaluate",
+            "code": "predictions = model.predict(X_test)\naccuracy = accuracy_score(y_test, predictions)\n\nprint(\"Accuracy:\", round(accuracy * 100, 1), \"%\")\nprint(\"\\nClassification Report:\")\nprint(classification_report(y_test, predictions, target_names=[\"Fail\", \"Pass\"]))\n\n# Test new students\nnew_students = [\n    [2, 55, 40],   # expected Fail\n    [7, 92, 78],   # expected Pass\n    [4, 70, 58]    # borderline\n]\n\nfor i, student in enumerate(new_students, 1):\n    pred = model.predict([student])[0]\n    result = \"Pass\" if pred == 1 else \"Fail\"\n    print(f\"Student {i} {student} → {result}\")",
+            "exercise": "Create 5 new student profiles and predict them. Do the predictions make sense to you?"
+          }
+        ],
+        "exercises": [
+          {
+            "id": "d5-e1",
+            "type": "coding",
+            "instruction": "Train the same model but with max_depth=3. Compare accuracy with the unlimited tree."
+          },
+          {
+            "id": "d5-e2",
+            "type": "real_data",
+            "instruction": "Kaggle Titanic dataset (classic beginner classification). Load it, select 3-4 features, train a Decision Tree and report accuracy. (You do not need to submit to the competition yet.)"
+          }
+        ],
+        "resources": [
+          "Kaggle Titanic competition (perfect first classification project)",
+          "Scikit-learn DecisionTreeClassifier docs"
+        ],
+        "checkpoint": "You can train a classifier, convert labels, make predictions and read accuracy.",
+        "assignment": "Choose a classification problem from your life or work and sketch the features + label you would need."
+      },
+      {
+        "day": 6,
+        "title": "Model Evaluation, Train/Test Split & Avoiding Common Mistakes",
+        "theme": "How good is my model really?",
+        "objectives": [
+          "Properly split data into train and test",
+          "Calculate and interpret Accuracy, MAE, Precision, Recall",
+          "Understand overfitting vs underfitting",
+          "Use cross-validation concept (simple explanation)"
+        ],
+        "theory_minutes": 25,
+        "practice_minutes": 105,
+        "theory": {
+          "key_concepts": [
+            {
+              "name": "Train / Test Split",
+              "explanation": "Never evaluate the model on the same data it was trained on. Always keep some data hidden."
+            },
+            {
+              "name": "Overfitting",
+              "explanation": "Model memorises training data and fails on new data."
+            },
+            {
+              "name": "Underfitting",
+              "explanation": "Model is too simple and cannot capture the real patterns."
+            },
+            {
+              "name": "Metrics",
+              "explanation": "Accuracy (classification), Mean Absolute Error (regression), Precision, Recall, F1."
+            }
+          ]
+        },
+        "practicals": [
+          {
+            "id": "d6-p1",
+            "title": "Compare different test sizes",
+            "code": "from sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import accuracy_score\n\n# Assume X and y already exist from previous day\n\nfor test_size in [0.1, 0.2, 0.3, 0.4]:\n    X_train, X_test, y_train, y_test = train_test_split(\n        X, y, test_size=test_size, random_state=42\n    )\n    model = DecisionTreeClassifier(random_state=42)\n    model.fit(X_train, y_train)\n    acc = accuracy_score(y_test, model.predict(X_test))\n    print(f\"test_size={test_size:.1f} → Accuracy = {acc*100:.1f}%\")",
+            "exercise": "What happens when test_size is very small or very large? Write your observation."
+          },
+          {
+            "id": "d6-p2",
+            "title": "Detect overfitting with max_depth",
+            "code": "print(\"Depth | Train Acc | Test Acc\")\nprint(\"-\" * 32)\nfor depth in [1, 2, 3, 5, 8, None]:\n    model = DecisionTreeClassifier(max_depth=depth, random_state=42)\n    model.fit(X_train, y_train)\n    train_acc = accuracy_score(y_train, model.predict(X_train))\n    test_acc = accuracy_score(y_test, model.predict(X_test))\n    print(f\"{str(depth):5} | {train_acc*100:8.1f}% | {test_acc*100:7.1f}%\")",
+            "expected_output": "Table showing train vs test accuracy for different depths",
+            "exercise": "Identify which depth starts to overfit (train high, test lower)."
+          },
+          {
+            "id": "d6-p3",
+            "title": "Full evaluation report for classification",
+            "code": "from sklearn.metrics import classification_report, confusion_matrix\n\nmodel = DecisionTreeClassifier(max_depth=3, random_state=42)\nmodel.fit(X_train, y_train)\npreds = model.predict(X_test)\n\nprint(\"Confusion Matrix:\")\nprint(confusion_matrix(y_test, preds))\nprint(\"\\nClassification Report:\")\nprint(classification_report(y_test, preds, target_names=[\"Fail\", \"Pass\"]))",
+            "exercise": "Explain in plain language what Precision and Recall mean for the 'Pass' class."
+          }
+        ],
+        "exercises": [
+          {
+            "id": "d6-e1",
+            "type": "coding",
+            "instruction": "Take your regression model from Day 4. Calculate MAE on both training and test sets. Is there a big difference?"
+          },
+          {
+            "id": "d6-e2",
+            "type": "thinking",
+            "instruction": "A model has 98% accuracy on training data and 62% on test data. What is the problem and what can you try to fix it?"
+          }
+        ],
+        "resources": [
+          "Scikit-learn model evaluation guide",
+          "Kaggle: Intermediate Machine Learning course (section on overfitting)"
+        ],
+        "checkpoint": "You can properly evaluate a model and recognise overfitting.",
+        "assignment": "Re-evaluate all models you have built so far with a proper train/test split and write a short evaluation summary."
+      },
+      {
+        "day": 7,
+        "title": "Feature Engineering & Model Improvement",
+        "theme": "Better features → Better models",
+        "objectives": [
+          "Create new useful features from existing ones",
+          "Handle categorical features (simple encoding)",
+          "Improve a baseline model",
+          "Understand the idea of feature importance"
+        ],
+        "theory_minutes": 20,
+        "practice_minutes": 110,
+        "theory": {
+          "key_concepts": [
+            {
+              "name": "Feature Engineering",
+              "explanation": "Creating new columns that help the model understand the problem better. Often more powerful than changing the algorithm."
+            }
+          ]
+        },
+        "practicals": [
+          {
+            "id": "d7-p1",
+            "title": "Create new features for the student dataset",
+            "code": "# Starting from the student DataFrame\ndf[\"Study_Level\"] = df[\"Hours_Studied\"].apply(lambda h: \"High\" if h >= 6 else \"Medium\" if h >= 3 else \"Low\")\ndf[\"Attendance_Level\"] = pd.cut(df[\"Attendance\"], bins=[0, 60, 80, 100], labels=[\"Low\", \"Medium\", \"High\"])\ndf[\"Score_per_Hour\"] = df[\"Previous_Score\"] / (df[\"Hours_Studied\"] + 0.1)  # avoid division by zero\n\nprint(df[[\"Hours_Studied\", \"Study_Level\", \"Attendance\", \"Attendance_Level\", \"Score_per_Hour\"]].head(8))",
+            "exercise": "Create one more feature that you think could be useful. Explain why."
+          },
+          {
+            "id": "d7-p2",
+            "title": "Encode categorical features and retrain",
+            "code": "from sklearn.preprocessing import LabelEncoder\n\nle = LabelEncoder()\ndf[\"Study_Level_Encoded\"] = le.fit_transform(df[\"Study_Level\"])\n\nfeatures = [\"Hours_Studied\", \"Attendance\", \"Previous_Score\", \"Study_Level_Encoded\"]\nX = df[features]\ny = df[\"Result_Num\"]\n\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)\n\nmodel = DecisionTreeClassifier(max_depth=4, random_state=42)\nmodel.fit(X_train, y_train)\nprint(\"Accuracy with new feature:\", round(accuracy_score(y_test, model.predict(X_test))*100, 1), \"%\")",
+            "exercise": "Compare accuracy before and after adding the new feature."
+          },
+          {
+            "id": "d7-p3",
+            "title": "Feature importance",
+            "code": "importance = pd.DataFrame({\n    \"Feature\": features,\n    \"Importance\": model.feature_importances_\n}).sort_values(\"Importance\", ascending=False)\n\nprint(importance)",
+            "exercise": "Which feature is most important according to the model? Does it match your intuition?"
+          }
+        ],
+        "exercises": [
+          {
+            "id": "d7-e1",
+            "type": "coding",
+            "instruction": "For the house rental dataset, create a new feature 'Price_per_m2' and also 'Size_Category' (Small/Medium/Large). Retrain and compare."
+          },
+          {
+            "id": "d7-e2",
+            "type": "real_data",
+            "instruction": "On any Kaggle dataset you used earlier, invent and add at least two new features. Document the idea behind each feature."
+          }
+        ],
+        "resources": [
+          "Kaggle: Feature Engineering course",
+          "Hugging Face Datasets – browse for inspiration on feature ideas"
+        ],
+        "checkpoint": "You can create new features and measure whether they improve the model.",
+        "assignment": "Apply feature engineering to your personal project dataset and keep a short log of what you tried and the result."
+      },
+      {
+        "day": 8,
+        "title": "End-to-End Project – Full Pipeline",
+        "theme": "From raw data to saved model",
+        "objectives": [
+          "Execute a complete ML pipeline in one notebook",
+          "Save and load a trained model with joblib",
+          "Write clean, readable project code",
+          "Document decisions"
+        ],
+        "theory_minutes": 15,
+        "practice_minutes": 120,
+        "theory": {
+          "key_concepts": [
+            {
+              "name": "ML Pipeline",
+              "explanation": "Problem → Data → Cleaning → Features → Split → Train → Evaluate → Save → Predict"
+            }
+          ]
+        },
+        "practicals": [
+          {
+            "id": "d8-p1",
+            "title": "Complete Student Performance Project (template)",
+            "code": "import pandas as pd\nfrom sklearn.model_selection import train_test_split\nfrom sklearn.tree import DecisionTreeClassifier\nfrom sklearn.metrics import accuracy_score, classification_report\nimport joblib\n\n# 1. Load / create data\ndata = {\n    \"Hours_Studied\": [2, 5, 7, 1, 6, 4, 8, 3, 9, 2, 7.5, 1.5, 6.5, 3.5, 8.5],\n    \"Attendance\": [60, 85, 95, 50, 90, 75, 98, 65, 99, 55, 92, 48, 88, 70, 96],\n    \"Previous_Score\": [45, 65, 80, 30, 75, 55, 90, 48, 95, 35, 88, 28, 82, 58, 91],\n    \"Result\": [\"Fail\", \"Pass\", \"Pass\", \"Fail\", \"Pass\", \"Pass\", \"Pass\", \"Fail\", \"Pass\", \"Fail\", \"Pass\", \"Fail\", \"Pass\", \"Pass\", \"Pass\"]\n}\ndf = pd.DataFrame(data)\n\n# 2. Clean & prepare\ndf[\"Result_Num\"] = df[\"Result\"].map({\"Fail\": 0, \"Pass\": 1})\n\n# 3. Features & target\nX = df[[\"Hours_Studied\", \"Attendance\", \"Previous_Score\"]]\ny = df[\"Result_Num\"]\n\n# 4. Split\nX_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)\n\n# 5. Train\nmodel = DecisionTreeClassifier(max_depth=4, random_state=42)\nmodel.fit(X_train, y_train)\n\n# 6. Evaluate\npreds = model.predict(X_test)\nprint(\"Accuracy:\", round(accuracy_score(y_test, preds)*100, 1), \"%\")\nprint(classification_report(y_test, preds, target_names=[\"Fail\", \"Pass\"]))\n\n# 7. Save model\njoblib.dump(model, \"student_performance_model.pkl\")\nprint(\"Model saved as student_performance_model.pkl\")",
+            "exercise": "Extend this template with at least one new feature and re-save the model."
+          },
+          {
+            "id": "d8-p2",
+            "title": "Load model and predict new students",
+            "code": "loaded_model = joblib.load(\"student_performance_model.pkl\")\n\nnew_students = pd.DataFrame([\n    [1.5, 45, 32],\n    [8, 95, 88],\n    [4, 72, 61]\n], columns=[\"Hours_Studied\", \"Attendance\", \"Previous_Score\"])\n\npredictions = loaded_model.predict(new_students)\nfor i, p in enumerate(predictions):\n    print(f\"Student {i+1}: {'Pass' if p == 1 else 'Fail'}\")",
+            "expected_output": "Predictions for the three new students"
+          }
+        ],
+        "exercises": [
+          {
+            "id": "d8-e1",
+            "type": "project",
+            "instruction": "Choose ONE of these real-world style projects and complete the full pipeline (data → clean → features → train → evaluate → save):\n\nA. House Rental Price Prediction (Regression)\nB. Student Pass/Fail Prediction (Classification)\nC. Simple Crop Yield Prediction (Regression)\nD. Your own idea (approved by instructor)"
+          }
+        ],
+        "resources": [
+          "Joblib documentation",
+          "Kaggle: any beginner-friendly competition for extra practice"
+        ],
+        "checkpoint": "You have a complete notebook that goes from raw data to a saved model.",
+        "assignment": "Finish your chosen end-to-end project and prepare a 3-minute explanation of the problem, data, model and results."
+      },
+      {
+        "day": 9,
+        "title": "Build & Deploy a Simple ML Web App with Streamlit",
+        "theme": "From notebook to interactive application",
+        "objectives": [
+          "Understand what Streamlit is",
+          "Create a basic interactive web interface",
+          "Load a trained model inside the app",
+          "Allow users to input data and get predictions"
+        ],
+        "theory_minutes": 15,
+        "practice_minutes": 120,
+        "theory": {
+          "key_concepts": [
+            {
+              "name": "Deployment",
+              "explanation": "Making your model usable by other people through a simple interface instead of only running in a notebook."
+            },
+            {
+              "name": "Streamlit",
+              "explanation": "Python library that turns data scripts into shareable web apps with very little code."
+            }
+          ]
+        },
+        "practicals": [
+          {
+            "id": "d9-p1",
+            "title": "Install and test Streamlit (local machine)",
+            "steps": [
+              "Open terminal / command prompt",
+              "Run: pip install streamlit pandas scikit-learn joblib",
+              "Create a file app.py"
+            ],
+            "code": "import streamlit as st\n\nst.title(\"My First Streamlit App\")\nst.write(\"Hello from IshConnect Machine Learning!\")\nname = st.text_input(\"What is your name?\")\nif name:\n    st.success(f\"Welcome {name}!\")",
+            "run_command": "streamlit run app.py",
+            "expected_output": "Browser opens with a simple interactive page"
+          },
+          {
+            "id": "d9-p2",
+            "title": "Full Student Performance Prediction App",
+            "code": "import streamlit as st\nimport joblib\nimport pandas as pd\n\n# Load the model you saved on Day 8\nmodel = joblib.load(\"student_performance_model.pkl\")\n\nst.set_page_config(page_title=\"Student Performance Predictor\", page_icon=\"🎓\")\nst.title(\"🎓 Student Performance Prediction\")\nst.write(\"Enter the student information below to get a Pass/Fail prediction.\")\n\nst.sidebar.header(\"About\")\nst.sidebar.info(\"This app uses a Decision Tree model trained on study hours, attendance and previous score.\")\n\nhours = st.number_input(\"Hours Studied per day\", min_value=0.0, max_value=15.0, value=5.0, step=0.5)\nattendance = st.slider(\"Attendance (%)\", min_value=0, max_value=100, value=80)\nscore = st.number_input(\"Previous Exam Score\", min_value=0, max_value=100, value=65)\n\nif st.button(\"Predict Result\", type=\"primary\"):\n    input_data = pd.DataFrame([[hours, attendance, score]],\n                              columns=[\"Hours_Studied\", \"Attendance\", \"Previous_Score\"])\n    prediction = model.predict(input_data)[0]\n    \n    st.subheader(\"Prediction Result\")\n    if prediction == 1:\n        st.success(\"✅ Predicted Result: **PASS**\")\n    else:\n        st.error(\"❌ Predicted Result: **FAIL**\")\n    \n    st.write(\"Input summary:\")\n    st.write(input_data)",
+            "exercise": "Improve the app: add a short description, change colours/messages, show the three input values clearly, and add a disclaimer that this is a learning example."
+          }
+        ],
+        "exercises": [
+          {
+            "id": "d9-e1",
+            "type": "coding",
+            "instruction": "Create a second Streamlit app for the House Rental Price Prediction model (regression). User inputs Size, Bedrooms, Location Score and receives an estimated rent."
+          },
+          {
+            "id": "d9-e2",
+            "type": "challenge",
+            "instruction": "Add a simple explanation section in the app that tells the user which features most influence the prediction (you can hard-code the insight from feature importance)."
+          }
+        ],
+        "resources": [
+          "Streamlit documentation: https://docs.streamlit.io",
+          "Streamlit gallery for inspiration",
+          "Note: Google Colab is not ideal for Streamlit. Use a local Python installation or a free service like Streamlit Community Cloud later."
+        ],
+        "checkpoint": "You have a working interactive web app that loads your trained model and returns predictions.",
+        "assignment": "Polish your Streamlit app and prepare to demonstrate it tomorrow."
+      },
+      {
+        "day": 10,
+        "title": "Final Project, Assessment & Next Steps",
+        "theme": "Prove you can build a real ML project",
+        "objectives": [
+          "Present a complete working project",
+          "Explain every major decision",
+          "Receive feedback",
+          "Know clear next learning paths (Kaggle, Hugging Face, more advanced topics)"
+        ],
+        "theory_minutes": 15,
+        "practice_minutes": 120,
+        "final_project_options": [
+          {
+            "id": "fp1",
+            "title": "House / Apartment Rental Price Predictor",
+            "type": "Regression",
+            "minimum_requirements": [
+              "Dataset with at least 30 rows (real or realistic)",
+              "At least 3 features",
+              "Proper train/test split and MAE evaluation",
+              "Saved model",
+              "Working Streamlit app"
+            ]
+          },
+          {
+            "id": "fp2",
+            "title": "Student / Exam Performance Classifier",
+            "type": "Classification",
+            "minimum_requirements": [
+              "Dataset with at least 30 rows",
+              "At least 3 features",
+              "Accuracy + classification report",
+              "Saved model",
+              "Working Streamlit app"
+            ]
+          },
+          {
+            "id": "fp3",
+            "title": "Custom Real-World Project",
+            "type": "Regression or Classification",
+            "note": "Must be approved by instructor. Examples: crop yield, simple health risk, small business sales prediction, attendance prediction, etc."
+          }
+        ],
+        "presentation_structure": [
+          "1. Problem statement (what are you predicting and why it matters)",
+          "2. Dataset explanation (source, size, features, target)",
+          "3. Data cleaning and feature engineering steps",
+          "4. Model choice and training",
+          "5. Evaluation results (and honest limitations)",
+          "6. Live demo of the Streamlit app",
+          "7. What you would improve with more time / more data"
+        ],
+        "assessment": {
+          "components": [
+            {
+              "name": "Daily practical exercises & participation",
+              "weight": 20
+            },
+            {
+              "name": "Knowledge checks / short quizzes",
+              "weight": 10
+            },
+            {
+              "name": "Final theory questions",
+              "weight": 15
+            },
+            {
+              "name": "Final practical project (code + model + app)",
+              "weight": 40
+            },
+            {
+              "name": "Project presentation & explanation",
+              "weight": 15
+            }
+          ],
+          "certificate_threshold": "Minimum 75% overall + successful working project demonstration"
+        },
+        "theory_questions": [
+          "What is the difference between AI and Machine Learning?",
+          "What is a feature and what is a label?",
+          "Why do we split data into training and testing sets?",
+          "What is overfitting and how can you detect it?",
+          "When would you choose regression vs classification?",
+          "Why is data cleaning usually the longest part of a real ML project?",
+          "What does Mean Absolute Error tell you?",
+          "What is the purpose of saving a model with joblib?",
+          "Name two platforms where you can find real datasets for practice.",
+          "What is the main advantage of deploying a model with Streamlit?"
+        ],
+        "next_steps_after_course": [
+          "Create a free Kaggle account and complete at least one Getting Started competition (Titanic or House Prices)",
+          "Explore Hugging Face Datasets and Models (search for 'tabular' or simple text classification)",
+          "Practise more feature engineering on real Kaggle datasets",
+          "Learn basic data visualisation with Matplotlib / Seaborn",
+          "Learn about Random Forest and Logistic Regression (natural next algorithms)",
+          "Join local or online ML communities",
+          "Start a personal portfolio of 2-3 small end-to-end projects"
+        ]
+      }
+    ],
+    "glossary": [
+      {"term": "Dataset", "definition": "A collection of data organised in rows and columns"},
+      {"term": "Feature", "definition": "An input variable used by the model to make predictions"},
+      {"term": "Label / Target", "definition": "The value the model is trying to predict"},
+      {"term": "Model", "definition": "The mathematical system that has learned patterns from data"},
+      {"term": "Training", "definition": "The process of teaching the model using examples"},
+      {"term": "Prediction", "definition": "The output the model gives for new data"},
+      {"term": "Overfitting", "definition": "When the model learns the training data too well and fails on new data"},
+      {"term": "Underfitting", "definition": "When the model is too simple and cannot learn the underlying patterns"},
+      {"term": "Accuracy", "definition": "Percentage of correct predictions (classification)"},
+      {"term": "MAE", "definition": "Mean Absolute Error – average size of prediction errors (regression)"},
+      {"term": "Pipeline", "definition": "The full sequence from raw data to a usable model"},
+      {"term": "Deployment", "definition": "Making the model available for others to use"}
+    ],
+    "instructor_notes": {
+      "environment": "Use Google Colab for Days 1-8. Day 9 requires local Python + Streamlit or alternative deployment.",
+      "datasets": "Always prefer real or realistic data. Encourage students to bring data from their own context (agriculture, education, small business, health).",
+      "pacing": "Protect the 80% practice time. Reduce theory if needed, never reduce hands-on time.",
+      "common_pitfalls": [
+        "Students copying code without understanding – force them to change values and re-run",
+        "Using the same variable names across regression and classification notebooks – cause confusion",
+        "Tiny datasets giving 100% accuracy – always discuss limitations",
+        "Streamlit installation issues on Day 9 – prepare a backup plan (Streamlit Cloud or pre-configured machines)"
+      ],
+      "success_metric": "A student who finishes the course should be able to take a new CSV, clean it, train a simple model, evaluate it, and put it behind a basic Streamlit interface with minimal help."
+    }
+  }
+}

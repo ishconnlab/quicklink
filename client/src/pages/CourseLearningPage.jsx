@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, BookOpen, Check, ChevronLeft, ChevronRight, ClipboardCheck, Code2, Copy, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardCheck, Code2, Copy, FileJson, LockKeyhole, Plus, Save, Trash2, Upload } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { PageHeader, ProgressBar } from '../components/layout.jsx';
 import { PageLoader, Spinner } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { useDialog } from '../context/DialogContext.jsx';
+import { parseCourseCurriculum } from '../lib/courseCurriculum.js';
 
-const newLesson = (title = 'New lesson') => ({ title, content: '', videoUrl: '', resources: [], code: { language: '', source: '' }, codeBlocks: [], knowledgeCheck: [], passMark: 70 });
+const newLesson = (title = 'New lesson') => ({ title, content: '', availableAt: null, videoUrl: '', resources: [], code: { language: '', source: '' }, codeBlocks: [], knowledgeCheck: [], passMark: 70 });
 const newModule = () => ({ title: 'New module', lessons: [] });
 
 function inlineText(value) {
@@ -44,7 +46,7 @@ function LessonContent({ content }) {
     while (index < lines.length && lines[index].trim() && !/^#{1,3}\s/.test(lines[index].trim()) && !lines[index].trim().startsWith('- ') && !lines[index].trim().startsWith('|')) { paragraph.push(lines[index].trim()); index += 1; }
     blocks.push(<p key={index} className="leading-7">{inlineText(paragraph.join(' '))}</p>);
   }
-  return <div className="mt-5 max-w-none space-y-4 text-sm text-slate-700">{blocks}</div>;
+  return <div className="mt-5 max-w-3xl space-y-4 break-words text-sm text-slate-700">{blocks}</div>;
 }
 
 const codeKeywords = new Set('const let var function return if else for while class import from export default def print public private static void new async await try catch finally throw SELECT FROM WHERE INSERT UPDATE DELETE CREATE TABLE'.split(' '));
@@ -64,13 +66,23 @@ function highlightLine(line) {
 }
 
 function MacCodeBlock({ block, copy }) {
-  return <section className="mt-5 overflow-hidden rounded-xl border border-slate-300 bg-white"><div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3 py-2"><div className="flex items-center gap-2"><span className="flex gap-1"><i className="h-2.5 w-2.5 rounded-full bg-red-400"/><i className="h-2.5 w-2.5 rounded-full bg-yellow-400"/><i className="h-2.5 w-2.5 rounded-full bg-green-500"/></span><span className="text-xs font-medium text-slate-600">{block.language || 'Code'}</span></div><button onClick={() => copy(block.source)} className="btn-secondary min-h-7 px-2 py-1 text-xs"><Copy size={13}/>Copy</button></div>{block.explanation && <p className="border-b border-slate-100 px-4 py-3 text-sm leading-6 text-slate-600">{block.explanation}</p>}<pre className="max-h-[480px] overflow-auto p-4 text-xs leading-6 text-slate-800"><code>{block.source.split('\n').map((line, index) => <span key={index} className="grid min-w-max grid-cols-[2.5rem_1fr]"><span className="select-none pr-3 text-right text-slate-400">{index + 1}</span><span>{highlightLine(line) || ' '}</span></span>)}</code></pre></section>;
+  return <section className="mt-5 min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-300 bg-white"><div className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2"><div className="flex min-w-0 items-center gap-2"><span className="flex shrink-0 gap-1"><i className="h-2.5 w-2.5 rounded-full bg-red-400"/><i className="h-2.5 w-2.5 rounded-full bg-yellow-400"/><i className="h-2.5 w-2.5 rounded-full bg-green-500"/></span><span className="truncate text-xs font-medium text-slate-600">{block.language || 'Code'}</span></div><button type="button" onClick={() => copy(block.source)} className="btn-secondary min-h-8 shrink-0 px-2.5 py-1 text-xs" aria-label="Copy complete code example"><Copy size={13}/>Copy code</button></div>{block.explanation && <p className="break-words border-b border-slate-100 px-4 py-3 text-sm leading-6 text-slate-600">{block.explanation}</p>}<pre className="max-h-[480px] max-w-full overflow-auto overscroll-x-contain p-4 font-mono text-[13px] leading-6 text-slate-800"><code className="block w-max min-w-full">{block.source.split('\n').map((line, index) => <span key={index} className="grid min-w-max grid-cols-[2.5rem_max-content] gap-3"><span className="select-none text-right text-slate-400">{index + 1}</span><span>{highlightLine(line) || ' '}</span></span>)}</code></pre></section>;
 }
+
+const localDateTimeValue = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+};
+const toIsoDateTime = (value) => (value ? new Date(value).toISOString() : null);
+const validObjectId = (value) => /^[0-9a-f]{24}$/i.test(value || '');
 
 export default function CourseLearningPage() {
   const { id } = useParams();
   const { user } = useAuth();
   const toast = useToast();
+  const dialog = useDialog();
   const admin = user?.role === 'admin';
   const [data, setData] = useState(null);
   const [analytics, setAnalytics] = useState(null);
@@ -84,6 +96,9 @@ export default function CourseLearningPage() {
   const [pageHidden, setPageHidden] = useState(false);
   const [assessmentWarning, setAssessmentWarning] = useState('');
   const [dragged, setDragged] = useState(null);
+  const [curriculumPreview, setCurriculumPreview] = useState(null);
+  const [curriculumError, setCurriculumError] = useState('');
+  const [curriculumLoading, setCurriculumLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,7 +111,7 @@ export default function CourseLearningPage() {
       setCourse(courseResponse.data.data.course);
       if (analyticsResponse) setAnalytics(analyticsResponse.data.data);
       const lessons = next.modules.flatMap((module) => module.lessons);
-      setSelectedId((current) => lessons.some((lesson) => lesson.id === current) ? current : next.progress.currentLesson || lessons.find((lesson) => lesson.unlocked)?.id || lessons[0]?.id || '');
+      setSelectedId((current) => lessons.some((lesson) => lesson.id === current && lesson.unlocked) ? current : lessons.find((lesson) => lesson.id === next.progress.currentLesson)?.id || lessons.find((lesson) => lesson.unlocked)?.id || lessons[0]?.id || '');
     } catch (error) { toast.error(apiError(error).message); }
     finally { setLoading(false); }
   }, [admin, id, toast]);
@@ -150,8 +165,8 @@ export default function CourseLearningPage() {
   const saveModules = async () => {
     setBusy(true);
     try {
-      const modules = data.modules.map((module) => ({ ...( /^[0-9a-f]{24}$/i.test(module.id || '') ? { _id: module.id } : {}), title: module.title, lessons: module.lessons.map((lesson) => ({ ...( /^[0-9a-f]{24}$/i.test(lesson.id || '') ? { _id: lesson.id } : {}), title: lesson.title, content: lesson.content, videoUrl: lesson.videoUrl, imageUrl: lesson.imageUrl || '', imagePublicId: lesson.imagePublicId || '', resources: lesson.resources || [], code: lesson.code || {}, codeBlocks: lesson.codeBlocks || [], knowledgeCheck: lesson.questions || [], passMark: Number(lesson.passMark || 70), assessmentAttempts: Number(lesson.assessmentAttempts || 3) })) }));
-      await api.patch(`/classes/${id}`, { modules });
+      const modules = data.modules.map((module) => ({ ...(validObjectId(module.id) ? { _id: module.id } : {}), title: module.title, lessons: module.lessons.map((lesson) => ({ ...(validObjectId(lesson.id) ? { _id: lesson.id } : {}), title: lesson.title, content: lesson.content, availableAt: lesson.availableAt || null, videoUrl: lesson.videoUrl, imageUrl: lesson.imageUrl || '', imagePublicId: lesson.imagePublicId || '', resources: lesson.resources || [], code: lesson.code || {}, codeBlocks: lesson.codeBlocks || [], knowledgeCheck: lesson.questions || [], passMark: Number(lesson.passMark || 70), assessmentAttempts: Number(lesson.assessmentAttempts || 3) })) }));
+      await api.patch(`/classes/${id}`, { modules, lessonAccessMode: data.lessonAccessMode || 'sequential' });
       toast.success('Course lessons saved.');
       await load();
     } catch (error) { toast.error(apiError(error).message); }
@@ -179,6 +194,108 @@ export default function CourseLearningPage() {
     finally { setBusy(false); }
   };
   const copyCode = async (source) => { try { await navigator.clipboard.writeText(source || ''); toast.success('Code copied.'); } catch { toast.error('Could not copy code.'); } };
+  const showCurriculumPreview = (source) => {
+    try {
+      const parsed = parseCourseCurriculum(source);
+      setCurriculumPreview(parsed);
+      setCurriculumError('');
+    } catch (error) {
+      setCurriculumPreview(null);
+      setCurriculumError(error.message || 'The curriculum JSON is invalid.');
+    }
+  };
+  const loadSuppliedCurriculum = async () => {
+    setCurriculumLoading(true);
+    setCurriculumError('');
+    try {
+      const response = await fetch('/IshConnect_ML_Curriculum.json');
+      if (!response.ok) throw new Error(`Could not load the supplied curriculum (${response.status}).`);
+      showCurriculumPreview(await response.text());
+    } catch (error) {
+      setCurriculumError(error.message || 'Could not load the supplied curriculum.');
+    } finally {
+      setCurriculumLoading(false);
+    }
+  };
+  const previewCurriculumFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setCurriculumLoading(true);
+    try {
+      showCurriculumPreview(await file.text());
+    } catch (error) {
+      setCurriculumPreview(null);
+      setCurriculumError(error.message || 'Could not read the selected JSON file.');
+    } finally {
+      setCurriculumLoading(false);
+    }
+  };
+  const importCurriculum = async () => {
+    if (!curriculumPreview) return;
+    if (data.modules.some((module) => module.lessons.length)) {
+      const confirmed = await dialog.confirm({
+        title: 'Replace the current course content?',
+        message: 'Importing replaces this course’s modules and lessons. Matching lesson IDs keep their progress; progress for changed lessons will no longer match.',
+        confirmLabel: 'Replace with imported curriculum',
+        tone: 'danger',
+      });
+      if (!confirmed) return;
+    }
+    setBusy(true);
+    try {
+      const imported = curriculumPreview.course;
+      const oldModule = data.modules[0];
+      const oldLessons = data.modules.flatMap((module) => module.lessons);
+      const modules = imported.modules.map((module, moduleIndex) => ({
+        ...module,
+        ...(validObjectId(oldModule?.id) && moduleIndex === 0 ? { id: oldModule.id } : {}),
+        lessons: module.lessons.map((lesson) => {
+          const matchingLesson = oldLessons.find((item) => item.title === lesson.title);
+          return { ...lesson, ...(validObjectId(matchingLesson?.id) ? { id: matchingLesson.id } : {}) };
+        }),
+      }));
+      await api.patch(`/classes/${id}`, {
+        title: imported.title,
+        subject: imported.subject,
+        course: imported.course,
+        difficulty: imported.difficulty,
+        courseDuration: imported.courseDuration,
+        language: imported.language,
+        introduction: imported.introduction,
+        description: imported.description,
+        prerequisites: imported.prerequisites,
+        learningObjectives: imported.learningObjectives,
+        lessonAccessMode: imported.lessonAccessMode,
+        modules: modules.map((module) => ({
+          ...(validObjectId(module.id) ? { _id: module.id } : {}),
+          title: module.title,
+          lessons: module.lessons.map((lesson) => ({
+            ...(validObjectId(lesson.id) ? { _id: lesson.id } : {}),
+            title: lesson.title,
+            content: lesson.content,
+            availableAt: lesson.availableAt,
+            videoUrl: lesson.videoUrl,
+            imageUrl: lesson.imageUrl,
+            imagePublicId: lesson.imagePublicId,
+            resources: lesson.resources,
+            code: lesson.code,
+            codeBlocks: lesson.codeBlocks,
+            knowledgeCheck: lesson.knowledgeCheck,
+            passMark: lesson.passMark,
+            assessmentAttempts: lesson.assessmentAttempts,
+          })),
+        })),
+      });
+      setCurriculumPreview(null);
+      toast.success(`${imported.title} imported as ${curriculumPreview.days.length} editable lessons.`);
+      await load();
+    } catch (error) {
+      toast.error(apiError(error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const uploadLessonImage = async (file, update) => {
     const body = new FormData(); body.append('image', file);
     setBusy(true);
@@ -193,9 +310,23 @@ export default function CourseLearningPage() {
   return <div className="space-y-5 pb-8">
     {pageHidden && <div className="fixed inset-0 z-[100] grid place-items-center bg-white/95 p-6 text-center"><div><ClipboardCheck className="mx-auto text-green-800"/><p className="mt-3 font-semibold text-slate-900">Assessment content is hidden</p><p className="mt-1 text-sm text-slate-600">Return to this tab to continue. The interruption has been recorded.</p></div></div>}
     <Link to={`/courses/${id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-green-800"><ArrowLeft size={16} />Back to {course.title}</Link>
-    <PageHeader eyebrow={admin ? 'Course builder' : 'Learning'} title={course.title} description={admin ? 'Organize course modules and lesson content.' : 'Continue where you left off and work through each lesson in order.'} />
+    <PageHeader eyebrow={admin ? 'Course builder' : 'Learning'} title={course.title} description={admin ? 'Organize course modules and lesson content.' : data.lessonAccessMode === 'scheduled' ? 'Lessons open on their scheduled dates. Your progress is saved across devices.' : 'Start with the first lesson. Complete each lesson to unlock the next; your progress is saved across devices.'} />
     {admin ? <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-      <aside className="h-fit space-y-4"><section className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><h2 className="font-bold text-slate-900">Modules</h2><button onClick={() => setData({ ...data, modules: [...data.modules, { ...newModule(), id: `new-module-${Date.now()}` }] })} className="btn-secondary min-h-8 px-2.5 py-1 text-xs"><Plus size={14} />Module</button></div>
+      <aside className="h-fit space-y-4"><section className="rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-slate-900">Course content</h2><button type="button" onClick={loadSuppliedCurriculum} disabled={curriculumLoading || busy} className="btn-secondary min-h-9 px-3 text-xs">{curriculumLoading ? <Spinner size={14} /> : <FileJson size={14} />}Preview supplied ML JSON</button></div>
+        <label className="btn-secondary mt-2 min-h-9 w-full cursor-pointer justify-center px-3 text-xs"><Upload size={14} />Preview another JSON file<input type="file" accept=".json,application/json" className="sr-only" onChange={previewCurriculumFile} /></label>
+        <p className="mt-2 text-xs leading-5 text-slate-500">Validate and preview a curriculum before importing its days into this course.</p>
+        {curriculumError && <p role="alert" className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs leading-5 text-red-700">{curriculumError}</p>}
+        {curriculumPreview && <div className="mt-3 space-y-3 rounded-xl border border-green-200 bg-green-50/60 p-3">
+          <div><p className="text-sm font-bold text-slate-900">{curriculumPreview.course.title}</p><p className="mt-1 text-xs text-slate-600">{curriculumPreview.days.length} days · {curriculumPreview.days.reduce((total, day) => total + day.codeExamples, 0)} code examples · validated</p></div>
+          <ol className="max-h-48 space-y-1 overflow-y-auto pr-1 text-xs text-slate-700">{curriculumPreview.days.map((day, index) => <li key={`${day.title}-${index}`} className="flex items-start justify-between gap-2"><span className="min-w-0 break-words">{day.title}</span><span className="shrink-0 text-slate-500">{day.codeExamples} code</span></li>)}</ol>
+          <details className="rounded-lg bg-white/80 p-2"><summary className="cursor-pointer text-xs font-semibold text-slate-700">Inspect source JSON</summary><pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-4 text-slate-600">{JSON.stringify(curriculumPreview.raw, null, 2)}</pre></details>
+          <button type="button" onClick={importCurriculum} disabled={busy} className="btn-primary min-h-9 w-full px-3 text-xs">{busy ? <Spinner size={14} /> : <Upload size={14} />}Import {curriculumPreview.days.length} days</button>
+        </div>}
+        <label className="label mt-4" htmlFor="lesson-access-mode">Lesson access</label><select id="lesson-access-mode" className="input min-h-10" value={data.lessonAccessMode || 'sequential'} onChange={(event) => setData((currentData) => ({ ...currentData, lessonAccessMode: event.target.value }))}><option value="sequential">Sequential — complete each lesson to unlock the next</option><option value="scheduled">Scheduled — each lesson opens on its date</option></select>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Optional lesson opening dates are enforced by the server in either mode.</p>
+      </section>
+      <section className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><h2 className="font-bold text-slate-900">Modules</h2><button onClick={() => setData({ ...data, modules: [...data.modules, { ...newModule(), id: `new-module-${Date.now()}` }] })} className="btn-secondary min-h-8 px-2.5 py-1 text-xs"><Plus size={14} />Module</button></div>
         <div className="mt-3 space-y-3">{data.modules.map((module, moduleIndex) => <section key={module.id || moduleIndex} draggable onDragStart={() => setDragged({ type: 'module', moduleIndex })} onDragOver={(event) => event.preventDefault()} onDrop={() => reorderModules(moduleIndex)} className="rounded-xl border border-slate-100 p-3"><input className="input min-h-9 px-2.5 text-sm font-semibold" value={module.title} onChange={(event) => updateAdminModule(moduleIndex, (item) => ({ ...item, title: event.target.value }))} aria-label="Module title" />
           <div className="mt-2 space-y-1">{module.lessons.map((lesson, lessonIndex) => <button key={lesson.id} draggable onDragStart={(event) => { event.stopPropagation(); setDragged({ type: 'lesson', moduleIndex, lessonIndex }); }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.stopPropagation(); reorderLessons(moduleIndex, lessonIndex); }} onClick={() => setSelectedId(lesson.id)} className={`block w-full truncate rounded-lg px-2.5 py-2 text-left text-xs ${selectedId === lesson.id ? 'bg-green-50 font-semibold text-green-900' : 'text-slate-600 hover:bg-slate-50'}`}>{lesson.title}</button>)}</div>
           <div className="mt-2 flex items-center justify-between"><button onClick={() => { const lesson = { ...newLesson(), id: `new-lesson-${Date.now()}`, questions: [] }; updateAdminModule(moduleIndex, (item) => ({ ...item, lessons: [...item.lessons, lesson] })); setSelectedId(lesson.id); }} className="inline-flex items-center gap-1 text-xs font-semibold text-green-800"><Plus size={13} />Lesson</button><button onClick={() => { setData({ ...data, modules: data.modules.filter((_, index) => index !== moduleIndex) }); if (module.lessons.some((lesson) => lesson.id === selectedId)) setSelectedId(''); }} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-700" aria-label="Delete module"><Trash2 size={14} /></button></div>
@@ -207,6 +338,7 @@ export default function CourseLearningPage() {
             {(() => { const lessonIndex = module.lessons.findIndex((lesson) => lesson.id === current.id); const lesson = module.lessons[lessonIndex]; const update = (changes) => updateAdminModule(moduleIndex, (item) => ({ ...item, lessons: item.lessons.map((entry, index) => index === lessonIndex ? { ...entry, ...changes } : entry) })); return <>
               <label className="block"><span className="label">Lesson title</span><input className="input" value={lesson.title} onChange={(event) => { update({ title: event.target.value }); setData((value) => value); }} /></label>
               <label className="block"><span className="label">Lesson content</span><textarea className="input min-h-56" maxLength={30000} value={lesson.content} onChange={(event) => update({ content: event.target.value })} placeholder="Use Markdown for headings (#, ##), lists (-), tables, bold, emphasis and inline code." /></label>
+              <label className="block"><span className="label inline-flex items-center gap-1"><CalendarClock size={14} />Lesson opens at (optional)</span><span className="mb-1 block text-xs text-slate-500">Leave blank to use the course access rule only.</span><input type="datetime-local" className="input" value={localDateTimeValue(lesson.availableAt)} onChange={(event) => update({ availableAt: toIsoDateTime(event.target.value) })} /></label>
               <label className="block"><span className="label">YouTube or Instagram URL (optional)</span><input type="url" className="input" value={lesson.videoUrl || ''} onChange={(event) => update({ videoUrl: event.target.value })} placeholder="Video or reel URL" /></label>
               <label className="block"><span className="label">Lesson image</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy || !/^[0-9a-f]{24}$/i.test(module.id || '') || !/^[0-9a-f]{24}$/i.test(lesson.id || '')} onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadLessonImage(file, update); }} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold" />{lesson.imageUrl && <span className="mt-1 block text-xs text-green-800">Lesson image uploaded</span>}</label>
               <section className="rounded-xl border border-slate-200 p-3"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-slate-800">Learning resources</h3><p className="text-xs text-slate-500">Links to references or downloadable materials.</p></div><button type="button" className="btn-secondary min-h-8 px-2.5 py-1 text-xs" onClick={() => update({ resources: [...(lesson.resources || []), { title: '', url: '' }] })}><Plus size={14}/>Add link</button></div>{(lesson.resources || []).map((resource, resourceIndex) => <div key={resourceIndex} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1.5fr_auto]"><input className="input min-h-9" maxLength={180} value={resource.title} onChange={(event) => { const resources = [...lesson.resources]; resources[resourceIndex] = { ...resource, title: event.target.value }; update({ resources }); }} placeholder="Resource title"/><input className="input min-h-9" type="url" maxLength={2000} value={resource.url} onChange={(event) => { const resources = [...lesson.resources]; resources[resourceIndex] = { ...resource, url: event.target.value }; update({ resources }); }} placeholder="https://…"/><button type="button" className="btn-secondary min-h-9 px-2 text-red-700" aria-label="Remove resource" onClick={() => update({ resources: lesson.resources.filter((_, index) => index !== resourceIndex) })}><Trash2 size={14}/></button></div>)}</section>
@@ -220,16 +352,16 @@ export default function CourseLearningPage() {
           </div>)}</div> : <div className="grid min-h-64 place-items-center text-center"><div><BookOpen className="mx-auto text-green-700" /><p className="mt-2 font-semibold text-slate-800">Choose a lesson to edit</p><p className="mt-1 text-sm text-slate-500">Add a module, then create lessons and their learning content.</p></div></div>}
       </main>
     </div> : <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
-      <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between gap-2"><h2 className="font-bold text-slate-900">Course outline</h2><span className="text-xs text-slate-500">{data.progress.completedLessons}/{data.progress.totalLessons}</span></div><div className="mt-3"><ProgressBar value={data.progress.percent} /></div><div className="mt-4 space-y-4">{data.modules.map((module) => <section key={module.id}><h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{module.title}</h3><div className="mt-1 space-y-1">{module.lessons.map((lesson) => <button key={lesson.id} onClick={() => { if (lesson.unlocked) selectLesson(lesson.id); }} disabled={!lesson.unlocked} className={`flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${selectedId === lesson.id ? 'bg-green-50 font-semibold text-green-900' : lesson.unlocked ? 'text-slate-700 hover:bg-slate-50' : 'cursor-not-allowed text-slate-400'}`}><span className="min-w-0 flex-1 truncate">{lesson.title}</span>{lesson.completed && <Check size={14} className="shrink-0 text-green-700" />}</button>)}</div></section>)}</div></aside>
-      <main className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 sm:p-7">
-        {current ? <article className="mx-auto max-w-4xl"><p className="eyebrow">{current.moduleTitle}</p><h2 className="mt-1 break-words text-2xl font-bold text-slate-950">{current.title}</h2><LessonContent content={current.content || 'This lesson does not have written content yet.'}/>
+      <aside className="h-fit rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between gap-2"><h2 className="font-bold text-slate-900">Course outline</h2><span className="text-xs text-slate-500">{data.progress.completedLessons}/{data.progress.totalLessons}</span></div><div className="mt-3"><ProgressBar value={data.progress.percent} /></div><div className="mt-4 space-y-4">{data.modules.map((module) => <section key={module.id}><h3 className="break-words text-xs font-bold uppercase tracking-wide text-slate-500">{module.title}</h3><div className="mt-1 space-y-1">{module.lessons.map((lesson) => <button key={lesson.id} onClick={() => { if (lesson.unlocked) selectLesson(lesson.id); }} disabled={!lesson.unlocked} className={`flex w-full min-w-0 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm ${selectedId === lesson.id ? 'bg-green-50 font-semibold text-green-900' : lesson.unlocked ? 'text-slate-700 hover:bg-slate-50' : 'cursor-not-allowed text-slate-400'}`}><span className="min-w-0 flex-1 break-words">{lesson.title}</span>{lesson.completed ? <Check size={14} className="shrink-0 text-green-700" /> : !lesson.unlocked ? <LockKeyhole size={13} className="shrink-0" aria-label="Locked" /> : null}</button>)}</div></section>)}</div></aside>
+      <main className="min-w-0 max-w-full rounded-2xl border border-slate-200 bg-white p-4 sm:p-7">
+        {current ? current.unlocked ? <article className="mx-auto min-w-0 max-w-5xl"><p className="eyebrow">{current.moduleTitle}</p><h2 className="mt-1 break-words text-2xl font-bold text-slate-950">{current.title}</h2><LessonContent content={current.content || 'This lesson does not have written content yet.'}/>
           {current.imageUrl && <img src={current.imageUrl} alt={`${current.title} lesson illustration`} loading="lazy" className="mt-5 max-h-[560px] w-full rounded-xl border border-slate-200 object-contain" />}
           {current.videoUrl && <div className="mt-5 aspect-video overflow-hidden rounded-xl bg-slate-950">{(() => { let embed = ''; try { const url = new URL(current.videoUrl); if (['youtube.com', 'www.youtube.com'].includes(url.hostname)) { const videoId = url.searchParams.get('v'); if (videoId) embed = `https://www.youtube-nocookie.com/embed/${videoId}`; } else if (url.hostname === 'youtu.be') embed = `https://www.youtube-nocookie.com/embed/${url.pathname.slice(1)}`; else if (['instagram.com', 'www.instagram.com'].includes(url.hostname)) { const match = url.pathname.match(/^\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/); if (match) embed = `https://www.instagram.com/p/${match[1]}/embed`; } } catch {} return embed ? <iframe title={`${current.title} video`} src={embed} className="h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /> : <a className="grid h-full place-items-center text-sm text-white underline" href={current.videoUrl} target="_blank" rel="noreferrer">Open lesson video</a>; })()}</div>}
           {(current.codeBlocks?.length ? current.codeBlocks : current.code?.source ? [current.code] : []).map((block, index) => <MacCodeBlock key={`${block.language}-${index}`} block={block} copy={copyCode}/>)}
           {current.resources?.length > 0 && <section className="mt-5"><h3 className="font-semibold text-slate-900">Lesson resources</h3><ul className="mt-2 space-y-1">{current.resources.map((resource, index) => <li key={index}><a href={resource.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-green-800 underline">{resource.title || resource.url}</a></li>)}</ul></section>}
           {current.hasAssessment && <section className="relative mt-6 overflow-hidden rounded-xl border border-slate-200 p-4 select-none"><span className="pointer-events-none absolute right-3 top-3 z-10 rotate-[-12deg] text-[10px] font-semibold text-slate-500/20">{user?.name} · {user?.id}</span><div className="flex items-center gap-2"><ClipboardCheck size={18} className="text-green-800"/><h3 className="font-bold text-slate-900">Knowledge check</h3></div><p className="mt-1 text-xs text-slate-500">10 questions · pass score {current.passMark}% · {current.attemptsUsed}/{current.assessmentAttempts} attempts used</p>{assessmentWarning && <p role="alert" className="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-900">{assessmentWarning}</p>}{!assessmentStarted && !current.completed && current.attemptsUsed < current.assessmentAttempts && <div className="mt-4 rounded-lg bg-green-50 p-3"><p className="text-sm text-green-950">This assessment records tab changes, focus loss, and fullscreen exits. These browser checks are deterrents and cannot block screenshots taken outside the browser.</p><button onClick={beginAssessment} className="btn-primary mt-3">Start assessment</button></div>}{!current.completed && current.attemptsUsed >= current.assessmentAttempts && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">No attempts remain. Contact your administrator.</p>}{(assessmentStarted || result || current.completed) && current.questions.map((question, questionIndex) => <fieldset key={questionIndex} className="mt-4"><legend className="text-sm font-semibold text-slate-800">{questionIndex + 1}. {question.prompt}</legend><div className="mt-2 grid gap-2 sm:grid-cols-2">{question.options.map((option, optionIndex) => <label key={optionIndex} className={`flex items-start gap-2 rounded-lg border p-2.5 text-sm ${answers[questionIndex] === optionIndex ? 'border-green-700 bg-green-50' : 'border-slate-200'}`}><input type="radio" name={`q-${questionIndex}`} checked={answers[questionIndex] === optionIndex} onChange={() => setAnswers({ ...answers, [questionIndex]: optionIndex })}/><span>{option}</span></label>)}</div>{result && <p className={`mt-2 text-xs ${result.explanations[questionIndex].correct ? 'text-green-800' : 'text-amber-800'}`}>{result.explanations[questionIndex].correct ? 'Correct.' : `Correct answer: ${question.options[result.explanations[questionIndex].correctOption]}.`} {result.explanations[questionIndex].explanation}</p>}</fieldset>)}{result && <p className={`mt-4 rounded-lg p-3 text-sm font-semibold ${result.passed ? 'bg-green-50 text-green-900' : 'bg-amber-50 text-amber-900'}`}>{result.score}% — {result.passed ? 'Passed' : 'Not passed yet'}. {result.attempt}/{result.attemptLimit} attempts used.</p>}{assessmentStarted && <button onClick={submitAssessment} disabled={busy || (current.completed && result?.passed)} className="btn-primary mt-4">{busy ? <Spinner size={16} /> : <ClipboardCheck size={16} />}{current.completed ? 'Assessment passed' : 'Submit assessment'}</button>}</section>}
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">{lessonIndex > 0 ? <button onClick={() => selectLesson(lessons[lessonIndex - 1].id)} className="btn-secondary"><ChevronLeft size={16}/>Previous</button> : <span/>}{!current.completed && !current.hasAssessment && <button onClick={markComplete} disabled={busy} className="btn-primary">{busy ? <Spinner size={16} /> : <Check size={16} />}Mark complete</button>}{lessonIndex + 1 < lessons.length && current.completed && <button onClick={() => selectLesson(lessons[lessonIndex + 1].id)} className="btn-secondary">Next lesson<ChevronRight size={16}/></button>}</div>
-        </article> : <div className="grid min-h-72 place-items-center text-center"><div><BookOpen className="mx-auto text-green-700"/><p className="mt-2 font-semibold text-slate-800">No lessons available yet</p><p className="mt-1 text-sm text-slate-500">Your instructor will add the course content here.</p></div></div>}
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">{lessonIndex > 0 ? <button onClick={() => selectLesson(lessons[lessonIndex - 1].id)} className="btn-secondary"><ChevronLeft size={16}/>Previous</button> : <span/>}{!current.completed && !current.hasAssessment && <button onClick={markComplete} disabled={busy} className="btn-primary">{busy ? <Spinner size={16} /> : <Check size={16} />}Mark complete</button>}{lessonIndex + 1 < lessons.length && current.completed && lessons[lessonIndex + 1].unlocked && <button onClick={() => selectLesson(lessons[lessonIndex + 1].id)} className="btn-secondary">Next lesson<ChevronRight size={16}/></button>}</div>
+        </article> : <section role="status" className="mx-auto grid min-h-72 max-w-xl place-items-center rounded-xl bg-slate-50 p-6 text-center"><div><LockKeyhole className="mx-auto text-slate-400"/><h2 className="mt-3 font-semibold text-slate-900">This lesson is locked</h2><p className="mt-1 text-sm leading-6 text-slate-600">{current.availableAt && new Date(current.availableAt) > new Date() ? <>Available {new Date(current.availableAt).toLocaleString()}.</> : 'Complete the previous lesson to unlock this one.'}</p></div></section> : <div className="grid min-h-72 place-items-center text-center"><div><BookOpen className="mx-auto text-green-700"/><p className="mt-2 font-semibold text-slate-800">No lessons available yet</p><p className="mt-1 text-sm text-slate-500">Your instructor will add the course content here.</p></div></div>}
       </main>
     </div>}
   </div>;

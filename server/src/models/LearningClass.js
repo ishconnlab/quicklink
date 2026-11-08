@@ -39,6 +39,7 @@ const lessonQuestionSchema = new mongoose.Schema({
 const lessonSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 180 },
   content: { type: String, default: '', maxlength: 30000 },
+  availableAt: { type: Date, default: null },
   videoUrl: { type: String, default: '', trim: true, maxlength: 2000 },
   imageUrl: { type: String, default: '', trim: true, maxlength: 1000 },
   imagePublicId: { type: String, default: '', trim: true, maxlength: 255 },
@@ -72,6 +73,7 @@ const learningClassSchema = new mongoose.Schema({
   language: { type: String, trim: true, maxlength: 80, default: 'English' },
   instructorName: { type: String, trim: true, maxlength: 160, default: '' },
   instructorBio: { type: String, trim: true, maxlength: 3000, default: '' },
+  lessonAccessMode: { type: String, enum: ['sequential', 'scheduled'], default: 'sequential' },
   modules: { type: [moduleSchema], default: [] },
   completionRequirements: {
     requireReading: { type: Boolean, default: false },
