@@ -33,23 +33,36 @@ export async function createCertificatePdf(certificate, verificationUrl) {
     const textWidth = font.widthOfTextAtSize(text, fittedSize);
     page.drawText(text, { x: (width - textWidth) / 2, y, size: fittedSize, font, color });
   };
-  const drawCenteredWrapped = (text, y, font, size, color, maxWidth = width - 140, lineHeight = 12) => {
+  const drawCenteredWrapped = (text, y, font, size, color, maxWidth = Math.min(460, width - 160), lineHeight = 12) => {
+    const maxLines = 3;
+    const tokens = [];
+    for (const [wordIndex, word] of text.trim().split(/\s+/).filter(Boolean).entries()) {
+      let fragment = '';
+      for (const character of word) {
+        if (fragment && font.widthOfTextAtSize(`${fragment}${character}`, size) > maxWidth) {
+          tokens.push({ text: fragment, joinToPrevious: Boolean(tokens.length && tokens.at(-1).wordIndex === wordIndex), wordIndex });
+          fragment = character;
+        } else fragment += character;
+      }
+      if (fragment) tokens.push({ text: fragment, joinToPrevious: Boolean(tokens.length && tokens.at(-1).wordIndex === wordIndex), wordIndex });
+    }
     const lines = [];
     let line = '';
     let truncated = false;
-    for (const word of text.trim().split(/\s+/).filter(Boolean)) {
-      const candidate = line ? `${line} ${word}` : word;
-      if (line && font.widthOfTextAtSize(candidate, size) > maxWidth) {
-        if (lines.length === 2) { truncated = true; break; }
+    for (const token of tokens) {
+      const candidate = line ? `${line}${token.joinToPrevious ? '' : ' '}${token.text}` : token.text;
+      if (font.widthOfTextAtSize(candidate, size) <= maxWidth) line = candidate;
+      else {
         lines.push(line);
-        line = word;
-      } else line = candidate;
+        if (lines.length >= maxLines) { truncated = true; line = ''; break; }
+        line = token.text;
+      }
     }
-    if (line && lines.length < 3) lines.push(line);
+    if (line && lines.length < maxLines) lines.push(line);
     if (truncated && lines.length) {
       let last = lines[lines.length - 1].trimEnd();
-      while (last && font.widthOfTextAtSize(`${last}…`, size) > maxWidth) last = last.slice(0, -1).trimEnd();
-      lines[lines.length - 1] = `${last}…`;
+      while (last && font.widthOfTextAtSize(`${last}...`, size) > maxWidth) last = last.slice(0, -1).trimEnd();
+      lines[lines.length - 1] = `${last}...`;
     }
     lines.forEach((value, index) => {
       const fittedSize = Math.min(size, maxWidth / Math.max(1, font.widthOfTextAtSize(value, size)) * size);
@@ -62,7 +75,6 @@ export async function createCertificatePdf(certificate, verificationUrl) {
   drawCenteredWrapped(certificate.description?.trim() || 'has successfully completed', height - 330, regular, 11, BRAND_COLOR);
   drawCentered(certificate.courseTitle, height - 383, bold, 20, ACCENT_COLOR, width - 200);
   drawCentered(`${certificate.level}  ·  Issued ${new Date(certificate.issuedAt).toLocaleDateString('en-GB')}`, height - 407, regular, 11, BRAND_COLOR);
-  drawCentered('QuickLink · QuickLink Learning Portal', height - 427, regular, 10, BRAND_COLOR);
 
   const stampWidth = 76;
   const stampHeight = stamp.height * stampWidth / stamp.width;

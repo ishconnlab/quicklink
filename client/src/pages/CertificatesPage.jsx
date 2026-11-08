@@ -43,7 +43,7 @@ export default function CertificatesPage() {
     setLoading(true);
     try {
       if (admin) {
-        const response = await api.get('/certificates/all', { params: { page, limit: 20, ...(status ? { status } : {}), ...(courseId ? { courseId } : {}), ...(query ? { search: query } : {}) } });
+        const response = await api.get('/certificates/all', { timeout: 90000, params: { page, limit: 15, ...(status ? { status } : {}), ...(courseId ? { courseId } : {}), ...(query ? { search: query } : {}) } });
         setCertificates(response.data.data.certificates);
         setTotal(response.data.data.total);
         setPages(response.data.data.pages);
@@ -60,7 +60,7 @@ export default function CertificatesPage() {
 
   useEffect(() => {
     if (!admin) return;
-    api.get('/courses', { params: { manage: true, limit: 100 } })
+    api.get('/courses', { timeout: 90000, params: { manage: true, limit: 100 } })
       .then((response) => setCourses(response.data.data.courses))
       .catch((error) => toast.error(apiError(error).message));
   }, [admin, toast]);
@@ -82,10 +82,24 @@ export default function CertificatesPage() {
   const openPreview = async (certificate) => {
     setBusyId(certificate.id);
     try {
-      const response = await api.get(`/certificates/${certificate.code}.pdf`, { responseType: 'blob' });
+      const response = await api.get(`/certificates/${certificate.code}.pdf`, { timeout: 120000, responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       setPreviewUrl(url);
       setPreviewTarget(certificate);
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setBusyId(''); }
+  };
+
+  const download = async (certificate) => {
+    setBusyId(certificate.id);
+    try {
+      const response = await api.get(`/certificates/${certificate.code}.pdf`, { timeout: 120000, responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `ishconnect-certificate-${certificate.code}.pdf`;
+      anchor.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) { toast.error(apiError(error).message); }
     finally { setBusyId(''); }
   };
@@ -161,7 +175,9 @@ export default function CertificatesPage() {
     try {
       await api.delete(`/certificates/${certificate.id}`);
       setCertificates((current) => current.filter((item) => item.id !== certificate.id));
-      setTotal((value) => Math.max(0, value - 1));
+      const nextTotal = Math.max(0, total - 1);
+      setTotal(nextTotal);
+      if (certificates.length === 1 && page > 1) setPage(Math.max(1, Math.ceil(nextTotal / 15)));
       toast.success('Certificate record deleted.');
     } catch (error) { toast.error(apiError(error).message); }
     finally { setBusyId(''); }
@@ -188,7 +204,7 @@ export default function CertificatesPage() {
       actions={admin ? <Link to="/courses" className="btn-primary"><Award size={17} />Issue from trainings</Link> : <Link to="/courses" className="btn-secondary"><Sparkles size={17} />Find another training</Link>}
     />
 
-    {admin && <div className="mb-5 grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+    {admin && <div className="mb-5 grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
       <StatCard label="Registry total" value={total} icon={Award} accent="brand" hint={query ? 'Matching this search' : 'All issued certificates'} />
       <StatCard label="Valid on page" value={validCount} icon={BadgeCheck} accent="green" hint={`${certificates.length} loaded`} />
       <StatCard label="Revoked on page" value={revokedCount} icon={ShieldX} accent={revokedCount ? 'red' : 'slate'} hint="Publicly marked invalid" />
@@ -214,12 +230,17 @@ export default function CertificatesPage() {
                 <div className="flex flex-wrap items-center gap-1.5"><h2 className="break-words font-bold text-slate-900">{certificate.courseTitle}</h2><Badge color={certificate.revoked ? 'red' : certificate.paymentStatus === 'pending' ? 'amber' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? 'slate' : 'green'}>{certificate.revoked ? 'Revoked' : certificate.paymentStatus === 'pending' ? 'Payment pending' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? `Payment ${certificate.paymentStatus}` : 'Valid'}</Badge><Badge color="slate">{certificate.level}</Badge>{certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}</div>
                 <p className="mt-1 text-sm text-slate-600">Awarded to <strong className="text-slate-800">{certificate.studentName}</strong></p>
                 <p className="mt-1 break-all text-xs text-slate-400">Code {certificate.code} · Issued {formatDateTime(certificate.issuedAt)}</p>
+                <button type="button" onClick={() => openPreview(certificate)} disabled={busyId === certificate.id || certificate.revoked || !['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required')} className="mt-3 block w-full max-w-sm rounded-xl border border-green-200 bg-white p-2 text-left transition hover:border-green-500 hover:bg-green-50/50 disabled:cursor-not-allowed disabled:opacity-60" aria-label={`Open full preview for ${certificate.studentName}'s ${certificate.courseTitle} certificate`}>
+                  <span className="block rounded-lg border border-slate-200 bg-white px-3 py-2 text-center"><span className="block text-[8px] font-bold uppercase tracking-[0.18em] text-green-800">IshConnect · Certificate</span><span className="mt-1 block truncate text-[10px] font-semibold text-slate-800">{certificate.studentName}</span><span className="block truncate text-[8px] text-slate-500">{certificate.description || 'has successfully completed'}</span><span className="block truncate text-[10px] font-bold text-green-900">{certificate.courseTitle}</span></span>
+                  <span className="mt-1 block text-center text-[10px] font-semibold text-green-800">{busyId === certificate.id ? 'Loading full preview…' : 'Click to view full certificate'}</span>
+                </button>
                 {certificate.paymentStatus && !['paid', 'not_required'].includes(certificate.paymentStatus) && <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">Certificate payment: {certificate.paymentStatus} · {certificate.paymentAmount} {certificate.paymentCurrency}{certificate.paymentReference ? ` · Ref ${certificate.paymentReference}` : ''}{certificate.paymentNote ? ` · ${certificate.paymentNote}` : ''}</p>}
                 {certificate.revoked && <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs leading-5 text-red-700">Revoked {formatDateTime(certificate.revokedAt)}{certificate.revocationReason ? `: ${certificate.revocationReason}` : '.'}</p>}
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
               {!certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <button className="btn-primary" onClick={() => openPreview(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <Eye size={15} />}Preview & print</button>}
+              {!certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <button className="btn-secondary" onClick={() => download(certificate)} disabled={busyId === certificate.id}><Download size={15} />Download PDF</button>}
               {!certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button>}
               {['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <a className="btn-secondary" href={verifyUrl(certificate)} target="_blank" rel="noreferrer"><ExternalLink size={15} />Verify</a>}
               {admin && <>
