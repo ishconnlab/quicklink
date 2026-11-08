@@ -35,14 +35,14 @@ export function SectionHeader({ title, description, action, icon: Icon }) {
 export function StatCard({ label, value, icon: Icon, hint, accent = 'brand' }) {
   const theme = { icon: 'bg-green-700 text-white' };
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="break-words text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-          <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900">{value}</p>
-          {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4">
+      <div className="flex min-w-0 flex-col-reverse items-start gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+        <div className="min-w-0 w-full">
+          <p className="break-words text-[10px] font-semibold uppercase leading-4 tracking-[0.08em] text-slate-400 sm:text-[11px] sm:tracking-[0.1em]">{label}</p>
+          <p className="mt-1.5 break-words text-xl font-bold leading-6 tracking-tight text-slate-900 sm:text-2xl">{value}</p>
+          {hint && <p className="mt-1 break-words text-xs leading-4 text-slate-500">{hint}</p>}
         </div>
-        {Icon && <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${theme.icon}`}><Icon size={19} /></div>}
+        {Icon && <div className={`flex h-8 w-8 shrink-0 self-end items-center justify-center rounded-lg sm:h-10 sm:w-10 sm:self-auto sm:rounded-xl ${theme.icon}`}><Icon size={17} className="sm:hidden" /><Icon size={19} className="hidden sm:block" /></div>}
       </div>
     </div>
   );

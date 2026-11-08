@@ -98,7 +98,7 @@ export const getDashboard = asyncHandler(async (_req, res) => {
       .populate('student', 'name email whatsapp country province')
       .populate('learningClass', 'title subject level startsAt payment')
       .sort({ createdAt: -1 }).limit(6).lean(),
-    LearningClass.find({ active: true, startsAt: { $gte: new Date() } }).sort({ startsAt: 1 }).limit(5).select('title subject level startsAt students').lean(),
+    LearningClass.find({ active: true, startsAt: { $gte: new Date() } }).sort({ startsAt: 1 }).limit(5).select('title subject level startsAt students thumbnailUrl thumbnailFile').lean(),
     ActivityLog.find({}).sort({ createdAt: -1 }).limit(8).lean(),
   ]);
   res.json({
@@ -121,6 +121,7 @@ export const getDashboard = asyncHandler(async (_req, res) => {
         title: item.title,
         subject: item.subject,
         level: item.level,
+        thumbnailUrl: item.thumbnailUrl || (item.thumbnailFile ? `/api/courses/${item._id}/thumbnail` : ''),
         startsAt: item.startsAt,
         enrolledCount: (item.students || []).length,
       })),

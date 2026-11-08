@@ -262,7 +262,7 @@ export default function CourseDetailPage() {
 
     <section className="mb-5 overflow-hidden rounded-3xl border border-green-100 bg-white shadow-sm shadow-green-950/[0.04]">
       <div className="flex flex-col sm:flex-row">
-        <div className="relative h-44 w-full shrink-0 sm:h-auto sm:w-72 lg:w-80"><CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="absolute inset-0" /><div className="absolute inset-0 bg-green-50 sm:bg-green-50" /></div>
+        <div className="relative h-44 w-full shrink-0 sm:h-auto sm:w-72 lg:w-80"><CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="absolute inset-0" /></div>
         <div className="min-w-0 flex-1 p-5 sm:p-6">
           <div className="flex flex-wrap gap-1.5"><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{course.trade && <Badge color="slate">{course.trade}</Badge>}{course.enrolled && <Badge color="green">Enrolled</Badge>}{!course.active && <Badge color="red">Archived</Badge>}{!course.published && <Badge color="amber">Draft</Badge>}</div>
           <h1 className="mt-3 break-words text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{course.title}</h1>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, ImagePlus, Save, Users, Wallet } from 'lucide-react';
-import api, { apiError } from '../api/client.js';
+import api, { apiError, assetUrl } from '../api/client.js';
 import { PageHeader } from '../components/layout.jsx';
 import { PageLoader, Spinner } from '../components/ui.jsx';
 import PagedCheckboxList from '../components/PagedCheckboxList.jsx';
@@ -50,9 +50,17 @@ export default function TrainingEditorPage() {
   const [form, setForm] = useState(blankForm);
   const [people, setPeople] = useState([]);
   const [thumbnail, setThumbnail] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState('');
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+
+  useEffect(() => {
+    if (!thumbnail) { setThumbnailPreview(''); return undefined; }
+    const preview = URL.createObjectURL(thumbnail);
+    setThumbnailPreview(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [thumbnail]);
 
   useEffect(() => {
     let active = true;
@@ -167,7 +175,7 @@ export default function TrainingEditorPage() {
           <Field label="Detailed description" className="sm:col-span-2"><textarea className="input min-h-32" maxLength={12000} value={form.description} onChange={(event) => set('description', event.target.value)} placeholder="Outcomes, who it is for, tools covered, and how learning is delivered." /></Field>
           <Field label="Learning objectives" hint="One objective per line." className="sm:col-span-2"><textarea className="input min-h-24" value={(form.learningObjectives || []).join('\n')} onChange={(event) => set('learningObjectives', event.target.value.split('\n').map((line) => line.trim()).filter(Boolean))} placeholder="Build a responsive website\nUse Git to track changes" /></Field>
           <Field label="Prerequisites" hint="One requirement per line." className="sm:col-span-2"><textarea className="input min-h-20" value={(form.prerequisites || []).join('\n')} onChange={(event) => set('prerequisites', event.target.value.split('\n').map((line) => line.trim()).filter(Boolean))} placeholder="Basic computer literacy" /></Field>
-          <Field label="Cover image" hint="Required. PNG, JPEG, or WebP up to 3 MB." className="sm:col-span-2"><div className="flex flex-wrap items-center gap-3"><label className="btn-secondary cursor-pointer"><ImagePlus size={16} />Choose image<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => setThumbnail(event.target.files?.[0] || null)} /></label>{thumbnail && <span className="min-w-0 truncate text-xs text-slate-500">{thumbnail.name}</span>}{!thumbnail && form.thumbnailUrl && <span className="text-xs text-green-800">Current cover is set.</span>}{errors.thumbnail && <span className="text-xs text-red-600">{errors.thumbnail}</span>}</div></Field>
+          <Field label="Cover image" hint="Required. PNG, JPEG, or WebP up to 3 MB." className="sm:col-span-2"><div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] sm:items-start"><div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl border border-slate-200 bg-green-50 sm:max-w-64">{(thumbnailPreview || form.thumbnailUrl) ? <img src={thumbnailPreview || assetUrl(form.thumbnailUrl)} alt={`Cover preview for ${form.title || 'this training'}`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <div className="grid h-full place-items-center text-sm text-green-800">Cover preview</div>}</div><div className="min-w-0"><label className="btn-secondary w-fit cursor-pointer"><ImagePlus size={16} />Choose image<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0] || null; if (file && (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024)) { toast.error('Choose a PNG, JPEG, or WebP image up to 3 MB.'); event.target.value = ''; return; } setThumbnail(file); setErrors((current) => ({ ...current, thumbnail: '' })); }} /></label>{thumbnail && <p className="mt-2 break-all text-xs text-slate-500">Selected: {thumbnail.name}</p>}{!thumbnail && form.thumbnailUrl && <p className="mt-2 text-xs text-green-800">Current cover image</p>}{errors.thumbnail && <p className="mt-2 text-xs text-red-600">{errors.thumbnail}</p>}<p className="mt-2 text-xs leading-5 text-slate-500">The preview shows exactly what will appear on the training card.</p></div></div></Field>
         </div>
       </section>
 

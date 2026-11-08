@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Activity, ArrowRight, Award, CreditCard, GraduationCap, PlusCircle, Radio, ReceiptText, Sparkles, UserCheck, Users, Video } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader, SectionHeader, StatCard } from '../components/layout.jsx';
+import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { EmptyState, PageLoader } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatDateTime, formatMoney } from '../lib/format.js';
@@ -86,7 +87,7 @@ export default function AdminDashboard() {
       <section className="space-y-4">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5">
           <SectionHeader title="Upcoming trainings" description="Scheduled to start soon." icon={Video} />
-          {upcomingTrainings.length ? <div className="space-y-2">{upcomingTrainings.map((training) => <Link key={training.id} to={`/courses/${training.id}`} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-green-200 hover:bg-green-50/40"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-50 text-brand-700"><Video size={15} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-800">{training.title}</span><span className="block text-xs text-slate-500">{formatDateTime(training.startsAt)} · {training.enrolledCount} enrolled</span></span><ArrowRight size={14} className="text-slate-300" /></Link>)}</div> : <p className="text-sm text-slate-500">No upcoming start dates.</p>}
+          {upcomingTrainings.length ? <div className="space-y-2">{upcomingTrainings.map((training) => <Link key={training.id} to={`/courses/${training.id}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-100 p-2.5 transition hover:border-green-200 hover:bg-green-50/40 sm:p-3"><CourseThumbnail imageUrl={training.thumbnailUrl} title={training.title} className="h-11 w-16 shrink-0 rounded-md" /><span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold leading-5 text-slate-800">{training.title}</span><span className="block break-words text-xs leading-4 text-slate-500">{formatDateTime(training.startsAt)} · {training.enrolledCount} enrolled</span></span><ArrowRight size={14} className="shrink-0 text-slate-300" /></Link>)}</div> : <p className="text-sm text-slate-500">No upcoming start dates.</p>}
           <Link to="/courses/new" className="mt-3 flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-green-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-green-50"><PlusCircle size={14} /> Create a training</Link>
         </div>
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5">

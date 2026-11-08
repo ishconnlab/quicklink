@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowRight, Award, CalendarClock, CheckCircle2, Clock3, CreditCard, FileCheck2, GraduationCap, Radio, Sparkles, Video } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader, ProgressBar, SectionHeader, StatCard } from '../components/layout.jsx';
+import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { EmptyState, PageLoader } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -96,8 +97,8 @@ export default function StudentDashboard() {
           const progress = progressFor(course);
           const payment = course.enrollment?.payment;
           return <article key={course.id} className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <div className="absolute inset-x-0 top-0 h-1 bg-green-50" />
-            <div className="p-5">
+            <CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="aspect-[16/7] w-full" />
+            <div className="min-w-0 p-4 sm:p-5">
               <div className="flex flex-wrap items-center gap-2"><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{liveClasses.some((item) => item.id === course.id) && <Badge color="red">Live now</Badge>}</div>
               <h3 className="mt-3 break-words text-base font-bold leading-6 text-slate-950">{course.title}</h3>
               <p className="mt-1.5 line-clamp-2 break-words text-sm leading-6 text-slate-500">{course.introduction || course.description || 'Open the training to see your requirements and next step.'}</p>
