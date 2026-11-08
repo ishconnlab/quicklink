@@ -6,6 +6,9 @@ import ApiError from '../utils/ApiError.js';
 import { Assignment } from '../models/Assignment.js';
 import { AssignmentSubmission } from '../models/AssignmentSubmission.js';
 import { CertificationAssessmentAttempt } from '../models/CertificationAssessmentAttempt.js';
+import { AssessmentDraft } from '../models/AssessmentDraft.js';
+import { Enrollment } from '../models/Enrollment.js';
+import { ProjectSubmission } from '../models/ProjectSubmission.js';
 import { ClassChatMessage } from '../models/ClassChatMessage.js';
 import { ClassInvitation } from '../models/ClassInvitation.js';
 import { ClassSessionNote } from '../models/ClassSessionNote.js';
@@ -66,6 +69,9 @@ export async function permanentlyDeleteClass(classId) {
     ClassInvitation.deleteMany({ learningClass: learningClass._id }),
     CourseCertificate.deleteMany({ course: learningClass._id }),
     CertificationAssessmentAttempt.deleteMany({ course: learningClass._id }),
+    AssessmentDraft.deleteMany({ course: learningClass._id }),
+    Enrollment.deleteMany({ learningClass: learningClass._id }),
+    ProjectSubmission.deleteMany({ learningClass: learningClass._id }),
     AssignmentSubmission.deleteMany({ $or: [{ learningClass: learningClass._id }, { assignment: { $in: assignmentIds } }] }),
     Assignment.deleteMany({ learningClass: learningClass._id }),
     TrainingRegistration.deleteMany({ form: { $in: formIds } }),

@@ -1,5 +1,5 @@
-/* QuickLink service worker: app-shell caching. */
-const CACHE = 'quicklink-shell-v3';
+/* IshConnect QuickLink service worker: app-shell caching. */
+const CACHE = 'ishconnect-shell-v4';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icons/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -12,7 +12,7 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -23,7 +23,7 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
 
-  // Learning content and progress always come from the authenticated API.
+  // Training data, payments, and certificates always come from the authenticated API.
   if (url.pathname.startsWith('/api')) return;
 
   // SPA navigations: network first, fall back to cached shell when offline.
@@ -59,7 +59,6 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Allow the app to trigger an immediate update.
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });

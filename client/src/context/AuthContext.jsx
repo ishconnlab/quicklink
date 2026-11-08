@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import api, { getToken, setToken, setUnauthorizedHandler } from '../api/client.js';
-import { isAdminRole, isStudentRole, isTeacherRole, normalizeRole } from '../lib/roles.js';
+import { isAdminRole, isStudentRole, normalizeRole } from '../lib/roles.js';
 
 const AuthContext = createContext(null);
 
@@ -11,8 +11,6 @@ const normalizeUser = (user) => {
     ...user,
     role: normalizeRole(user.role),
     isAdmin: admin,
-    isOwner: admin,
-    isTeacher: isTeacherRole(user.role),
     isStudent: isStudentRole(user.role),
   };
 };
@@ -60,9 +58,16 @@ export function AuthProvider({ children }) {
     return account;
   }, []);
 
-  const register = useCallback(async (name, email, password, educationLevel) => {
-    const res = await api.post('/auth/register', { name, email, password, educationLevel });
+  const register = useCallback(async (payload) => {
+    const res = await api.post('/auth/register', payload);
     return res.data.data.user;
+  }, []);
+
+  const updateProfile = useCallback(async (payload) => {
+    const res = await api.patch('/auth/profile', payload);
+    const account = normalizeUser(res.data.data.user);
+    setUser(account);
+    return account;
   }, []);
 
   const changePassword = useCallback(async (currentPassword, newPassword) => {
@@ -79,6 +84,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
+        updateProfile,
         changePassword,
         refresh: loadUser,
       }}

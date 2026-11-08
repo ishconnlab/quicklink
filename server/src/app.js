@@ -8,14 +8,12 @@ import config, { isAllowedOrigin } from './config/env.js';
 import { notFound, errorHandler } from './middleware/errorHandler.js';
 import authRoutes from './routes/authRoutes.js';
 import userRoutes from './routes/userRoutes.js';
-import learningRoutes from './routes/learningRoutes.js';
 import classRoutes from './routes/classRoutes.js';
 import courseRoutes from './routes/courseRoutes.js';
-import assignmentRoutes from './routes/assignmentRoutes.js';
 import certificateRoutes from './routes/certificateRoutes.js';
 import registrationRoutes from './routes/registrationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
-import teacherRoutes from './routes/teacherRoutes.js';
+import assignmentRoutes from './routes/assignmentRoutes.js';
 
 export function createApp() {
   const app = express();
@@ -78,14 +76,12 @@ export function createApp() {
 
   app.use('/api/auth', authRoutes);
   app.use('/api/users', userRoutes);
-  app.use('/api/learning', learningRoutes);
   app.use('/api/classes', classRoutes);
   app.use('/api/courses', courseRoutes);
-  app.use('/api/assignments', assignmentRoutes);
   app.use('/api/certificates', certificateRoutes);
   app.use('/api/registrations', registrationRoutes);
   app.use('/api/admin', adminRoutes);
-  app.use('/api/teacher', teacherRoutes);
+  app.use('/api/assignments', assignmentRoutes);
 
   app.use(notFound);
   app.use(errorHandler);

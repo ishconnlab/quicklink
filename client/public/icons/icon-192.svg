@@ -1,7 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="QuickLink">
-  <rect width="192" height="192" rx="40" fill="#15803d"/>
-  <path d="M62 62h56a10 10 0 0 1 10 10v12a10 10 0 0 1-10 10H92l-24 22v-22h-6a10 10 0 0 1-10-10V72a10 10 0 0 1 10-10z" fill="#ffffff"/>
-  <circle cx="74" cy="128" r="9" fill="#ffffff"/>
-  <circle cx="100" cy="128" r="9" fill="#ffffff"/>
-  <circle cx="126" cy="128" r="9" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f97316"/><stop offset="1" stop-color="#b45309"/>
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="44" fill="url(#g)"/>
+  <path d="M56 126V66h18v24h44V66h18v60h-18v-24H74v24H56z" fill="#fff"/>
 </svg>

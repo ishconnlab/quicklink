@@ -75,7 +75,7 @@ export default function ClassReportPage() {
       const url = URL.createObjectURL(response.data);
       const anchor = document.createElement('a');
       anchor.href = url;
-      anchor.download = `quicklink-attendance-${data.session.sessionCode}.pdf`;
+      anchor.download = `ishconnect-attendance-${data.session.sessionCode}.pdf`;
       anchor.click();
       URL.revokeObjectURL(url);
     } catch (error) { toast.error(apiError(error).message); }
@@ -85,7 +85,7 @@ export default function ClassReportPage() {
   if (!data) return <EmptyState title="Report unavailable" description="The session may still be live or you may not have access." />;
   const { session, class: classInfo } = data;
   const report = session.report;
-  const canManage = isAdmin(user) || (user?.role === 'teacher' && (classInfo.teacher?.id === user.id || classInfo.teachers?.some((teacher) => teacher.id === user.id)));
+  const canManage = isAdmin(user);
   return <div>
     <Link to={`/classes/${classInfo.id}`} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"><ArrowLeft size={16} />Back to class</Link>
     <PageHeader title="Class attendance report" subtitle={`${classInfo.title} · ${classInfo.subject} · ${classInfo.level}`} actions={<div className="flex gap-2"><button className="btn-secondary" onClick={downloadCsv}><Download size={17} />CSV</button><button className="btn-primary" onClick={downloadPdf}><FileText size={17} />Download PDF</button></div>} />
@@ -102,6 +102,6 @@ export default function ClassReportPage() {
       <div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-semibold text-slate-800">Attendance</h2><Badge color="brand">{report.attendance.length} people</Badge></div>
       <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead><tr className="border-b border-slate-100 text-xs uppercase text-slate-400"><th className="py-2 pr-3">Name</th><th className="py-2 pr-3">Role</th><th className="py-2 pr-3">Status</th><th className="py-2 pr-3">First joined</th><th className="py-2 pr-3">Time present</th><th className="py-2">Joins</th></tr></thead><tbody>{report.attendance.map((person) => <tr key={`${person.user}-${person.role}`} className="border-b border-slate-50"><td className="py-3 pr-3"><span className="block font-medium text-slate-800">{person.name}</span><span className="text-xs text-slate-400">{person.email}</span>{person.correctionHistory?.map((correction, index) => <span key={index} className="block text-[10px] text-slate-400">Correction: {correction.fromStatus} → {correction.toStatus} · {correction.reason}</span>)}</td><td className="py-3 pr-3 capitalize text-slate-600">{person.role}</td><td className="py-3 pr-3"><Badge color={person.status === 'present' ? 'green' : person.status === 'late' ? 'amber' : person.status === 'early' || person.status === 'excused' ? 'brand' : 'slate'}>{person.status || (person.attended ? 'present' : 'absent')}</Badge>{canManage && person.role === 'student' && <button onClick={() => correctAttendance(person)} className="ml-2 text-xs text-brand-700">Correct</button>}</td><td className="py-3 pr-3 text-slate-600">{person.firstJoinedAt ? formatDateTime(person.firstJoinedAt) : '—'}</td><td className="py-3 pr-3 text-slate-600">{person.attended ? duration(person.totalSeconds) : '—'}</td><td className="py-3 text-slate-600">{person.joinCount || '—'}</td></tr>)}</tbody></table></div>
     </section>
-    {report.teacherNotes && <section className="card"><h2 className="mb-2 font-semibold text-slate-800">Teacher notes</h2><p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{report.teacherNotes}</p></section>}
+    {report.teacherNotes && <section className="card"><h2 className="mb-2 font-semibold text-slate-800">Session notes</h2><p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{report.teacherNotes}</p></section>}
   </div>;
 }

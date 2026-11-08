@@ -1,112 +1,97 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Award, BookOpenCheck, ClipboardCheck, GraduationCap, Radio, SlidersHorizontal, UserRound, Users, UsersRound } from 'lucide-react';
+import { Activity, ArrowRight, Award, CreditCard, GraduationCap, PlusCircle, Radio, ReceiptText, Sparkles, UserCheck, Users, Video } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
-import { PageHeader, SectionHeader, StatCard } from '../components/layout.jsx';
-import { Badge } from '../components/layout.jsx';
+import { Badge, PageHeader, SectionHeader, StatCard } from '../components/layout.jsx';
 import { EmptyState, PageLoader } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { formatDateTime, formatMoney } from '../lib/format.js';
 
-const LEVELS = ['all', 'L3', 'L4', 'L5', 'Bootcamp', 'Training'];
+const paymentTone = { not_required: 'slate', unpaid: 'amber', pending: 'brand', paid: 'green', rejected: 'red', waived: 'green' };
+const paymentLabel = { not_required: 'Not required', unpaid: 'Unpaid', pending: 'Pending review', paid: 'Paid', rejected: 'Rejected', waived: 'Waived' };
 
 export default function AdminDashboard() {
   const toast = useToast();
-  const toastRef = useRef(toast);
-  toastRef.current = toast;
-  const [summary, setSummary] = useState(null);
-  const [followers, setFollowers] = useState([]);
-  const [teacherId, setTeacherId] = useState('');
-  const [level, setLevel] = useState('all');
-  const [enrollment, setEnrollment] = useState('all');
-  const [loading, setLoading] = useState(true);
-
-  const loadSummary = useCallback(async () => {
-    setLoading(true);
+  const [state, setState] = useState({ loading: true, data: null });
+  const load = useCallback(async () => {
+    setState((current) => ({ ...current, loading: true }));
     try {
-      const response = await api.get('/users/dashboard-summary', { params: { level, enrollment } });
-      setSummary(response.data.data);
-      setTeacherId((current) => response.data.data.teachersByFollowers.some((teacher) => teacher.teacherId === current)
-        ? current : response.data.data.teachersByFollowers[0]?.teacherId || '');
+      const response = await api.get('/admin/dashboard');
+      setState({ loading: false, data: response.data.data });
     } catch (error) {
-      toastRef.current.error(apiError(error).message);
-    } finally {
-      setLoading(false);
+      toast.error(apiError(error).message);
+      setState((current) => ({ ...current, loading: false }));
     }
-  }, [level, enrollment]);
+  }, [toast]);
+  useEffect(() => { load(); }, [load]);
 
-  useEffect(() => { loadSummary(); }, [loadSummary]);
+  if (state.loading && !state.data) return <PageLoader label="Loading your command center…" />;
+  if (!state.data) return <EmptyState title="Dashboard could not load" description="Check the server connection and try again." action={<button className="btn-primary" onClick={load}>Try again</button>} />;
 
-  useEffect(() => {
-    if (!teacherId) { setFollowers([]); return; }
-    let active = true;
-    api.get('/users/followers', { params: { teacherId } })
-      .then((response) => { if (active) setFollowers(response.data.data.followers); })
-      .catch((error) => { if (active) toastRef.current.error(apiError(error).message); });
-    return () => { active = false; };
-  }, [teacherId]);
-
-  if (loading && !summary) return <PageLoader label="Loading admin dashboard…" />;
-  if (!summary) return <EmptyState title="Dashboard could not load" description="Check your connection and try again." action={<button className="btn-primary" onClick={loadSummary}>Try again</button>} />;
-
-  const shortcuts = [
-    { to: '/users', title: 'People & accounts', description: 'Approve students, create teachers, and manage access.', icon: UserRound },
-    { to: '/registrations', title: 'Registrations', description: 'Review public training forms and enroll applicants.', icon: ClipboardCheck },
-    { to: '/classes', title: 'Courses & classes', description: 'Publish courses, assign teachers, and schedule sessions.', icon: BookOpenCheck },
-  ];
+  const { stats, recentEnrollments, upcomingTrainings, recentActivity } = state.data;
+  const revenue = stats.revenueByCurrency?.length ? stats.revenueByCurrency.map((item) => formatMoney(item.total, item.currency)).join(' · ') : 'No payments recorded';
 
   return <div>
     <PageHeader
-      title="Admin dashboard"
-      subtitle="A clear view of enrollment, teaching activity, accounts, certificates, and training registrations."
-      actions={<><Link to="/registrations" className="btn-secondary">Review registrations</Link><Link to="/users" className="btn-primary">Manage people</Link></>}
+      eyebrow="Administration"
+      title="Training command center"
+      subtitle="Monitor enrollments, payments, live sessions, assessments, and certificates across the platform."
+      actions={<><Link to="/enrollments?paymentStatus=pending" className="btn-secondary"><CreditCard size={16} />Verify payments</Link><Link to="/courses/new" className="btn-primary"><PlusCircle size={17} />New training</Link></>}
     />
 
-    {summary.pendingRegistrations > 0 && <Link to="/registrations" className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200/80 bg-gradient-to-r from-amber-50 to-white p-4 shadow-sm transition hover:border-amber-300">
-      <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><ClipboardCheck size={19} /></span><div><p className="text-sm font-bold text-amber-950">{summary.pendingRegistrations} registration{summary.pendingRegistrations === 1 ? '' : 's'} waiting</p><p className="text-xs text-amber-700">Review applicants and enroll approved students.</p></div></div>
-      <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-800">Open queue <ArrowRight size={16} /></span>
-    </Link>}
-
-    <section className="mb-6 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800"><SlidersHorizontal size={16} className="text-brand-700" /> Dashboard filters</div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block"><span className="label">Class level</span><select className="input" value={level} onChange={(event) => setLevel(event.target.value)}><option value="all">All levels</option>{LEVELS.slice(1).map((value) => <option key={value}>{value}</option>)}</select></label>
-        <label className="block"><span className="label">Enrollment status</span><select className="input" value={enrollment} onChange={(event) => setEnrollment(event.target.value)}><option value="all">All active classes</option><option value="open">Open for enrollment</option></select></label>
-      </div>
-      <p className="mt-2 text-xs text-slate-500">Filters apply to class, enrollment, and live-class counts. Account and certificate totals remain system-wide.</p>
-    </section>
-
     <section className="mb-7">
-      <SectionHeader title="Platform overview" description="Key numbers from across your learning workspace." />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-        <StatCard label="Active students" value={summary.activeStudents} icon={GraduationCap} />
-        <StatCard label="Active teachers" value={summary.activeTeachers} icon={Users} accent="purple" />
-        <StatCard label="Active classes" value={summary.activeClasses} icon={BookOpenCheck} />
-        <StatCard label="Current enrollments" value={summary.currentEnrollments} icon={UsersRound} accent="green" />
-        <StatCard label="Pending registrations" value={summary.pendingRegistrations} icon={ClipboardCheck} accent="amber" />
-        <StatCard label="Live classes" value={summary.liveClasses} icon={Radio} accent="amber" />
-        <StatCard label="Certificates issued" value={summary.certificatesIssued} icon={Award} accent="green" />
+      <SectionHeader title="Platform pulse" description="Live totals across every training." icon={Sparkles} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <StatCard label="Active students" value={stats.activeStudents} icon={GraduationCap} hint={`${stats.students} total student accounts`} />
+        <StatCard label="Active trainings" value={stats.trainings} icon={Video} hint={`${stats.enrollments} current enrollments`} />
+        <StatCard label="Pending payments" value={stats.pendingPayments} icon={CreditCard} accent="amber" hint="Waiting for verification" />
+        <StatCard label="Live now" value={stats.liveClasses} icon={Radio} accent={stats.liveClasses ? 'red' : 'slate'} hint={stats.liveClasses ? 'Sessions in progress' : 'No live sessions'} />
+        <StatCard label="Certificates" value={stats.certificates} icon={Award} accent="green" hint="Valid certificates issued" />
+        <StatCard label="Projects" value={stats.projectSubmissions} icon={ReceiptText} accent="purple" hint="Project submissions received" />
       </div>
     </section>
 
-    <section className="mb-7">
-      <SectionHeader title="Workspace shortcuts" description="Jump straight to the areas that keep QuickLink moving." />
-      <div className="grid gap-3 md:grid-cols-3">
-        {shortcuts.map(({ to, title, description, icon: Icon }) => <Link key={to} to={to} className="group rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/[0.03] transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-md">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-700 ring-1 ring-brand-100"><Icon size={20} /></span>
-          <h3 className="mt-4 font-bold text-slate-900">{title}</h3>
-          <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>
-          <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">Open <ArrowRight size={15} className="transition group-hover:translate-x-0.5" /></span>
-        </Link>)}
+    <section className="mb-6 rounded-2xl border border-emerald-200/70 bg-gradient-to-r from-emerald-50 via-white to-orange-50 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><p className="eyebrow text-emerald-700">Verified revenue</p><p className="mt-1 text-2xl font-black tracking-tight text-slate-950">{revenue}</p><p className="mt-0.5 text-xs text-slate-500">Confirmed and waived enrollments are not included in revenue.</p></div>
+        <Link to="/enrollments" className="btn-secondary">Open enrollment ledger <ArrowRight size={15} /></Link>
       </div>
     </section>
+
+    <div className="mb-7 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
+      <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03]">
+        <div className="border-b border-slate-100 p-4 sm:p-5"><SectionHeader title="Recent enrollments" description="The latest students who joined a training." action={<Link to="/enrollments" className="text-sm font-semibold text-brand-700">View all</Link>} icon={Users} /></div>
+        {recentEnrollments.length ? <div className="divide-y divide-slate-100">{recentEnrollments.map((enrollment) => <div key={enrollment.id} className="flex flex-wrap items-center gap-3 p-4 transition hover:bg-orange-50/30">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-50 text-xs font-bold text-brand-800 ring-1 ring-orange-100">{enrollment.student?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
+          <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">{enrollment.student?.name || 'Student'}</p><p className="truncate text-xs text-slate-500">{enrollment.class?.title || 'Training'} · {formatDateTime(enrollment.enrolledAt)}</p></div>
+          <Badge color={paymentTone[enrollment.paymentStatus] || 'slate'}>{paymentLabel[enrollment.paymentStatus] || enrollment.paymentStatus}</Badge>
+          {enrollment.paymentReference && <Link to={`/enrollments?search=${encodeURIComponent(enrollment.student?.email || '')}`} className="text-xs font-semibold text-brand-700 hover:underline">Review</Link>}
+        </div>)}</div> : <div className="p-5"><EmptyState title="No enrollments yet" description="Student enrollments will appear here." /></div>}
+      </section>
+
+      <section className="space-y-4">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+          <SectionHeader title="Upcoming trainings" description="Scheduled to start soon." icon={Video} />
+          {upcomingTrainings.length ? <div className="space-y-2">{upcomingTrainings.map((training) => <Link key={training.id} to={`/courses/${training.id}`} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-orange-200 hover:bg-orange-50/40"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-brand-700"><Video size={15} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-800">{training.title}</span><span className="block text-xs text-slate-500">{formatDateTime(training.startsAt)} · {training.enrolledCount} enrolled</span></span><ArrowRight size={14} className="text-slate-300" /></Link>)}</div> : <p className="text-sm text-slate-500">No upcoming start dates.</p>}
+          <Link to="/courses/new" className="mt-3 flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-orange-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-orange-50"><PlusCircle size={14} /> Create a training</Link>
+        </div>
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+          <SectionHeader title="Quick actions" icon={Sparkles} />
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              { to: '/enrollments?paymentStatus=pending', label: 'Verify payments', icon: CreditCard },
+              { to: '/students', label: 'Manage students', icon: Users },
+              { to: '/registrations', label: 'Registration queue', icon: UserCheck },
+              { to: '/certificates', label: 'Certificates', icon: Award },
+            ].map(({ to, label, icon: Icon }) => <Link key={to} to={to} className="flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40"><Icon size={16} className="text-brand-700" />{label}</Link>)}
+          </div>
+        </div>
+      </section>
+    </div>
 
     <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
-      <SectionHeader
-        title="Teacher followers"
-        description="See which students are following each teacher."
-        action={<label className="block w-full sm:w-72"><span className="label">Teacher</span><select className="input" value={teacherId} onChange={(event) => setTeacherId(event.target.value)}><option value="">Select a teacher</option>{summary.teachersByFollowers.map((teacher) => <option key={teacher.teacherId} value={teacher.teacherId}>{teacher.name} · {teacher.followers} followers</option>)}</select></label>}
-      />
-      {teacherId && followers.length ? <ul className="divide-y divide-slate-100">{followers.map((follower) => <li key={follower.id} className="flex flex-wrap items-center justify-between gap-3 py-3"><div className="flex min-w-0 items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">{follower.name?.slice(0, 1)?.toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800">{follower.name}</span><span className="block truncate text-xs text-slate-500">{follower.email}</span></span></div><Badge color="brand">Follower</Badge></li>)}</ul> : <EmptyState title={teacherId ? 'No followers yet' : 'No followed teachers yet'} description={teacherId ? 'Students who follow this teacher will appear here.' : 'Teacher follower counts will appear here when students follow them.'} />}
+      <SectionHeader title="Recent activity" description="The latest actions across the platform." icon={Activity} action={<Link to="/enrollments" className="text-sm font-semibold text-brand-700">Open operations</Link>} />
+      {recentActivity.length ? <ol className="relative space-y-3 border-l border-orange-100 pl-4">{recentActivity.map((entry) => <li key={entry.id} className="relative"><span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-brand-500 ring-4 ring-white" /><p className="text-sm text-slate-700"><span className="font-semibold text-slate-900">{entry.actorName || 'System'}</span> {entry.message}</p><p className="mt-0.5 text-xs text-slate-400">{formatDateTime(entry.createdAt)}</p></li>)}</ol> : <EmptyState title="No activity yet" description="Actions will appear here as your team manages the platform." />}
     </section>
   </div>;
 }

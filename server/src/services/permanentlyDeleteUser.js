@@ -5,6 +5,9 @@ import { ActivityLog } from '../models/ActivityLog.js';
 import { Assignment } from '../models/Assignment.js';
 import { AssignmentSubmission } from '../models/AssignmentSubmission.js';
 import { CertificationAssessmentAttempt } from '../models/CertificationAssessmentAttempt.js';
+import { AssessmentDraft } from '../models/AssessmentDraft.js';
+import { Enrollment } from '../models/Enrollment.js';
+import { ProjectSubmission } from '../models/ProjectSubmission.js';
 import { ClassChatMessage } from '../models/ClassChatMessage.js';
 import { ClassInvitation } from '../models/ClassInvitation.js';
 import { ClassSessionNote } from '../models/ClassSessionNote.js';
@@ -15,7 +18,6 @@ import { LearningProgress } from '../models/LearningProgress.js';
 import { LiveSession } from '../models/LiveSession.js';
 import { Notification } from '../models/Notification.js';
 import { PlatformSetting } from '../models/PlatformSetting.js';
-import { TeacherFollow } from '../models/TeacherFollow.js';
 import { TrainingRegistration } from '../models/TrainingRegistration.js';
 import { User } from '../models/User.js';
 import ApiError from '../utils/ApiError.js';
@@ -34,29 +36,18 @@ export async function permanentlyDeleteUser(userId) {
   if (['admin', 'owner'].includes(user.role)) throw ApiError.forbidden('Administrator accounts cannot be permanently deleted here.');
 
   const classes = await LearningClass.find({
-    $or: [{ teacher: user._id }, { teachers: user._id }, { students: user._id }, { createdBy: user._id }],
+    $or: [{ students: user._id }, { createdBy: user._id }],
   });
-  const teachingClassIds = user.role === 'teacher'
-    ? classes.filter((learningClass) => learningClass.teacher?.equals(user._id)
-      || learningClass.teachers.some((teacherId) => teacherId.equals(user._id))).map((learningClass) => learningClass._id)
-    : [];
   const activeSession = await LiveSession.exists({
     status: 'live',
-    $or: [
-      { startedBy: user._id },
-      { 'attendance.user': user._id },
-      ...(teachingClassIds.length ? [{ learningClass: { $in: teachingClassIds } }] : []),
-    ],
+    $or: [{ startedBy: user._id }, { 'attendance.user': user._id }],
   });
-  if (activeSession) throw ApiError.conflict('End any live session this user started or teaches, and have them leave other live sessions before deleting the account.');
+  if (activeSession) throw ApiError.conflict('End any live session this user started and have them leave other live sessions before deleting the account.');
 
   const ownedSubmissions = await AssignmentSubmission.find({ student: user._id }).select('files').lean();
   await Promise.all(ownedSubmissions.flatMap((submission) => (submission.files || []).map((file) => removeStoredFile(file.storageKey))));
 
   for (const learningClass of classes) {
-    const remainingTeachers = (learningClass.teachers || []).filter((teacherId) => !teacherId.equals(user._id));
-    if (learningClass.teacher?.equals(user._id)) learningClass.teacher = remainingTeachers[0] || null;
-    learningClass.teachers = remainingTeachers;
     learningClass.students = (learningClass.students || []).filter((studentId) => !studentId.equals(user._id));
     if (learningClass.createdBy?.equals(user._id)) learningClass.createdBy = null;
     await learningClass.save();
@@ -90,8 +81,12 @@ export async function permanentlyDeleteUser(userId) {
     LearningProgress.deleteMany({ student: user._id }),
     LearningAssessmentAttempt.deleteMany({ student: user._id }),
     CertificationAssessmentAttempt.deleteMany({ student: user._id }),
+    AssessmentDraft.deleteMany({ student: user._id }),
+    Enrollment.deleteMany({ student: user._id }),
+    Enrollment.updateMany({ paymentVerifiedBy: user._id }, { $set: { paymentVerifiedBy: null } }),
+    ProjectSubmission.deleteMany({ student: user._id }),
+    ProjectSubmission.updateMany({ reviewedBy: user._id }, { $set: { reviewedBy: null } }),
     CourseCertificate.deleteMany({ student: user._id }),
-    TeacherFollow.deleteMany({ $or: [{ teacher: user._id }, { follower: user._id }] }),
     Notification.deleteMany({ recipient: user._id }),
     ClassInvitation.deleteMany({ student: user._id }),
     ClassInvitation.updateMany({ sentBy: user._id }, { $set: { sentBy: null } }),
@@ -110,6 +105,7 @@ export async function permanentlyDeleteUser(userId) {
     ),
     Assignment.updateMany({ createdBy: user._id }, { $set: { createdBy: null } }),
     CourseCertificate.updateMany({ revokedBy: user._id }, { $set: { revokedBy: null } }),
+    CourseCertificate.updateMany({ issuedBy: user._id }, { $set: { issuedBy: null } }),
     ClassSessionNote.updateMany({ updatedBy: user._id }, { $set: { updatedBy: null } }),
     PlatformSetting.updateMany({ updatedBy: user._id }, { $set: { updatedBy: null } }),
     ClassChatMessage.deleteMany({ user: user._id }),

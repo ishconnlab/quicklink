@@ -7,6 +7,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import config from '../config/env.js';
 import { LearningClass } from '../models/LearningClass.js';
+import { Enrollment } from '../models/Enrollment.js';
 import { LiveSession } from '../models/LiveSession.js';
 import { TrainingRegistration, REGISTRATION_STATUSES, normalizedEmail, normalizedPhone } from '../models/TrainingRegistration.js';
 import { TrainingRegistrationForm } from '../models/TrainingRegistrationForm.js';
@@ -124,12 +125,11 @@ export function statusTransition(registration, status, user, note = '') {
 }
 
 async function manageableClassIds(user) {
-  if (isAdmin(user)) return null;
-  return LearningClass.find({ $or: [{ teacher: user._id }, { teachers: user._id }] }).distinct('_id');
+  return isAdmin(user) ? null : [];
 }
 
 async function formWithClass(formId, user) {
-  const form = await TrainingRegistrationForm.findById(formId).populate('learningClass', 'title course subject level active published teacher teachers students maxStudents enrollmentOpen startsAt schedule timezone');
+  const form = await TrainingRegistrationForm.findById(formId).populate('learningClass', 'title course subject level active published students maxStudents enrollmentOpen startsAt schedule timezone payment');
   if (!form) throw ApiError.notFound('Registration form not found.');
   assertCanManageClass(user, form.learningClass);
   return form;
@@ -143,6 +143,23 @@ async function registrationFor(form, registrationId) {
 
 function temporaryPassword() {
   return `${randomBytes(9).toString('base64url')}Aa1!`;
+}
+
+async function ensureEnrollment(learningClass, studentId) {
+  const payment = learningClass.payment || {};
+  await Enrollment.updateOne(
+    { learningClass: learningClass._id, student: studentId },
+    {
+      $setOnInsert: {
+        status: 'enrolled',
+        enrolledAt: new Date(),
+        paymentStatus: payment.enabled ? 'unpaid' : 'not_required',
+        paymentAmount: payment.amount || 0,
+        paymentCurrency: payment.currency || 'RWF',
+      },
+    },
+    { upsert: true },
+  );
 }
 
 async function sendEnrollmentEmail({ student, learningClass, temporaryPassword: password }) {
@@ -208,6 +225,7 @@ async function enrollRegistration(form, registration, req) {
     throw ApiError.conflict('This class has reached its enrollment capacity.');
   }
   if (!alreadyEnrolled) await LearningClass.updateOne({ _id: learningClass._id }, { $addToSet: { students: student._id } });
+  await ensureEnrollment(learningClass, student._id);
   registration.student = student._id;
   statusTransition(registration, 'ENROLLED', req.user, 'Registration approved and student enrolled.');
   registration.accountClaimTokenHash = null;
@@ -423,14 +441,16 @@ async function addStudentToRegistrationClass(form, registration, student) {
       $push: { statusHistory: { status: 'ENROLLED', at: new Date(), note: 'Student account created and enrolled from the training registration form.' } },
     }, { new: true });
     if (!updated) throw ApiError.conflict('This registration has already been linked to an account.');
+    await ensureEnrollment(learningClass, student._id);
   } catch (error) {
     if (addedToRoster) await LearningClass.updateOne({ _id: learningClass._id }, { $pull: { students: student._id } });
+    await Enrollment.deleteOne({ learningClass: learningClass._id, student: student._id });
     throw error;
   }
 }
 
 export const createStudentAccountFromRegistration = asyncHandler(async (req, res) => {
-  const { registrationId, accountClaimToken, educationLevel } = req.body;
+  const { registrationId, accountClaimToken } = req.body;
   const { form, registration } = await findClaimableRegistration(req.params.slug, registrationId, accountClaimToken);
   if (await User.exists({ email: registration.email })) {
     throw ApiError.conflict('An account already uses this email. Sign in with that account to link it to this training.');
@@ -453,7 +473,6 @@ export const createStudentAccountFromRegistration = asyncHandler(async (req, res
     $set: {
       accountVerificationTokenHash: verificationTokenHash,
       accountVerificationExpiresAt: verificationExpiresAt,
-      pendingAccountEducationLevel: educationLevel,
       accountSetupTokenHash: null,
       accountSetupExpiresAt: null,
     },
@@ -493,7 +512,6 @@ export const verifyStudentAccountFromRegistration = asyncHandler(async (req, res
   const suppliedHash = createHash('sha256').update(req.body.accountVerificationToken).digest();
   const storedHash = registration?.accountVerificationTokenHash ? Buffer.from(registration.accountVerificationTokenHash, 'hex') : Buffer.alloc(0);
   if (!registration || storedHash.length !== suppliedHash.length || !timingSafeEqual(storedHash, suppliedHash)
-    || !registration.pendingAccountEducationLevel
     || !registration.accountClaimExpiresAt || registration.accountClaimExpiresAt <= new Date()
     || registration.status === 'REJECTED' || registration.student) {
     throw ApiError.conflict('This verification link is invalid, expired, or already used. Request a new verification email.');
@@ -515,7 +533,7 @@ export const verifyStudentAccountFromRegistration = asyncHandler(async (req, res
     },
   });
   if (!updated.modifiedCount) throw ApiError.conflict('This verification link has already been used.');
-  res.json({ success: true, data: { accountSetupToken, registrationId: registration._id.toString(), email: registration.email, educationLevel: registration.pendingAccountEducationLevel } });
+  res.json({ success: true, data: { accountSetupToken, registrationId: registration._id.toString(), email: registration.email } });
 });
 
 export const completeStudentAccountFromRegistration = asyncHandler(async (req, res) => {
@@ -530,7 +548,7 @@ export const completeStudentAccountFromRegistration = asyncHandler(async (req, r
   const suppliedHash = createHash('sha256').update(req.body.accountSetupToken).digest();
   const storedHash = registration?.accountSetupTokenHash ? Buffer.from(registration.accountSetupTokenHash, 'hex') : Buffer.alloc(0);
   if (!registration || storedHash.length !== suppliedHash.length || !timingSafeEqual(storedHash, suppliedHash)
-    || !registration.pendingAccountEducationLevel || !registration.accountClaimExpiresAt || registration.accountClaimExpiresAt <= new Date()
+    || !registration.accountClaimExpiresAt || registration.accountClaimExpiresAt <= new Date()
     || registration.status === 'REJECTED' || registration.student) {
     throw ApiError.conflict('Your email verification has expired. Request a new account-verification email.');
   }
@@ -541,7 +559,7 @@ export const completeStudentAccountFromRegistration = asyncHandler(async (req, r
   const student = new User({
     name: registration.name,
     email: registration.email,
-    educationLevel: registration.pendingAccountEducationLevel,
+    whatsapp: registration.whatsapp || '',
     role: 'student',
     isActive: true,
     registrationStatus: 'approved',

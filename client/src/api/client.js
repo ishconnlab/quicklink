@@ -25,6 +25,10 @@ export function assetUrl(url) {
   }
 }
 
+export function apiOrigin() {
+  return API_BASE || window.location.origin;
+}
+
 const api = axios.create({
   baseURL: `${API_BASE}/api`,
   timeout: 20000,
@@ -55,14 +59,14 @@ api.interceptors.response.use(
 export function apiError(error) {
   if (error.code === 'ERR_NETWORK') {
     return {
-      message: 'Could not connect to the QuickLink server. Check your connection or try again.',
+      message: 'Could not connect to the IshConnect server. Check your connection or try again.',
       offline: true,
       details: null,
     };
   }
   if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
     return {
-      message: 'The QuickLink server is taking too long to respond. It may be starting up; please try again.',
+      message: 'The IshConnect server is taking too long to respond. It may be starting up; please try again.',
       offline: false,
       timeout: true,
       details: null,

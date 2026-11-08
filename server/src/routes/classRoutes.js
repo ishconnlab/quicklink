@@ -5,7 +5,7 @@ import * as notes from '../controllers/classNoteController.js';
 import * as invitations from '../controllers/classInvitationController.js';
 import * as attendanceReports from '../controllers/attendanceReportController.js';
 import * as assignments from '../controllers/assignmentController.js';
-import { requireAuth, requireAdmin, requireTeacher } from '../middleware/auth.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 
 const router = Router();
@@ -37,24 +37,40 @@ const pdfQuery = z.object({
   studentId: objectId.optional(),
   sessionId: objectId.optional(),
 });
+const paymentSchema = z.object({
+  enabled: z.boolean().optional(),
+  freeDays: z.number().int().min(0).max(60).optional(),
+  amount: z.number().int().min(0).max(100000000).optional(),
+  currency: z.string().trim().min(1).max(12).optional(),
+  paymentCode: z.string().trim().min(1).max(40).optional(),
+  paymentName: z.string().trim().min(1).max(120).optional(),
+  instructions: z.string().trim().max(2000).optional(),
+});
+const projectSchema = z.object({
+  enabled: z.boolean().optional(),
+  required: z.boolean().optional(),
+  title: z.string().trim().max(180).optional(),
+  instructions: z.string().trim().max(4000).optional(),
+  allowGithub: z.boolean().optional(),
+  allowOtherLinks: z.boolean().optional(),
+  requireDescription: z.boolean().optional(),
+});
+const completionSchema = z.object({
+  requireReading: z.boolean().optional().default(false),
+  requireTheory: z.boolean().optional().default(false),
+  requirePractical: z.boolean().optional().default(false),
+  requireAttendance: z.boolean().optional().default(false),
+  minimumScore: z.number().min(0).max(100).optional().default(0),
+});
 const classFields = {
   title: z.string().trim().min(2).max(160),
   subject: z.string().trim().min(2).max(120),
   trade: z.string().trim().max(120).optional().default(''),
   introduction: z.string().trim().max(500).optional().default(''),
-  learningMaterials: z.array(objectId).max(50).optional().default([]),
-  completionRequirements: z.object({
-    requireReading: z.boolean().optional().default(false),
-    requireTheory: z.boolean().optional().default(false),
-    requirePractical: z.boolean().optional().default(false),
-    requireAttendance: z.boolean().optional().default(false),
-    minimumScore: z.number().min(0).max(100).optional().default(0),
-  }).optional(),
+  completionRequirements: completionSchema.optional(),
   course: z.string().trim().max(160).optional().default(''),
   level: z.enum(['L3', 'L4', 'L5', 'Bootcamp', 'Training']),
   description: z.string().trim().max(12000).optional().default(''),
-  teacherId: objectId.optional(),
-  teacherIds: z.array(objectId).min(1).max(20).optional(),
   studentIds: z.array(objectId).max(300).default([]),
   startsAt: z.string().datetime().nullable().optional(),
   endsAt: z.string().datetime().nullable().optional(),
@@ -67,7 +83,15 @@ const classFields = {
   timezone: z.string().trim().min(1).max(80).optional().default('Africa/Johannesburg'),
   maxStudents: z.number().int().min(1).max(10000).optional().default(300),
   enrollmentOpen: z.boolean().optional().default(true),
+  allowCancellation: z.boolean().optional().default(true),
   published: z.boolean().optional().default(true),
+  payment: paymentSchema.optional(),
+  projectSubmission: projectSchema.optional(),
+  certificationAssessmentEnabled: z.boolean().optional(),
+  assessmentAttempts: z.number().int().min(1).max(10).optional(),
+  assessmentPassMark: z.number().int().min(1).max(100).optional(),
+  assessmentLockdown: z.boolean().optional(),
+  minimumAttendanceSessions: z.number().int().min(0).max(100).optional(),
 };
 const createClassSchema = z.object(classFields);
 const updateClassSchema = z.object({
@@ -77,31 +101,29 @@ const updateClassSchema = z.object({
 
 router.use(requireAuth);
 router.get('/:classId/assignments', validate(classIdParams, 'params'), assignments.listClassAssignments);
-router.post('/:classId/assignments', validate(classIdParams, 'params'), validate(z.object(assignmentFields).refine((body) => body.passMark <= body.maxPoints, { message: 'Pass mark cannot exceed the assignment maximum.' })), assignments.createAssignment);
-router.get('/people/:role(teachers|students)', requireTeacher, classes.listPeople);
+router.post('/:classId/assignments', requireAdmin, validate(classIdParams, 'params'), validate(z.object(assignmentFields).refine((body) => body.passMark <= body.maxPoints, { message: 'Pass mark cannot exceed the assignment maximum.' })), assignments.createAssignment);
+router.get('/people/students', requireAdmin, classes.listPeople);
 router.post('/invitations/:token/accept', validate(invitationTokenParams, 'params'), invitations.acceptInvitation);
 router.get('/join/:sessionCode', validate(codeParams, 'params'), classes.joinByCode);
 router.get('/sessions/:sessionId/report', validate(sessionParams, 'params'), classes.getSessionReport);
 router.get('/sessions/:sessionId/notes', validate(sessionParams, 'params'), notes.getNotes);
-router.put('/sessions/:sessionId/notes', validate(sessionParams, 'params'), validate(z.object({ content: z.string().max(20000), revision: z.number().int().min(0) })), notes.saveNotes);
+router.put('/sessions/:sessionId/notes', requireAdmin, validate(sessionParams, 'params'), validate(z.object({ content: z.string().max(20000), revision: z.number().int().min(0) })), notes.saveNotes);
 router.post('/sessions/:sessionId/livekit-token', validate(sessionParams, 'params'), classes.createLiveKitToken);
-router.post('/sessions/:sessionId/end', validate(sessionParams, 'params'), validate(z.object({ teacherNotes: z.string().trim().max(4000).optional().default('') })), classes.endSession);
-router.patch('/sessions/:sessionId/attendance/:studentId', validate(attendanceParams, 'params'), validate(z.object({ status: z.enum(['present','absent','late','early','excused']), reason: z.string().trim().min(3).max(1000) })), classes.correctAttendance);
+router.post('/sessions/:sessionId/end', requireAdmin, validate(sessionParams, 'params'), validate(z.object({ teacherNotes: z.string().trim().max(4000).optional().default('') })), classes.endSession);
+router.patch('/sessions/:sessionId/attendance/:studentId', requireAdmin, validate(attendanceParams, 'params'), validate(z.object({ status: z.enum(['present', 'absent', 'late', 'early', 'excused']), reason: z.string().trim().min(3).max(1000) })), classes.correctAttendance);
 router.get('/sessions/:sessionId', validate(sessionParams, 'params'), classes.getSession);
 router.get('/', classes.listClasses);
-router.get('/:id/report.pdf', validate(idParams, 'params'), validate(pdfQuery, 'query'), attendanceReports.downloadAttendancePdf);
-router.get('/:id/invitations', validate(idParams, 'params'), invitations.listInvitations);
-router.post('/:id/invitations', validate(idParams, 'params'), validate(z.object({ studentIds: z.array(objectId).min(1).max(100) })), invitations.sendInvitations);
-router.post('/:id/invitations/:invitationId/resend', validate(invitationParams, 'params'), invitations.resendInvitation);
-router.delete('/:id/invitations/:invitationId', validate(invitationParams, 'params'), invitations.revokeInvitation);
+router.get('/:id/report.pdf', requireAdmin, validate(idParams, 'params'), validate(pdfQuery, 'query'), attendanceReports.downloadAttendancePdf);
+router.get('/:id/invitations', requireAdmin, validate(idParams, 'params'), invitations.listInvitations);
+router.post('/:id/invitations', requireAdmin, validate(idParams, 'params'), validate(z.object({ studentIds: z.array(objectId).min(1).max(100) })), invitations.sendInvitations);
+router.post('/:id/invitations/:invitationId/resend', requireAdmin, validate(invitationParams, 'params'), invitations.resendInvitation);
+router.delete('/:id/invitations/:invitationId', requireAdmin, validate(invitationParams, 'params'), invitations.revokeInvitation);
 router.get('/:id/sessions', validate(idParams, 'params'), classes.listClassSessions);
-router.post('/', requireTeacher, validate(createClassSchema), classes.createClass);
-router.patch('/:id', requireTeacher, validate(idParams, 'params'), validate(updateClassSchema), classes.updateClass);
+router.post('/', requireAdmin, validate(createClassSchema), classes.createClass);
+router.patch('/:id', requireAdmin, validate(idParams, 'params'), validate(updateClassSchema), classes.updateClass);
 router.delete('/:id/permanent', requireAdmin, validate(idParams, 'params'), classes.permanentlyDeleteClass);
-router.delete('/:id', requireTeacher, validate(idParams, 'params'), classes.archiveClass);
+router.delete('/:id', requireAdmin, validate(idParams, 'params'), classes.archiveClass);
 router.get('/:id', validate(idParams, 'params'), classes.getClass);
-router.post('/:id/sessions', validate(idParams, 'params'), validate(z.object({ title: z.string().trim().max(180).optional().default('') })), classes.startSession);
+router.post('/:id/sessions', requireAdmin, validate(idParams, 'params'), validate(z.object({ title: z.string().trim().max(180).optional().default('') })), classes.startSession);
 
 export default router;
-
-

@@ -1,0 +1,21 @@
+import mongoose from 'mongoose';
+
+const draftAnswerSchema = new mongoose.Schema({
+  questionIndex: { type: Number, required: true, min: 0, max: 9 },
+  optionIndex: { type: Number, required: true, min: 0, max: 3 },
+}, { _id: false });
+
+const assessmentDraftSchema = new mongoose.Schema({
+  student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+  course: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningClass', required: true, index: true },
+  answers: { type: [draftAnswerSchema], default: [] },
+  currentIndex: { type: Number, default: 0, min: 0, max: 9 },
+  fullscreenExitCount: { type: Number, default: 0, min: 0 },
+  startedAt: { type: Date, default: Date.now },
+  lastSavedAt: { type: Date, default: Date.now },
+}, { timestamps: true });
+
+assessmentDraftSchema.index({ student: 1, course: 1 }, { unique: true });
+
+export const AssessmentDraft = mongoose.model('AssessmentDraft', assessmentDraftSchema);
+export default AssessmentDraft;

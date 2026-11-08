@@ -5,6 +5,7 @@ import { LiveSession } from '../models/LiveSession.js';
 import { ClassChatMessage } from '../models/ClassChatMessage.js';
 import { verifyToken } from '../utils/token.js';
 import { normalizeRole, isAdmin, ROLES } from '../security/roles.js';
+import { assertCanAttend } from './classAccess.js';
 import config, { isAllowedOrigin } from '../config/env.js';
 import { RoomServiceClient, TrackSource } from 'livekit-server-sdk';
 
@@ -19,7 +20,7 @@ function publicMessage(message) {
     userId: message.user.toString(),
     name: message.name,
     role: message.role,
-    body: message.removedAt ? '[Message removed by a teacher]' : message.body,
+    body: message.removedAt ? '[Message removed by an administrator]' : message.body,
     pinned: Boolean(message.pinned),
     removed: Boolean(message.removedAt),
     createdAt: message.createdAt,
@@ -28,13 +29,13 @@ function publicMessage(message) {
 
 async function assertSessionAccess(session, user) {
   if (!session || session.status !== 'live') throw new Error('This class is no longer live.');
-  const item = await LearningClass.findById(session.learningClass).select('teacher teachers students');
+  const item = await LearningClass.findById(session.learningClass);
   if (!item) throw new Error('Class not found.');
+  if (!item.active) throw new Error('This training is archived.');
   const allowed = isAdmin(user)
-    || item.teacher?.toString() === user._id.toString()
-    || item.teachers.some((teacher) => teacher.toString() === user._id.toString())
     || item.students.some((student) => student.toString() === user._id.toString());
   if (!allowed) throw new Error('You are not enrolled in this class.');
+  await assertCanAttend(item, user);
   return item;
 }
 
@@ -56,7 +57,7 @@ async function openAttendance(sessionId, user) {
   } else {
     await LiveSession.updateOne(
       { _id: sessionId, status: 'live', 'attendance.user': { $ne: user._id } },
-      { $push: { attendance: { user: user._id, name: user.name, role: user.role === 'student' ? 'student' : 'teacher', firstJoinedAt: now, lastJoinedAt: now, joinCount: 1, totalSeconds: 0 } } }
+      { $push: { attendance: { user: user._id, name: user.name, role: user.role, firstJoinedAt: now, lastJoinedAt: now, joinCount: 1, totalSeconds: 0 } } }
     );
   }
 }
@@ -166,9 +167,8 @@ export function initializeClassRealtime(httpServer) {
       try {
         const session = await LiveSession.findOne({ _id: sessionId, status: 'live' });
         const classItem = await assertSessionAccess(session, user);
-        const teacherIds = [classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map(String);
-        if (user.role !== 'admin' && !teacherIds.includes(user._id)) {
-          return acknowledge({ ok: false, message: 'Only the assigned teacher or an admin can request student screen sharing.' });
+        if (user.role !== 'admin') {
+          return acknowledge({ ok: false, message: 'Only an administrator can request student screen sharing.' });
         }
         if (!classItem.students.some((id) => id.toString() === studentId)) {
           return acknowledge({ ok: false, message: 'That participant is not an enrolled student in this class.' });
@@ -232,9 +232,7 @@ export function initializeClassRealtime(httpServer) {
       try {
         const session = await LiveSession.findById(sessionId);
         if (!session || session.status !== 'live') return acknowledge({ ok: false, message: 'This class has ended.' });
-        const classItem = session && await LearningClass.findById(session.learningClass).select('teacher teachers');
-        const teacherIds = classItem ? [classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map(String) : [];
-        if (user.role !== 'admin' && !teacherIds.includes(user._id)) return acknowledge({ ok: false, message: 'Only a teacher can pin class messages.' });
+        if (user.role !== 'admin') return acknowledge({ ok: false, message: 'Only an administrator can pin class messages.' });
         const message = await ClassChatMessage.findOneAndUpdate(
           { _id: messageId, session: sessionId, removedAt: null },
           { $set: { pinned: Boolean(pinned), pinnedBy: pinned ? user._id : null } },
@@ -253,9 +251,7 @@ export function initializeClassRealtime(httpServer) {
       try {
         const session = await LiveSession.findById(sessionId);
         if (!session || session.status !== 'live') return acknowledge({ ok: false, message: 'This class has ended.' });
-        const classItem = session && await LearningClass.findById(session.learningClass).select('teacher teachers');
-        const teacherIds = classItem ? [classItem.teacher, ...(classItem.teachers || [])].filter(Boolean).map(String) : [];
-        if (user.role !== 'admin' && !teacherIds.includes(user._id)) return acknowledge({ ok: false, message: 'Only a teacher can remove class messages.' });
+        if (user.role !== 'admin') return acknowledge({ ok: false, message: 'Only an administrator can remove class messages.' });
         const message = await ClassChatMessage.findOneAndUpdate({ _id: messageId, session: sessionId, removedAt: null }, { $set: { removedAt: new Date(), removedBy: user._id, body: '' } }, { new: true });
         if (!message) return acknowledge({ ok: false, message: 'Message not found.' });
         io.to(roomName(sessionId)).emit('chat:updated', publicMessage(message));

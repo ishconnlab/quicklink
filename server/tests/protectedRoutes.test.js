@@ -68,8 +68,8 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     assert.equal(share.status, 400);
     assert.equal(registrationAdmin.status, 401);
     assert.equal(invalidRegistrationForm.status, 400);
-    assert.equal(assessmentStatus.status, 401);
-    assert.equal(assessmentSubmit.status, 401);
+    assert.equal(assessmentStatus.status, 404);
+    assert.equal(assessmentSubmit.status, 404);
     assert.equal(certificationSettings.status, 401);
     assert.equal(saveCertificationSettings.status, 401);
     assert.equal(certificationAssessment.status, 401);

@@ -4,13 +4,12 @@ import { LiveSession } from '../models/LiveSession.js';
 import { ClassSessionNote } from '../models/ClassSessionNote.js';
 
 async function access(sessionId, user) {
-  const session = await LiveSession.findById(sessionId).populate('learningClass', 'teacher teachers students');
+  const session = await LiveSession.findById(sessionId).populate('learningClass', 'students');
   if (!session) throw ApiError.notFound('Class session not found');
   const item = session.learningClass;
-  const teachers = [item.teacher, ...(item.teachers || [])].filter(Boolean).map((teacher) => (teacher._id || teacher).toString());
-  const allowed = user.role === 'admin' || teachers.includes(user._id.toString()) || item.students.some((student) => student.toString() === user._id.toString());
+  const allowed = user.role === 'admin' || item.students.some((student) => student.toString() === user._id.toString());
   if (!allowed) throw ApiError.forbidden('You are not enrolled in this class.');
-  return { session, canEdit: user.role === 'admin' || teachers.includes(user._id.toString()) };
+  return { session, canEdit: user.role === 'admin' };
 }
 
 export const getNotes = asyncHandler(async (req, res) => {
@@ -21,7 +20,7 @@ export const getNotes = asyncHandler(async (req, res) => {
 
 export const saveNotes = asyncHandler(async (req, res) => {
   const { session, canEdit } = await access(req.params.sessionId, req.user);
-  if (!canEdit) throw ApiError.forbidden('Only a teacher or admin can update shared class notes.');
+  if (!canEdit) throw ApiError.forbidden('Only an administrator can update shared class notes.');
   const expectedRevision = req.body.revision;
   const note = await ClassSessionNote.findOneAndUpdate(
     { session: session._id, revision: expectedRevision },

@@ -13,10 +13,6 @@ export const login = asyncHandler(async (req, res) => {
   if ((user.registrationStatus || 'approved') === 'pending') throw ApiError.forbidden('Your student registration is waiting for admin approval.');
   if (user.registrationStatus === 'rejected') throw ApiError.forbidden('This student registration was not approved. Contact the QuickLink administrator.');
   if (!user.isActive) throw ApiError.forbidden('This account is disabled. Contact the QuickLink administrator.');
-  if (user.role === 'user') user.role = 'student';
-  if (!['admin', 'owner', 'teacher', 'student'].includes(user.role)) {
-    throw ApiError.forbidden('This account does not have access to QuickLink Learning.');
-  }
   user.role = normalizeRole(user.role);
 
   user.lastLoginAt = new Date();
@@ -25,12 +21,28 @@ export const login = asyncHandler(async (req, res) => {
 });
 
 export const register = asyncHandler(async (req, res) => {
-  const { name, email, password, educationLevel } = req.body;
+  const { name, email, password, whatsapp, country, province } = req.body;
   try {
-    const user = new User({ name, email, educationLevel, role: 'student', isActive: false, registrationStatus: 'pending' });
+    const user = new User({
+      name,
+      email,
+      whatsapp,
+      country,
+      province,
+      role: 'student',
+      isActive: true,
+      registrationStatus: 'approved',
+    });
     await user.setPassword(password);
     await user.save();
-    res.status(202).json({ success: true, data: { user: user.toSafeJSON(), message: 'Registration received. An administrator must approve your account before you can sign in.' } });
+    res.status(201).json({
+      success: true,
+      data: {
+        token: signToken(user),
+        user: user.toSafeJSON(),
+        message: 'Your QuickLink student account is ready. Welcome aboard.',
+      },
+    });
   } catch (error) {
     if (error?.code === 11000) throw ApiError.conflict('An account with this email already exists.');
     throw error;
@@ -39,6 +51,16 @@ export const register = asyncHandler(async (req, res) => {
 
 export const me = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user: req.user.toSafeJSON() } });
+});
+
+export const updateProfile = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.user._id);
+  if (!user) throw ApiError.unauthorized();
+  for (const field of ['name', 'whatsapp', 'country', 'province']) {
+    if (req.body[field] !== undefined) user[field] = req.body[field];
+  }
+  await user.save();
+  res.json({ success: true, data: { user: user.toSafeJSON() } });
 });
 
 export const changePassword = asyncHandler(async (req, res) => {
@@ -57,5 +79,4 @@ export const logout = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { message: 'Signed out successfully' } });
 });
 
-export default { login, me, changePassword };
-
+export default { login, register, me, updateProfile, changePassword, logout };

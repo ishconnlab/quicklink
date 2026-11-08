@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 const attendanceSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true },
-  role: { type: String, enum: ['teacher', 'student'], required: true },
+  role: { type: String, enum: ['admin', 'teacher', 'student'], required: true },
   firstJoinedAt: { type: Date, required: true },
   lastJoinedAt: { type: Date, required: true },
   lastLeftAt: { type: Date, default: null },
@@ -15,7 +15,7 @@ const reportAttendanceSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   name: { type: String, required: true },
   email: { type: String, default: '' },
-  role: { type: String, enum: ['teacher', 'student'], required: true },
+  role: { type: String, enum: ['admin', 'teacher', 'student'], required: true },
   attended: { type: Boolean, default: false },
   status: { type: String, enum: ['present', 'absent', 'late', 'early', 'excused'], default: 'absent' },
   late: { type: Boolean, default: false },

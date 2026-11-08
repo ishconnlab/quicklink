@@ -5,7 +5,7 @@ import { TrainingRegistration } from '../src/models/TrainingRegistration.js';
 import { User } from '../src/models/User.js';
 import { createUserSchema, registerSchema } from '../src/utils/validators.js';
 
-test('student accounts accept bootcamp and training education levels', () => {
+test('student accounts preserve legacy education levels while account creation ignores them', () => {
   for (const educationLevel of ['Bootcamp', 'Training']) {
     const user = new User({
       name: 'Training Student',
@@ -15,9 +15,28 @@ test('student accounts accept bootcamp and training education levels', () => {
       role: 'student',
     });
     assert.equal(user.validateSync(), undefined);
-    assert.equal(registerSchema.safeParse({ name: 'Training Student', email: 'student@example.test', password: 'valid-password', educationLevel }).success, true);
-    assert.equal(createUserSchema.safeParse({ name: 'Training Student', email: 'student@example.test', password: 'valid-password', role: 'student', educationLevel }).success, true);
   }
+  const registration = registerSchema.safeParse({
+    name: 'Training Student',
+    email: 'student@example.test',
+    whatsapp: '+27123456789',
+    country: 'South Africa',
+    province: 'Gauteng',
+    password: 'valid-password',
+    educationLevel: 'Bootcamp',
+  });
+  assert.equal(registration.success, true);
+  assert.equal('educationLevel' in registration.data, false);
+  const created = createUserSchema.safeParse({
+    name: 'Training Student',
+    email: 'student@example.test',
+    password: 'valid-password',
+    role: 'admin',
+    educationLevel: 'Training',
+  });
+  assert.equal(created.success, true);
+  assert.equal('educationLevel' in created.data, false);
+  assert.equal('role' in created.data, false);
 });
 
 test('training registrations can store expiring, non-public account claim data', () => {

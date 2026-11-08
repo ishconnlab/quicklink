@@ -4,6 +4,8 @@ const classInvitationSchema = new mongoose.Schema({
   learningClass: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningClass', required: true, index: true },
   student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   email: { type: String, required: true, lowercase: true, trim: true },
+  whatsapp: { type: String, default: '', trim: true, maxlength: 40 },
+  whatsappUrl: { type: String, default: '', maxlength: 4000 },
   tokenHash: { type: String, default: null, select: false },
   status: { type: String, enum: ['pending', 'sent', 'accepted', 'expired', 'failed', 'revoked'], default: 'pending', index: true },
   expiresAt: { type: Date, default: null },

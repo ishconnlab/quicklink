@@ -13,29 +13,39 @@ export const loginSchema = z.object({
 export const registerSchema = z.object({
   name: z.string().trim().min(2, 'Name is too short').max(120),
   email: z.string().trim().toLowerCase().email('A valid email is required').max(254),
+  whatsapp: z.string().trim().min(7, 'Enter a valid WhatsApp number').max(40),
+  country: z.string().trim().min(2, 'Choose your country').max(120),
+  province: z.string().trim().min(2, 'Enter your province, state, or region').max(120),
   password: z.string().min(10, 'Password must be at least 10 characters').max(200),
-  educationLevel: z.enum(['L3', 'L4', 'L5', 'Bootcamp', 'Training']),
 });
 
 export const createUserSchema = z.object({
   name: z.string().trim().min(2, 'Name is too short').max(120),
   email: z.string().trim().toLowerCase().email('A valid email is required'),
   password: z.string().min(8, 'Password must be at least 8 characters').max(200),
-  role: z.enum(['teacher', 'student']).default('student'),
-  educationLevel: z.enum(['L3', 'L4', 'L5', 'Bootcamp', 'Training']).optional(),
-}).refine((body) => body.role !== 'student' || Boolean(body.educationLevel), 'Choose an education level for student accounts.');
+  whatsapp: z.string().trim().max(40).optional().default(''),
+  country: z.string().trim().max(120).optional().default(''),
+  province: z.string().trim().max(120).optional().default(''),
+});
 export const updateUserSchema = z.object({
   name: z.string().trim().min(2).max(120).optional(),
   email: z.string().trim().toLowerCase().email().max(254).optional(),
-  role: z.enum(['teacher', 'student']).optional(),
-  educationLevel: z.enum(['L3', 'L4', 'L5', 'Bootcamp', 'Training']).nullable().optional(),
+  role: z.enum(['admin', 'student']).optional(),
+  whatsapp: z.string().trim().max(40).optional(),
+  country: z.string().trim().max(120).optional(),
+  province: z.string().trim().max(120).optional(),
   registrationStatus: z.enum(['approved', 'rejected']).optional(),
   isActive: z.boolean().optional(),
   password: z.string().min(8).max(200).optional(),
-}).refine((value) => Object.keys(value).length > 0, 'Provide at least one account field to update')
-  .refine((value) => value.role !== 'student' || Boolean(value.educationLevel), 'Choose an education level when assigning the student role.');
+}).refine((value) => Object.keys(value).length > 0, 'Provide at least one account field to update');
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Current password is required'),
   newPassword: z.string().min(8, 'New password must be at least 8 characters').max(200),
 });
+export const updateProfileSchema = z.object({
+  name: z.string().trim().min(2).max(120).optional(),
+  whatsapp: z.string().trim().max(40).optional(),
+  country: z.string().trim().max(120).optional(),
+  province: z.string().trim().max(120).optional(),
+}).refine((value) => Object.keys(value).length > 0, 'Provide at least one profile field to update');
 export const idParamSchema = z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id') });

@@ -2,18 +2,16 @@ import ApiError from '../utils/ApiError.js';
 
 export const ROLES = Object.freeze({
   ADMIN: 'admin',
-  TEACHER: 'teacher',
   STUDENT: 'student',
 });
 
 export const PRIMARY_ROLES = Object.freeze(Object.values(ROLES));
 
-// Historical QuickLink databases used "owner" for the administrator role.
-// Treat it as an alias so existing sessions and records keep working until the
-// migration script has normalized the stored value.
+// Legacy QuickLink databases used owner/admin and teacher roles. Only admin and
+// student exist after the training-platform redesign: owner records become
+// admins and former teacher records are safely demoted to students.
 export function normalizeRole(role) {
   if (role === 'owner' || role === 'admin') return ROLES.ADMIN;
-  if (role === 'teacher') return ROLES.TEACHER;
   return ROLES.STUDENT;
 }
 
@@ -22,30 +20,24 @@ export function isAdmin(user) {
   return role === ROLES.ADMIN || role === 'owner';
 }
 
-export function isTeacher(user) {
-  return (typeof user === 'string' ? user : user?.role) === ROLES.TEACHER;
+export function isTeacher() {
+  return false;
 }
 
 export function isStudent(user) {
-  return (typeof user === 'string' ? user : user?.role) === ROLES.STUDENT;
+  return normalizeRole(typeof user === 'string' ? user : user?.role) === ROLES.STUDENT;
 }
 
 export function roleLabel(role) {
-  if (isAdmin(role)) return 'Admin';
-  if (isTeacher(role)) return 'Teacher';
-  return 'Student';
+  return isAdmin(role) ? 'Admin' : 'Student';
 }
 
-export function classTeacherIds(learningClass) {
-  if (!learningClass) return [];
-  return [learningClass.teacher, ...(learningClass.teachers || [])]
-    .filter(Boolean)
-    .map((teacher) => (teacher._id || teacher).toString());
+export function classTeacherIds() {
+  return [];
 }
 
-export function isClassTeacher(user, learningClass) {
-  if (!user || !learningClass) return false;
-  return classTeacherIds(learningClass).includes(user._id.toString());
+export function isClassTeacher() {
+  return false;
 }
 
 export function isEnrolledStudent(user, learningClass) {
@@ -55,18 +47,18 @@ export function isEnrolledStudent(user, learningClass) {
   );
 }
 
-export function canManageClass(user, learningClass) {
-  return isAdmin(user) || isClassTeacher(user, learningClass);
+export function canManageClass(user) {
+  return isAdmin(user);
 }
 
 export function canAccessClass(user, learningClass) {
-  return canManageClass(user, learningClass) || isEnrolledStudent(user, learningClass);
+  return canManageClass(user) || isEnrolledStudent(user, learningClass);
 }
 
 export function assertCanManageClass(user, learningClass) {
   if (!learningClass) throw ApiError.notFound('Class not found');
-  if (!canManageClass(user, learningClass)) {
-    throw ApiError.forbidden('Only an assigned teacher or an administrator can manage this class.');
+  if (!canManageClass(user)) {
+    throw ApiError.forbidden('Only an administrator can manage training classes.');
   }
 }
 

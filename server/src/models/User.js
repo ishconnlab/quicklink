@@ -14,7 +14,10 @@ const userSchema = new mongoose.Schema(
       index: true,
     },
     passwordHash: { type: String, required: true, select: false },
-    role: { type: String, enum: Object.values(ROLES), default: ROLES.STUDENT, index: true },
+    role: { type: String, enum: ['admin', 'student'], default: ROLES.STUDENT, index: true },
+    whatsapp: { type: String, default: '', trim: true, maxlength: 40 },
+    country: { type: String, default: '', trim: true, maxlength: 120 },
+    province: { type: String, default: '', trim: true, maxlength: 120 },
     educationLevel: { type: String, enum: ['L3', 'L4', 'L5', 'Bootcamp', 'Training'], default: null },
     registrationStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: 'approved', index: true },
     isActive: { type: Boolean, default: true },
@@ -32,9 +35,12 @@ userSchema.methods.setPassword = async function setPassword(plain) {
 };
 
 userSchema.pre('validate', function migrateLegacyRole(next) {
-  if (this.role === 'user') this.role = ROLES.STUDENT;
-  // Accept legacy owner records; new writes always use the admin value.
-  if (this.role === 'owner') this.role = ROLES.ADMIN;
+  const normalized = normalizeRole(this.role);
+  if (this.role !== normalized) {
+    this.role = normalized;
+    if (normalized !== 'admin') this.educationLevel = this.educationLevel || null;
+  }
+  if (!this.registrationStatus) this.registrationStatus = 'approved';
   next();
 });
 
@@ -57,10 +63,13 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     name: this.name,
     email: this.email,
     role,
+    whatsapp: this.whatsapp || '',
+    country: this.country || '',
+    province: this.province || '',
     isActive: this.isActive,
     isAdmin: role === ROLES.ADMIN,
     isOwner: role === ROLES.ADMIN,
-    isTeacher: role === ROLES.TEACHER,
+    isTeacher: false,
     isStudent: role === ROLES.STUDENT,
     educationLevel: this.educationLevel || null,
     registrationStatus: this.registrationStatus || 'approved',
