@@ -93,13 +93,17 @@ export const getDashboard = asyncHandler(async (_req, res) => {
     { $match: { paymentStatus: 'paid' } },
     { $group: { _id: '$paymentCurrency', total: { $sum: '$paymentAmount' } } },
   ]);
-  const [recentEnrollments, upcomingTrainings, recentActivity] = await Promise.all([
+  const [recentEnrollments, upcomingTrainings, recentActivity, recentProjectSubmissions] = await Promise.all([
     Enrollment.find({ status: 'enrolled' })
       .populate('student', 'name email whatsapp country province')
       .populate('learningClass', 'title subject level startsAt payment')
       .sort({ createdAt: -1 }).limit(6).lean(),
     LearningClass.find({ active: true, startsAt: { $gte: new Date() } }).sort({ startsAt: 1 }).limit(5).select('title subject level startsAt students thumbnailUrl thumbnailFile').lean(),
     ActivityLog.find({}).sort({ createdAt: -1 }).limit(8).lean(),
+    ProjectSubmission.find({})
+      .populate('student', 'name email')
+      .populate('learningClass', 'title')
+      .sort({ submittedAt: -1 }).limit(8).lean(),
   ]);
   res.json({
     success: true,
@@ -131,6 +135,21 @@ export const getDashboard = asyncHandler(async (_req, res) => {
         action: entry.action,
         message: entry.message,
         createdAt: entry.createdAt,
+      })),
+      recentProjectSubmissions: recentProjectSubmissions.map((submission) => ({
+        id: submission._id.toString(),
+        status: submission.status,
+        linkUrl: submission.linkUrl,
+        description: submission.description,
+        submittedAt: submission.submittedAt,
+        student: submission.student ? {
+          name: submission.student.name,
+          email: submission.student.email,
+        } : null,
+        course: submission.learningClass ? {
+          id: submission.learningClass._id.toString(),
+          title: submission.learningClass.title,
+        } : null,
       })),
     },
   });

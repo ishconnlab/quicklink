@@ -302,7 +302,8 @@ export const listCourses = asyncHandler(async (req, res) => {
     : {};
   const filter = manage
     ? { ...offeringFilter }
-    : { students: req.user._id, active: true };
+    : { active: true, published: { $ne: false } };
+  if (!manage && enrolledOnly) filter.students = req.user._id;
   if (req.query.level) filter.level = req.query.level;
   if (req.query.subject) filter.subject = { $regex: escapeRegex(req.query.subject), $options: 'i' };
   if (req.query.trade) filter.trade = { $regex: escapeRegex(req.query.trade), $options: 'i' };
@@ -342,7 +343,7 @@ export const getCourse = asyncHandler(async (req, res) => {
   if (!item) throw ApiError.notFound('Training not found.');
   const enrollment = isAdmin(req.user) ? null : await getEnrollment(item._id, req.user._id);
   const enrolled = Boolean(enrollment) || (item.students || []).some((student) => student.toString() === req.user._id.toString());
-  if (!isAdmin(req.user) && (!item.active || !enrolled)) throw ApiError.notFound('Training not found.');
+  if (!isAdmin(req.user) && (!item.active || (!enrolled && item.published === false))) throw ApiError.notFound('Training not found.');
   res.json({ success: true, data: { course: courseJson(item, req.user, enrollment) } });
 });
 

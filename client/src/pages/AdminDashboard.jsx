@@ -29,7 +29,7 @@ export default function AdminDashboard() {
   if (state.loading && !state.data) return <PageLoader label="Loading your command center…" />;
   if (!state.data) return <EmptyState title="Dashboard could not load" description="Check the server connection and try again." action={<button className="btn-primary" onClick={load}>Try again</button>} />;
 
-  const { stats, recentEnrollments, upcomingTrainings, recentActivity } = state.data;
+  const { stats, recentEnrollments, upcomingTrainings, recentActivity, recentProjectSubmissions = [] } = state.data;
   const revenue = stats.revenueByCurrency?.length ? stats.revenueByCurrency.map((item) => formatMoney(item.total, item.currency)).join(' · ') : 'No payments recorded';
   const submissionNotifications = state.notifications.filter((item) => ['assignment', 'project'].includes(item.type));
 
@@ -63,6 +63,17 @@ export default function AdminDashboard() {
 
     <section className="mb-6 rounded-2xl border border-green-200 bg-white p-4 sm:p-5">
       <SectionHeader title="Submission inbox" description="New student work sent to the admin team." icon={ReceiptText} action={<Link to="/courses" className="text-sm font-semibold text-brand-700">Open training manager</Link>} />
+      {recentProjectSubmissions.length > 0 && <div className="mb-4 space-y-2">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Recent project submissions</h3>
+        {recentProjectSubmissions.map((submission) => <article key={submission.id} className="rounded-xl border border-slate-100 p-3.5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-800">{submission.student?.name || 'Student'} <span className="font-normal text-slate-400">· {submission.course?.title || 'Course'}</span></p><p className="mt-0.5 text-xs text-slate-400">{submission.student?.email} · {formatDateTime(submission.submittedAt)}</p></div>
+            <Badge color={submission.status === 'approved' ? 'green' : submission.status === 'changes_requested' ? 'amber' : 'brand'}>{submission.status === 'changes_requested' ? 'Changes requested' : submission.status === 'approved' ? 'Approved' : 'Awaiting review'}</Badge>
+          </div>
+          <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600">{submission.description || 'No description submitted.'}</p>
+          <div className="mt-2 flex flex-wrap gap-3"><a href={submission.linkUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-brand-700 hover:underline">Open project</a>{submission.course?.id && <Link to={`/courses/${submission.course.id}`} className="text-xs font-semibold text-brand-700 hover:underline">Review submission</Link>}</div>
+        </article>)}
+      </div>}
       {submissionNotifications.length ? <div className="divide-y divide-slate-100">{submissionNotifications.slice(0, 8).map((item) => <div key={item.id} className={`flex min-w-0 items-center gap-3 py-3 ${item.read ? '' : 'bg-green-50/60'}`}><span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold text-slate-800">{item.title}</span><span className="block break-words text-xs leading-4 text-slate-500">{item.message} · {formatDateTime(item.createdAt)}</span></span><Link to={item.href || '/courses'} onClick={() => markRead(item)} className="btn-secondary min-h-9 shrink-0 px-3">Review</Link></div>)}</div> : <p className="text-sm text-slate-500">New assignment and project submissions will appear here.</p>}
     </section>
 

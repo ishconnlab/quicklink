@@ -94,8 +94,8 @@ export default function CoursesPage({ offeringType = '' }) {
   return <div>
     <PageHeader
       eyebrow={admin ? `${adminType === 'course' ? 'Course' : 'Training'} operations` : 'Training catalog'}
-      title={admin ? (adminType === 'course' ? 'Courses' : 'Trainings') : 'My trainings'}
-      subtitle={admin ? (adminType === 'course' ? 'Create and manage self-paced courses separately from scheduled trainings.' : 'Create, publish, schedule, and manage instructor-led trainings.') : 'Your enrolled courses and trainings in one place.'}
+      title={admin ? (adminType === 'course' ? 'Courses' : 'Trainings') : 'Courses and trainings'}
+      subtitle={admin ? (adminType === 'course' ? 'Create and manage self-paced courses separately from scheduled trainings.' : 'Create, publish, schedule, and manage instructor-led trainings.') : 'Browse published courses and trainings, then enroll in any offering with open enrollment.'}
       actions={admin ? <Link to={`/courses/new${adminType === 'course' ? '?type=course' : ''}`} className="btn-primary"><PlusCircle size={17} />New {typeLabel}</Link> : <Link to="/classes" className="btn-secondary">My live classes</Link>}
     />
 
@@ -110,9 +110,9 @@ export default function CoursesPage({ offeringType = '' }) {
         <select className="input min-w-0 text-sm" value={filters.subject} onChange={(event) => setFilters({ ...filters, subject: event.target.value })} aria-label="Filter by subject"><option value="">Any subject</option>{result.subjects.map((subject) => <option key={subject}>{subject}</option>)}</select>
         <select className="input col-span-2 min-w-0 text-sm sm:col-span-1" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })} aria-label="Sort trainings"><option value="newest">Recently updated</option><option value="title">Name A-Z</option><option value="popular">Most enrolled</option><option value="level">Level</option></select>
       </div>
-      <p className="mt-2 text-xs text-slate-500">{result.total} {admin ? typeLabel : 'course or training'}{result.total === 1 ? '' : 's'}{admin ? ' · includes drafts' : ' · your enrolled trainings'}</p>
+      <p className="mt-2 text-xs text-slate-500">{result.total} {admin ? typeLabel : 'published course or training'}{result.total === 1 ? '' : 's'}{admin ? ' · includes drafts' : ' · open to enrollment'}</p>
     </div>
-    {loading ? <PageLoader label={`Loading ${admin ? typeLabel : 'trainings'}…`} /> : !result.courses.length ? <EmptyState icon={GraduationCap} title={admin ? `No ${typeLabel}s found` : 'No enrolled trainings'} description={admin ? `Create the first ${typeLabel} or adjust your filters.` : 'Your enrolled courses and trainings will appear here.'} action={admin ? <Link to={`/courses/new${adminType === 'course' ? '?type=course' : ''}`} className="btn-primary">Create {typeLabel}</Link> : null} /> : <>
+    {loading ? <PageLoader label={`Loading ${admin ? typeLabel : 'courses and trainings'}…`} /> : !result.courses.length ? <EmptyState icon={GraduationCap} title={admin ? `No ${typeLabel}s found` : 'No published courses or trainings'} description={admin ? `Create the first ${typeLabel} or adjust your filters.` : 'Published offerings will appear here when available. Try clearing your filters.'} action={admin ? <Link to={`/courses/new${adminType === 'course' ? '?type=course' : ''}`} className="btn-primary">Create {typeLabel}</Link> : null} /> : <>
       <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">{result.courses.map((course) => <CourseCard key={course.id} course={course} admin={admin} onDelete={deleteTraining} deleting={deletingId === course.id} />)}</div>
       {result.pages > 1 && <div className="mt-5 flex items-center justify-center gap-3"><button className="btn-secondary" disabled={result.page <= 1} onClick={() => load(result.page - 1)}>Previous</button><span className="text-sm text-slate-500">Page {result.page} of {result.pages}</span><button className="btn-secondary" disabled={result.page >= result.pages} onClick={() => load(result.page + 1)}>Next</button></div>}
     </>}
