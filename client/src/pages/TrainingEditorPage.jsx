@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, ImagePlus, Save, Users, Wallet } from 'lucide-react';
 import api, { apiError, assetUrl } from '../api/client.js';
 import { PageHeader } from '../components/layout.jsx';
@@ -7,8 +7,9 @@ import { PageLoader, Spinner } from '../components/ui.jsx';
 import PagedCheckboxList from '../components/PagedCheckboxList.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 
-const blankForm = () => ({
-  title: '', subject: '', trade: '', course: '', level: 'Training', introduction: '', description: '',
+const blankForm = (offeringType = 'training') => ({
+  offeringType,
+  title: '', subject: '', trade: '', course: '', level: offeringType === 'course' ? 'L3' : 'Training', introduction: '', description: '',
   difficulty: 'Beginner', courseDuration: '', learningObjectives: [], prerequisites: [], language: 'English', slug: '', instructorName: '', instructorBio: '',
   startsAt: '', endsAt: '', enrollmentOpensAt: '', enrollmentClosesAt: '', schedule: '',
   durationMinutes: 60, lateThresholdMinutes: 15, earlyThresholdPercent: 75, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg',
@@ -43,11 +44,14 @@ function Field({ label, hint, className = '', children }) {
 
 export default function TrainingEditorPage() {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
   const editing = Boolean(id);
+  const initialOfferingType = !editing && searchParams.get('type') === 'course' ? 'course' : 'training';
   const requestId = useRef(newRequestId());
-  const [form, setForm] = useState(blankForm);
+  const [form, setForm] = useState(() => blankForm(initialOfferingType));
+  const isCourse = (editing ? form.offeringType : initialOfferingType) === 'course';
   const [people, setPeople] = useState([]);
   const [thumbnail, setThumbnail] = useState(null);
   const [thumbnailPreview, setThumbnailPreview] = useState('');
@@ -94,7 +98,7 @@ export default function TrainingEditorPage() {
 
   const validate = () => {
     const next = {};
-    if (form.title.trim().length < 2) next.title = 'Enter a training title.';
+    if (form.title.trim().length < 2) next.title = `Enter a ${isCourse ? 'course' : 'training'} title.`;
     if (form.subject.trim().length < 2) next.subject = 'Enter a subject.';
     if (!thumbnail && !form.thumbnailUrl) next.thumbnail = 'Choose a cover image before saving this course.';
     if (Number(form.maxStudents) < Math.max(1, form.studentIds.length)) next.maxStudents = 'Capacity must cover the selected students.';
@@ -108,18 +112,19 @@ export default function TrainingEditorPage() {
     if (!validate()) { toast.error('Review the highlighted fields.'); return; }
     setSaving(true);
     const payload = {
+      offeringType: isCourse ? 'course' : 'training',
       title: form.title.trim(), subject: form.subject.trim(), trade: form.trade || '', course: form.course || '',
       level: form.level, introduction: form.introduction || '', description: form.description || '',
       difficulty: form.difficulty || 'Beginner', courseDuration: form.courseDuration || '', learningObjectives: form.learningObjectives || [], prerequisites: form.prerequisites || [], language: form.language || 'English', instructorName: form.instructorName || '', instructorBio: form.instructorBio || '', ...(form.slug ? { slug: form.slug } : {}),
       studentIds: form.studentIds,
-      startsAt: toIso(form.startsAt), endsAt: toIso(form.endsAt),
-      enrollmentOpensAt: toIso(form.enrollmentOpensAt), enrollmentClosesAt: toIso(form.enrollmentClosesAt),
-      schedule: form.schedule || '', durationMinutes: num(form.durationMinutes, 60),
+      startsAt: isCourse ? null : toIso(form.startsAt), endsAt: isCourse ? null : toIso(form.endsAt),
+      enrollmentOpensAt: isCourse ? null : toIso(form.enrollmentOpensAt), enrollmentClosesAt: isCourse ? null : toIso(form.enrollmentClosesAt),
+      schedule: isCourse ? '' : form.schedule || '', durationMinutes: num(form.durationMinutes, 60),
       lateThresholdMinutes: num(form.lateThresholdMinutes, 15), earlyThresholdPercent: num(form.earlyThresholdPercent, 75),
       timezone: form.timezone || 'Africa/Johannesburg', maxStudents: num(form.maxStudents, 300),
       enrollmentOpen: Boolean(form.enrollmentOpen), allowCancellation: Boolean(form.allowCancellation), published: Boolean(form.published),
-      completionRequirements: { ...form.completionRequirements, minimumScore: num(form.completionRequirements.minimumScore, 0) },
-      payment: { ...form.payment, freeDays: num(form.payment.freeDays, 0), amount: num(form.payment.amount, 0) },
+      completionRequirements: { ...form.completionRequirements, requireAttendance: isCourse ? false : form.completionRequirements.requireAttendance, minimumScore: num(form.completionRequirements.minimumScore, 0) },
+      payment: { ...form.payment, freeDays: isCourse ? 0 : num(form.payment.freeDays, 0), amount: num(form.payment.amount, 0) },
       projectSubmission: { ...form.projectSubmission },
     };
     try {
@@ -135,7 +140,7 @@ export default function TrainingEditorPage() {
         body.append('thumbnail', thumbnail);
         await api.post(`/courses/${savedId}/thumbnail`, body);
       }
-      toast.success(editing ? 'Training updated.' : 'Training created.');
+      toast.success(editing ? `${isCourse ? 'Course' : 'Training'} updated.` : `${isCourse ? 'Course' : 'Training'} created.`);
       navigate(`/courses/${savedId}`);
     } catch (error) {
       toast.error(apiError(error).message);
@@ -147,23 +152,23 @@ export default function TrainingEditorPage() {
   if (loading) return <PageLoader label="Loading training editor…" />;
 
   return <div className="pb-4">
-    <Link to={editing ? `/courses/${id}` : '/courses'} className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft size={16} />{editing ? 'Back to training' : 'Back to trainings'}</Link>
+    <Link to={editing ? `/courses/${id}` : (isCourse ? '/admin/courses' : '/courses')} className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft size={16} />{editing ? `Back to ${isCourse ? 'course' : 'training'}` : `Back to ${isCourse ? 'courses' : 'trainings'}`}</Link>
     <PageHeader
-      eyebrow={editing ? 'Edit training' : 'New training'}
-      title={editing ? form.title || 'Edit training' : 'Create a premium training'}
-      subtitle="Set the learning experience, schedule, roster, payment rules, project requirements, and completion criteria."
-      actions={<button form="training-form" type="submit" disabled={saving} className="btn-primary">{saving ? <Spinner size={17} /> : <Save size={17} />}{saving ? 'Saving…' : editing ? 'Save changes' : 'Create training'}</button>}
+      eyebrow={`${editing ? 'Edit' : 'New'} ${isCourse ? 'course' : 'training'}`}
+      title={editing ? form.title || `Edit ${isCourse ? 'course' : 'training'}` : isCourse ? 'Create a self-paced course' : 'Create a premium training'}
+      subtitle={isCourse ? 'Set up an online course with structured lessons, saved progress, enrollment, and certificates. Live-class schedules and attendance do not apply.' : 'Set the learning experience, schedule, roster, payment rules, project requirements, and completion criteria.'}
+      actions={<button form="training-form" type="submit" disabled={saving} className="btn-primary">{saving ? <Spinner size={17} /> : <Save size={17} />}{saving ? 'Saving…' : editing ? 'Save changes' : `Create ${isCourse ? 'course' : 'training'}`}</button>}
     />
 
     <form id="training-form" onSubmit={submit} className="space-y-5">
       <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
-        <h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><BookOpen size={18} className="text-brand-700" />Training identity</h2>
+        <h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><BookOpen size={18} className="text-brand-700" />{isCourse ? 'Course identity' : 'Training identity'}</h2>
         <p className="mt-1 text-sm text-slate-500">This is what students see in the catalog and on their certificate.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field label="Full training title" hint="Use the official program name." className="sm:col-span-2"><input className={`input ${errors.title ? 'ring-2 ring-red-400' : ''}`} required minLength={2} maxLength={160} value={form.title} onChange={(event) => set('title', event.target.value)} placeholder="e.g. Professional Web Development Bootcamp" />{errors.title && <span className="mt-1 block text-xs text-red-600">{errors.title}</span>}</Field>
+          <Field label={`Full ${isCourse ? 'course' : 'training'} title`} hint="Use the official program name." className="sm:col-span-2"><input className={`input ${errors.title ? 'ring-2 ring-red-400' : ''}`} required minLength={2} maxLength={160} value={form.title} onChange={(event) => set('title', event.target.value)} placeholder={isCourse ? 'e.g. Machine Learning Foundations' : 'e.g. Professional Web Development Bootcamp'} />{errors.title && <span className="mt-1 block text-xs text-red-600">{errors.title}</span>}</Field>
           <Field label="Subject"><input className={`input ${errors.subject ? 'ring-2 ring-red-400' : ''}`} required minLength={2} maxLength={120} value={form.subject} onChange={(event) => set('subject', event.target.value)} placeholder="e.g. Software Development" />{errors.subject && <span className="mt-1 block text-xs text-red-600">{errors.subject}</span>}</Field>
           <Field label="Trade / pathway" hint="Optional grouping for the catalog."><input className="input" maxLength={120} value={form.trade} onChange={(event) => set('trade', event.target.value)} placeholder="e.g. Technology" /></Field>
-          <Field label="Level"><select className="input" value={form.level} onChange={(event) => set('level', event.target.value)}>{['Bootcamp', 'Training'].map((level) => <option key={level}>{level}</option>)}</select></Field>
+          <Field label="Level"><select className="input" value={form.level} onChange={(event) => set('level', event.target.value)}>{(isCourse ? ['L3', 'L4', 'L5', 'Bootcamp', 'Training'] : ['Bootcamp', 'Training']).map((level) => <option key={level}>{level}</option>)}</select></Field>
           <Field label="Program / course label" hint="Optional internal program name."><input className="input" maxLength={160} value={form.course} onChange={(event) => set('course', event.target.value)} placeholder="e.g. Web Development" /></Field>
           <Field label="Difficulty"><select className="input" value={form.difficulty} onChange={(event) => set('difficulty', event.target.value)}>{['Beginner', 'Intermediate', 'Advanced'].map((item) => <option key={item}>{item}</option>)}</select></Field>
           <Field label="Course duration" hint="Learning programme duration, separate from live session length."><input className="input" maxLength={120} value={form.courseDuration} onChange={(event) => set('courseDuration', event.target.value)} placeholder="e.g. 8 weeks" /></Field>
@@ -179,7 +184,20 @@ export default function TrainingEditorPage() {
         </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+      {isCourse && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+        <h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><Users size={18} className="text-brand-700" />Course enrollment</h2>
+        <p className="mt-1 text-sm text-slate-500">Learners find courses alongside trainings in their Trainings area. No live-class schedule or attendance is required.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Maximum students"><input type="number" min="1" max="10000" className={`input ${errors.maxStudents ? 'ring-2 ring-red-400' : ''}`} value={form.maxStudents} onChange={(event) => set('maxStudents', event.target.value)} />{errors.maxStudents && <span className="mt-1 block text-xs text-red-600">{errors.maxStudents}</span>}</Field>
+        </div>
+        <div className="mt-4 grid gap-2 sm:grid-cols-3">
+          <Toggle label="Enrollment open" description="Students can join from the Trainings area." checked={form.enrollmentOpen} onChange={(value) => set('enrollmentOpen', value)} />
+          <Toggle label="Allow students to leave" description="Students may cancel their enrollment." checked={form.allowCancellation} onChange={(value) => set('allowCancellation', value)} />
+          <Toggle label="Published" description="Visible to students in Trainings." checked={form.published} onChange={(value) => set('published', value)} />
+        </div>
+      </section>}
+
+      {!isCourse && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><CalendarClock size={18} className="text-brand-700" />Schedule and enrollment</h2>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Training starts"><input type="datetime-local" className="input" value={form.startsAt} onChange={(event) => set('startsAt', event.target.value)} /></Field>
@@ -198,7 +216,7 @@ export default function TrainingEditorPage() {
           <Toggle label="Allow students to leave" description="Students may cancel their enrollment." checked={form.allowCancellation} onChange={(value) => set('allowCancellation', value)} />
           <Toggle label="Published" description="Visible in the student catalog." checked={form.published} onChange={(value) => set('published', value)} />
         </div>
-      </section>
+      </section>}
 
       <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><Users size={18} className="text-brand-700" />Enrolled students</h2>
@@ -208,10 +226,10 @@ export default function TrainingEditorPage() {
 
       <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><Wallet size={18} className="text-brand-700" />Payment rules</h2>
-        <p className="mt-1 text-sm text-slate-500">Students attend free for the configured number of days, then live access and project submission require verified payment.</p>
-        <div className="mt-4"><Toggle label="Require payment for this training" description="Enable mobile money payment with admin verification." checked={form.payment.enabled} onChange={(value) => set('payment', { ...form.payment, enabled: value })} /></div>
+        <p className="mt-1 text-sm text-slate-500">{isCourse ? 'Optionally require verified payment before students can access this self-paced course.' : 'Students attend free for the configured number of days, then live access and project submission require verified payment.'}</p>
+        <div className="mt-4"><Toggle label={`Require payment for this ${isCourse ? 'course' : 'training'}`} description="Enable mobile money payment with admin verification." checked={form.payment.enabled} onChange={(value) => set('payment', { ...form.payment, enabled: value })} /></div>
         {form.payment.enabled && <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Free access days"><input type="number" min="0" max="60" className="input" value={form.payment.freeDays} onChange={(event) => set('payment', { ...form.payment, freeDays: event.target.value })} /></Field>
+          {!isCourse && <Field label="Free access days"><input type="number" min="0" max="60" className="input" value={form.payment.freeDays} onChange={(event) => set('payment', { ...form.payment, freeDays: event.target.value })} /></Field>}
           <Field label="Amount"><input type="number" min="0" className="input" value={form.payment.amount} onChange={(event) => set('payment', { ...form.payment, amount: event.target.value })} /></Field>
           <Field label="Currency"><input className="input" maxLength={12} value={form.payment.currency} onChange={(event) => set('payment', { ...form.payment, currency: event.target.value })} /></Field>
           <Field label="Payment code"><input className="input" required={form.payment.enabled} maxLength={40} value={form.payment.paymentCode} onChange={(event) => set('payment', { ...form.payment, paymentCode: event.target.value })} placeholder="e.g. 699655" /></Field>
@@ -234,17 +252,17 @@ export default function TrainingEditorPage() {
           <Toggle label="Require a description" description="At least 10 characters explaining the work." checked={form.projectSubmission.requireDescription} onChange={(value) => set('projectSubmission', { ...form.projectSubmission, requireDescription: value })} />
         </div>}
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
-          <Toggle label="Require attendance" description="Students must attend the configured minimum sessions." checked={form.completionRequirements.requireAttendance} onChange={(value) => set('completionRequirements', { ...form.completionRequirements, requireAttendance: value })} />
+          {!isCourse && <Toggle label="Require attendance" description="Students must attend the configured minimum sessions." checked={form.completionRequirements.requireAttendance} onChange={(value) => set('completionRequirements', { ...form.completionRequirements, requireAttendance: value })} />}
           <Toggle label="Require practical assignments" description="All published practical work must pass." checked={form.completionRequirements.requirePractical} onChange={(value) => set('completionRequirements', { ...form.completionRequirements, requirePractical: value })} />
           <Toggle label="Require theory assessments" description="All published quizzes must pass." checked={form.completionRequirements.requireTheory} onChange={(value) => set('completionRequirements', { ...form.completionRequirements, requireTheory: value })} />
           <Field label="Minimum overall assignment score (%)"><input type="number" min="0" max="100" className="input" value={form.completionRequirements.minimumScore} onChange={(event) => set('completionRequirements', { ...form.completionRequirements, minimumScore: event.target.value })} /></Field>
         </div>
-        <p className="mt-3 rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900">The certification assessment and its 10 questions are configured from the training detail page after saving. Defaults come from platform settings.</p>
+        <p className="mt-3 rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900">The certification assessment and its 10 questions are configured from the {isCourse ? 'course' : 'training'} detail page after saving. Defaults come from platform settings.</p>
       </section>
 
       <div className="sticky bottom-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-100 bg-white/95 p-3 shadow-lg shadow-green-950/5 backdrop-blur lg:bottom-4">
-        <p className="text-xs text-slate-500">Changes apply to enrolled students immediately. A live session blocks roster changes.</p>
-        <div className="flex gap-2"><Link to={editing ? `/courses/${id}` : '/courses'} className="btn-secondary">Cancel</Link><button type="submit" disabled={saving} className="btn-primary">{saving ? <Spinner size={17} /> : <Save size={17} />}{saving ? 'Saving…' : editing ? 'Save changes' : 'Create training'}</button></div>
+        <p className="text-xs text-slate-500">Changes apply to enrolled students immediately.{!isCourse && ' A live session blocks roster changes.'}</p>
+        <div className="flex gap-2"><Link to={editing ? `/courses/${id}` : (isCourse ? '/admin/courses' : '/courses')} className="btn-secondary">Cancel</Link><button type="submit" disabled={saving} className="btn-primary">{saving ? <Spinner size={17} /> : <Save size={17} />}{saving ? 'Saving…' : editing ? 'Save changes' : `Create ${isCourse ? 'course' : 'training'}`}</button></div>
       </div>
     </form>
   </div>;

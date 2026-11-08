@@ -66,6 +66,7 @@ const learningClassSchema = new mongoose.Schema({
   thumbnailUrl: { type: String, default: '', maxlength: 1000 },
   learningMaterials: [{ type: mongoose.Schema.Types.ObjectId, ref: 'LearningBook' }],
   slug: { type: String, trim: true, lowercase: true, maxlength: 180, sparse: true, unique: true },
+  offeringType: { type: String, enum: ['training', 'course'], default: 'training', index: true },
   difficulty: { type: String, enum: ['Beginner', 'Intermediate', 'Advanced'], default: 'Beginner' },
   courseDuration: { type: String, trim: true, maxlength: 120, default: '' },
   learningObjectives: [{ type: String, trim: true, maxlength: 500 }],

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, ArrowRight, Award, CreditCard, GraduationCap, PlusCircle, Radio, ReceiptText, Sparkles, UserCheck, Users, Video } from 'lucide-react';
+import { Activity, ArrowRight, Award, BookOpen, CreditCard, GraduationCap, PlusCircle, Radio, ReceiptText, Sparkles, UserCheck, Users, Video } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader, SectionHeader, StatCard } from '../components/layout.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';
@@ -46,7 +46,7 @@ export default function AdminDashboard() {
       eyebrow="Administration"
       title="Training command center"
       subtitle="Monitor enrollments, payments, live sessions, assessments, and certificates across the platform."
-      actions={<><Link to="/enrollments?paymentStatus=pending" className="btn-secondary"><CreditCard size={16} />Verify payments</Link><Link to="/courses/new" className="btn-primary"><PlusCircle size={17} />New training</Link></>}
+      actions={<><Link to="/enrollments?paymentStatus=pending" className="btn-secondary"><CreditCard size={16} />Verify payments</Link><Link to="/courses/new?type=course" className="btn-secondary"><BookOpen size={16} />New course</Link><Link to="/courses/new" className="btn-primary"><PlusCircle size={17} />New training</Link></>}
     />
 
     <section className="mb-7">

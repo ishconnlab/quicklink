@@ -21,6 +21,7 @@ const listQuery = z.object({
   sort: z.enum(['newest', 'title', 'level', 'popular']).optional(),
   enrolled: z.enum(['true', 'false']).optional(),
   manage: z.enum(['true', 'false']).optional(),
+  offeringType: z.enum(['training', 'course']).optional(),
   page: z.string().regex(/^\d{1,4}$/).optional(),
   limit: z.string().regex(/^\d{1,3}$/).optional(),
 });

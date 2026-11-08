@@ -86,6 +86,7 @@ const lesson = z.object({
 const modulesSchema = z.array(z.object({ _id: objectId.optional(), title: z.string().trim().min(2).max(180), lessons: z.array(lesson).max(100).default([]) })).max(100);
 const classFields = {
   title: z.string().trim().min(2).max(160),
+  offeringType: z.enum(['training', 'course']).optional(),
   subject: z.string().trim().min(2).max(120),
   trade: z.string().trim().max(120).optional().default(''),
   introduction: z.string().trim().max(500).optional().default(''),

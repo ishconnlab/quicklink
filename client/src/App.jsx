@@ -82,7 +82,8 @@ export default function App() {
         <Route path="/training-registration/:slug" element={<PublicTrainingRegistrationPage />} />
         <Route element={<Protected><AppLayout /></Protected>}>
           <Route path="/dashboard" element={user?.role === 'admin' ? <AdminOnly><AdminDashboard /></AdminOnly> : <StudentDashboard />} />
-          <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/courses" element={<CoursesPage offeringType="training" />} />
+          <Route path="/admin/courses" element={<AdminOnly><CoursesPage offeringType="course" /></AdminOnly>} />
           <Route path="/courses/new" element={<AdminOnly><TrainingEditorPage /></AdminOnly>} />
           <Route path="/courses/:id" element={<CourseDetailPage />} />
           <Route path="/courses/:id/learn" element={<CourseLearningPage />} />

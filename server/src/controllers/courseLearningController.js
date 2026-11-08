@@ -5,6 +5,7 @@ import { LearningClass } from '../models/LearningClass.js';
 import { CourseLearningProgress } from '../models/CourseLearningProgress.js';
 import { isAdmin } from '../security/roles.js';
 import { isLessonAccessible } from '../services/lessonAccess.js';
+import { getEnrollment, paymentState } from '../services/classAccess.js';
 
 const idString = (value) => String(value?._id || value || '');
 function allLessons(course) {
@@ -66,6 +67,16 @@ async function courseAndProgress(req) {
   const admin = isAdmin(req.user);
   const enrolled = (course.students || []).some((student) => idString(student) === idString(req.user._id));
   if (!admin && (req.user.role !== 'student' || !enrolled)) throw ApiError.forbidden('You must be enrolled to access lessons.');
+  if (!admin && course.payment?.enabled) {
+    const enrollment = await getEnrollment(course._id, req.user._id);
+    const payment = paymentState(course, enrollment);
+    if (!payment.allowed) {
+      throw ApiError.conflict(
+        `Payment is required to access this course from day ${payment.freeDays + 1}. Submit your payment reference and wait for admin verification.`,
+        { code: 'PAYMENT_REQUIRED', ...payment },
+      );
+    }
+  }
   const progress = admin ? null : await CourseLearningProgress.findOne({ student: req.user._id, course: course._id });
   return { course, progress, admin };
 }

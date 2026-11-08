@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
-  Award, ChevronDown, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, PanelLeftClose,
+  Award, BookOpen, ChevronDown, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, PanelLeftClose,
   PanelLeftOpen, ReceiptText, Settings, Users, Video, X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -85,6 +85,7 @@ export default function AppLayout() {
       { label: 'Overview', links: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
       { label: 'Training operations', links: [
         { to: '/courses', label: 'Trainings', icon: GraduationCap },
+        { to: '/admin/courses', label: 'Courses', icon: BookOpen },
         { to: '/classes', label: 'Live classes', icon: Video },
         { to: '/enrollments', label: 'Enrollments & payments', icon: ReceiptText },
         { to: '/certificates', label: 'Certificates', icon: Award },

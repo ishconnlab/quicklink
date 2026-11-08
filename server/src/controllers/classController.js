@@ -84,6 +84,7 @@ function classJson(item, options = {}) {
     trade: item.trade || '',
     introduction: item.introduction || '',
     slug: item.slug || '',
+    offeringType: item.offeringType || 'training',
     difficulty: item.difficulty || 'Beginner',
     courseDuration: item.courseDuration || '',
     learningObjectives: item.learningObjectives || [],
@@ -262,9 +263,10 @@ export const listPeople = asyncHandler(async (req, res) => {
 export const listClasses = asyncHandler(async (req, res) => {
   const admin = isAdmin(req.user);
   const includeArchived = admin && req.query.includeArchived === 'true';
-  const filter = admin
-    ? (includeArchived ? {} : { active: true })
-    : { students: req.user._id, active: true };
+  const filter = {
+    offeringType: { $ne: 'course' },
+    ...(admin ? (includeArchived ? {} : { active: true }) : { students: req.user._id, active: true }),
+  };
   const page = Math.max(1, Number(req.query.page || 1));
   const limit = Math.min(100, Math.max(1, Number(req.query.limit || 24)));
   const [classes, total] = await Promise.all([
@@ -295,8 +297,11 @@ export const listCourses = asyncHandler(async (req, res) => {
   const admin = isAdmin(req.user);
   const manage = req.query.manage === 'true' && admin;
   const enrolledOnly = req.query.enrolled === 'true';
+  const offeringFilter = manage && req.query.offeringType
+    ? (req.query.offeringType === 'training' ? { offeringType: { $ne: 'course' } } : { offeringType: 'course' })
+    : {};
   const filter = manage
-    ? {}
+    ? { ...offeringFilter }
     : { students: req.user._id, active: true };
   if (req.query.level) filter.level = req.query.level;
   if (req.query.subject) filter.subject = { $regex: escapeRegex(req.query.subject), $options: 'i' };
@@ -314,8 +319,8 @@ export const listCourses = asyncHandler(async (req, res) => {
       .sort(req.query.sort === 'title' ? { title: 1 } : req.query.sort === 'popular' ? { students: -1, updatedAt: -1 } : req.query.sort === 'level' ? { level: 1, title: 1 } : { updatedAt: -1 })
       .skip((page - 1) * limit).limit(limit).lean(),
     LearningClass.countDocuments(filter),
-    LearningClass.distinct('subject', manage ? {} : { active: true, $or: [{ published: true }, { published: { $exists: false } }] }),
-    LearningClass.distinct('trade', manage ? {} : { active: true, $or: [{ published: true }, { published: { $exists: false } }] }),
+    LearningClass.distinct('subject', manage ? offeringFilter : { active: true, $or: [{ published: true }, { published: { $exists: false } }] }),
+    LearningClass.distinct('trade', manage ? offeringFilter : { active: true, $or: [{ published: true }, { published: { $exists: false } }] }),
   ]);
   const enrollments = await enrollmentMapFor(req.user, items);
   res.json({
@@ -485,13 +490,17 @@ export const createClass = asyncHandler(async (req, res) => {
   }
   validateClassDates(req.body);
   const students = await resolveStudents(req.body.studentIds || []);
+  const offeringType = req.body.offeringType || 'training';
   if (students.length > (req.body.maxStudents || 300)) throw ApiError.badRequest('The selected students exceed the training capacity.');
   const platformSettings = await getPlatformSettings();
+  const paymentSettings = { ...platformSettings.payment, ...(req.body.payment || {}) };
+  if (offeringType === 'course') paymentSettings.freeDays = 0;
   const slugBase = (req.body.slug || req.body.title).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 150) || 'training';
   if (req.body.slug && await LearningClass.exists({ slug: req.body.slug })) throw ApiError.conflict('That course slug is already in use.');
   const item = new LearningClass({
     ...(requestId ? { _id: requestId } : {}),
     title: req.body.title,
+    offeringType,
     subject: req.body.subject,
     trade: req.body.trade || '',
     introduction: req.body.introduction || '',
@@ -505,16 +514,19 @@ export const createClass = asyncHandler(async (req, res) => {
     instructorBio: req.body.instructorBio || '',
     lessonAccessMode: req.body.lessonAccessMode || 'sequential',
     modules: req.body.modules || [],
-    completionRequirements: req.body.completionRequirements || {},
+    completionRequirements: {
+      ...(req.body.completionRequirements || {}),
+      ...(offeringType === 'course' ? { requireAttendance: false } : {}),
+    },
     course: req.body.course || '',
     level: req.body.level || 'Training',
     description: req.body.description || '',
     students: students.map((student) => student._id),
-    startsAt: req.body.startsAt || null,
-    endsAt: req.body.endsAt || null,
-    enrollmentOpensAt: req.body.enrollmentOpensAt || null,
-    enrollmentClosesAt: req.body.enrollmentClosesAt || null,
-    schedule: req.body.schedule || '',
+    startsAt: offeringType === 'course' ? null : req.body.startsAt || null,
+    endsAt: offeringType === 'course' ? null : req.body.endsAt || null,
+    enrollmentOpensAt: offeringType === 'course' ? null : req.body.enrollmentOpensAt || null,
+    enrollmentClosesAt: offeringType === 'course' ? null : req.body.enrollmentClosesAt || null,
+    schedule: offeringType === 'course' ? '' : req.body.schedule || '',
     durationMinutes: req.body.durationMinutes,
     lateThresholdMinutes: req.body.lateThresholdMinutes,
     earlyThresholdPercent: req.body.earlyThresholdPercent,
@@ -523,7 +535,7 @@ export const createClass = asyncHandler(async (req, res) => {
     enrollmentOpen: req.body.enrollmentOpen,
     allowCancellation: req.body.allowCancellation,
     published: req.body.published !== false,
-    payment: { ...platformSettings.payment, ...(req.body.payment || {}) },
+    payment: paymentSettings,
     certificatePayment: req.body.certificatePayment || {},
     projectSubmission: req.body.projectSubmission || {},
     certificationAssessmentEnabled: Boolean(req.body.certificationAssessmentEnabled),
@@ -553,12 +565,15 @@ export const createClass = asyncHandler(async (req, res) => {
 export const updateClass = asyncHandler(async (req, res) => {
   const item = await LearningClass.findById(req.params.id);
   if (!item) throw ApiError.notFound('Training not found.');
+  if (req.body.offeringType && req.body.offeringType !== (item.offeringType || 'training')) {
+    throw ApiError.conflict('A course and a training cannot be converted into each other after creation.');
+  }
   if (req.body.slug && req.body.slug !== item.slug && await LearningClass.exists({ slug: req.body.slug, _id: { $ne: item._id } })) throw ApiError.conflict('That course slug is already in use.');
   if (req.body.studentIds !== undefined && await LiveSession.exists({ learningClass: item._id, status: 'live' })) {
     throw ApiError.conflict('End the live session before changing the student roster.');
   }
   const fields = [
-    'title', 'subject', 'trade', 'introduction', 'completionRequirements', 'course', 'level', 'description',
+    'title', 'offeringType', 'subject', 'trade', 'introduction', 'completionRequirements', 'course', 'level', 'description',
     'slug', 'difficulty', 'courseDuration', 'learningObjectives', 'prerequisites', 'language', 'instructorName', 'instructorBio', 'lessonAccessMode', 'modules',
     'active', 'published', 'startsAt', 'endsAt', 'enrollmentOpensAt', 'enrollmentClosesAt', 'schedule',
     'durationMinutes', 'lateThresholdMinutes', 'earlyThresholdPercent', 'timezone', 'maxStudents',
@@ -567,6 +582,15 @@ export const updateClass = asyncHandler(async (req, res) => {
   ];
   for (const field of fields) if (req.body[field] !== undefined) item[field] = req.body[field];
   if (req.body.payment) Object.assign(item.payment, req.body.payment);
+  if (item.offeringType === 'course') {
+    item.startsAt = null;
+    item.endsAt = null;
+    item.enrollmentOpensAt = null;
+    item.enrollmentClosesAt = null;
+    item.schedule = '';
+    item.completionRequirements.requireAttendance = false;
+    item.payment.freeDays = 0;
+  }
   if (req.body.projectSubmission) Object.assign(item.projectSubmission, req.body.projectSubmission);
   if (req.body.active === true) item.archivedAt = null;
   validateClassDates({ ...item.toObject(), ...req.body });
@@ -681,6 +705,7 @@ export const startSession = asyncHandler(async (req, res) => {
   const item = await LearningClass.findById(req.params.id);
   if (!item) throw ApiError.notFound('Training not found.');
   if (!isAdmin(req.user)) throw ApiError.forbidden('Only an administrator can start a live class.');
+  if (item.offeringType === 'course') throw ApiError.conflict('Self-paced courses do not have live classroom sessions.');
   if (!item.active) throw ApiError.conflict('Archived trainings cannot start a new session.');
   const current = await LiveSession.findOne({ learningClass: item._id, status: 'live' });
   if (current) throw ApiError.conflict('This training already has a live session.');

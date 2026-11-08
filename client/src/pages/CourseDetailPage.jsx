@@ -107,10 +107,10 @@ export default function CourseDetailPage() {
   };
 
   const leaveTraining = async () => {
-    const confirmed = await dialog.confirm({ title: 'Leave this training?', message: 'Your enrollment will be cancelled. Your attendance and submission history are kept for administration.', confirmLabel: 'Leave training', tone: 'danger' });
+    const confirmed = await dialog.confirm({ title: `Leave this ${course?.offeringType === 'course' ? 'course' : 'training'}?`, message: 'Your enrollment will be cancelled. Your progress and submission history are kept for administration.', confirmLabel: `Leave ${course?.offeringType === 'course' ? 'course' : 'training'}`, tone: 'danger' });
     if (!confirmed) return;
     setBusy('leave');
-    try { await api.delete(`/courses/${id}/enroll`); toast.success('You left the training.'); await load(); }
+    try { await api.delete(`/courses/${id}/enroll`); toast.success(`You left the ${course?.offeringType === 'course' ? 'course' : 'training'}.`); await load(); }
     catch (error) { toast.error(apiError(error).message); }
     finally { setBusy(''); }
   };
@@ -218,15 +218,16 @@ export default function CourseDetailPage() {
   const toggleArchive = async () => {
     if (!course) return;
     if (course.active) {
-      const approved = await dialog.confirm({ title: 'Archive this training?', message: 'Students keep their records, but the training is hidden from the catalog and new live sessions cannot start.', confirmLabel: 'Archive', tone: 'danger' });
+      const label = course.offeringType === 'course' ? 'course' : 'training';
+      const approved = await dialog.confirm({ title: `Archive this ${label}?`, message: `Students keep their records, but the ${label} is hidden from the catalog and new enrollments are stopped.`, confirmLabel: 'Archive', tone: 'danger' });
       if (!approved) return;
       setBusy('archive');
-      try { await api.delete(`/classes/${id}`); toast.success('Training archived.'); await load(); }
+      try { await api.delete(`/classes/${id}`); toast.success(`${label[0].toUpperCase()}${label.slice(1)} archived.`); await load(); }
       catch (error) { toast.error(apiError(error).message); }
       finally { setBusy(''); }
     } else {
       setBusy('archive');
-      try { await api.patch(`/classes/${id}`, { active: true }); toast.success('Training restored.'); await load(); }
+      try { await api.patch(`/classes/${id}`, { active: true }); toast.success(`${course.offeringType === 'course' ? 'Course' : 'Training'} restored.`); await load(); }
       catch (error) { toast.error(apiError(error).message); }
       finally { setBusy(''); }
     }
@@ -234,57 +235,61 @@ export default function CourseDetailPage() {
 
   const deleteTraining = async () => {
     if (!course) return;
+    const label = course.offeringType === 'course' ? 'course' : 'training';
     const approved = await dialog.confirm({
-      title: 'Delete this training permanently?',
-      message: 'This removes the training and its enrollments, submissions, certificates, registration records, attendance, and learning materials. This cannot be undone. End any live class first.',
-      confirmLabel: 'Delete training',
+      title: `Delete this ${label} permanently?`,
+      message: `This removes the ${label} and its enrollments, submissions, certificates, registration records, attendance, and learning materials. This cannot be undone.`,
+      confirmLabel: `Delete ${label}`,
       tone: 'danger',
     });
     if (!approved) return;
     setBusy('delete');
     try {
       await api.delete(`/classes/${id}/permanent`);
-      toast.success('Training deleted.');
-      navigate('/courses', { replace: true });
+      toast.success(`${label[0].toUpperCase()}${label.slice(1)} deleted.`);
+      navigate(course.offeringType === 'course' ? '/admin/courses' : '/courses', { replace: true });
     } catch (error) { toast.error(apiError(error).message); }
     finally { setBusy(''); }
   };
 
-  if (loading && !course) return <PageLoader label="Opening training…" />;
-  if (!course) return <EmptyState title="Training not found" description="It may have been removed or is unavailable." action={<Link to="/courses" className="btn-primary">Back to trainings</Link>} />;
+  if (loading && !course) return <PageLoader label="Opening course…" />;
+  if (!course) return <EmptyState title="Course or training not found" description="It may have been removed or is unavailable." action={<Link to="/courses" className="btn-primary">Back to trainings</Link>} />;
 
+  const isCourse = course.offeringType === 'course';
+  const itemLabel = isCourse ? 'course' : 'training';
+  const adminListPath = isCourse ? '/admin/courses' : '/courses';
   const payment = course.enrollment?.payment || null;
   const assessmentConfigured = course.assessment?.enabled;
   const eligibleCandidates = adminData.candidates.filter((candidate) => candidate.eligible && !candidate.certificate);
 
   return <div className="pb-4">
-    <button onClick={() => navigate(admin ? '/courses' : '/courses')} className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft size={16} />Back to trainings</button>
+    <button onClick={() => navigate(admin ? adminListPath : '/courses')} className="mb-3 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500 hover:text-slate-900"><ArrowLeft size={16} />Back to {admin ? (isCourse ? 'courses' : 'trainings') : 'trainings'}</button>
 
     <section className="mb-5 overflow-hidden rounded-3xl border border-green-100 bg-white shadow-sm shadow-green-950/[0.04]">
       <div className="flex flex-col sm:flex-row">
         <div className="relative h-44 w-full shrink-0 sm:h-auto sm:w-72 lg:w-80"><CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="absolute inset-0" /></div>
         <div className="min-w-0 flex-1 p-5 sm:p-6">
-          <div className="flex flex-wrap gap-1.5"><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{course.trade && <Badge color="slate">{course.trade}</Badge>}{course.enrolled && <Badge color="green">Enrolled</Badge>}{!course.active && <Badge color="red">Archived</Badge>}{!course.published && <Badge color="amber">Draft</Badge>}</div>
+          <div className="flex flex-wrap gap-1.5"><Badge color="brand">{isCourse ? 'Course' : 'Training'}</Badge><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{course.trade && <Badge color="slate">{course.trade}</Badge>}{course.enrolled && <Badge color="green">Enrolled</Badge>}{!course.active && <Badge color="red">Archived</Badge>}{!course.published && <Badge color="amber">Draft</Badge>}</div>
           <h1 className="mt-3 break-words text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{course.title}</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{course.introduction || course.description || 'Open this training to review its schedule, payment rules, projects, and certification requirements.'}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{course.introduction || course.description || (isCourse ? 'Explore this self-paced course, its lessons, and certification requirements.' : 'Open this training to review its schedule, payment rules, projects, and certification requirements.')}</p>
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
             <span className="inline-flex items-center gap-1.5"><Users size={14} />{course.enrolledCount}{course.maxStudents ? `/${course.maxStudents}` : ''} enrolled</span>
             {course.startsAt && <span className="inline-flex items-center gap-1.5"><CalendarClock size={14} />Starts {formatDateTime(course.startsAt)}</span>}
-            {course.payment?.enabled && <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700"><Wallet size={14} />{formatMoney(course.payment.amount, course.payment.currency)} · {course.payment.freeDays} free days</span>}
+            {course.payment?.enabled && <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700"><Wallet size={14} />{formatMoney(course.payment.amount, course.payment.currency)}{!isCourse && ` · ${course.payment.freeDays} free days`}</span>}
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
             {admin ? <>
               <Link to={`/courses/${id}/learn`} className="btn-secondary"><ClipboardCheck size={16} />Manage lessons</Link>
-              <Link to={`/courses/${id}/edit`} className="btn-primary"><Pencil size={16} />Edit training</Link>
-              <Link to={`/classes/${id}`} className="btn-secondary"><Video size={16} />Live classroom</Link>
+              <Link to={`/courses/${id}/edit`} className="btn-primary"><Pencil size={16} />Edit {itemLabel}</Link>
+              {!isCourse && <Link to={`/classes/${id}`} className="btn-secondary"><Video size={16} />Live classroom</Link>}
               <button className="btn-secondary" onClick={() => setSettingsOpen(true)}><Target size={16} />Assessment setup</button>
               <button className="btn-secondary" onClick={toggleArchive} disabled={busy === 'archive'}>{busy === 'archive' ? <Spinner size={15} /> : course.active ? <LockKeyhole size={15} /> : <PlayCircle size={15} />}{course.active ? 'Archive' : 'Restore'}</button>
               <button className="btn-ghost text-red-700" onClick={deleteTraining} disabled={busy === 'delete'}>{busy === 'delete' ? <Spinner size={15} /> : <Trash2 size={15} />}Delete permanently</button>
             </> : course.enrolled ? <>
               <Link to={`/courses/${id}/learn`} className="btn-primary"><BookOpen size={16} />Continue learning</Link>
-              <Link to={`/classes/${id}`} className="btn-primary"><Video size={16} />Open classroom</Link>
-              {course.allowCancellation && <button className="btn-secondary" onClick={leaveTraining} disabled={busy === 'leave'}>{busy === 'leave' ? <Spinner size={15} /> : null}Leave training</button>}
-            </> : <button className="btn-primary" onClick={enroll} disabled={busy === 'enroll' || course.enrollmentStatus !== 'open'}>{busy === 'enroll' ? <Spinner size={16} /> : <Users size={16} />}{course.enrollmentStatus === 'open' ? 'Enroll in this training' : course.enrollmentStatus === 'closed' ? 'Enrollment closed' : course.enrollmentStatus === 'full' ? 'Training full' : course.enrollmentStatus}</button>}
+              {!isCourse && <Link to={`/classes/${id}`} className="btn-primary"><Video size={16} />Open classroom</Link>}
+              {course.allowCancellation && <button className="btn-secondary" onClick={leaveTraining} disabled={busy === 'leave'}>{busy === 'leave' ? <Spinner size={15} /> : null}Leave {itemLabel}</button>}
+            </> : <button className="btn-primary" onClick={enroll} disabled={busy === 'enroll' || course.enrollmentStatus !== 'open'}>{busy === 'enroll' ? <Spinner size={16} /> : <Users size={16} />}{course.enrollmentStatus === 'open' ? `Enroll in this ${itemLabel}` : course.enrollmentStatus === 'closed' ? 'Enrollment closed' : course.enrollmentStatus === 'full' ? `${isCourse ? 'Course' : 'Training'} full` : course.enrollmentStatus}</button>}
           </div>
         </div>
       </div>
@@ -294,7 +299,7 @@ export default function CourseDetailPage() {
       <div className="min-w-0 space-y-5">
         {admin ? <>
           <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="eyebrow">Training overview</p><h2 className="mt-1 text-base font-bold text-slate-950">Operations snapshot</h2></div><Link to={`/enrollments?search=${encodeURIComponent(course.title)}`} className="btn-secondary">Enrollment ledger</Link></div>
+            <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="eyebrow">{isCourse ? 'Course' : 'Training'} overview</p><h2 className="mt-1 text-base font-bold text-slate-950">Operations snapshot</h2></div><Link to={`/enrollments?search=${encodeURIComponent(course.title)}`} className="btn-secondary">Enrollment ledger</Link></div>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Fact icon={Users} label="Enrolled" value={`${course.enrolledCount} / ${course.maxStudents}`} />
               <Fact icon={Target} label="Assessment" value={assessmentConfigured ? `${course.assessment.questionCount} questions` : 'Not enabled'} />
@@ -319,8 +324,8 @@ export default function CourseDetailPage() {
           </section>
         </> : <>
           {course.enrolled && payment && course.payment?.enabled && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Payment</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><Wallet size={18} className="text-brand-700" />Training payment</h2></div><Badge color={paymentTone[payment.status] || 'slate'}>{paymentLabel[payment.status] || payment.status}</Badge></div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3"><Fact icon={Wallet} label="Amount" value={formatMoney(payment.amount, payment.currency)} /><Fact icon={Clock3} label="Free access" value={payment.allowed ? `Until ${formatDateTime(payment.freeUntil)}` : `Ended ${formatDateTime(payment.freeUntil)}`} /><Fact icon={ShieldCheck} label="Status" value={payment.allowed ? 'Access active' : 'Payment required'} /></div>
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Payment</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><Wallet size={18} className="text-brand-700" />{isCourse ? 'Course payment' : 'Training payment'}</h2></div><Badge color={paymentTone[payment.status] || 'slate'}>{paymentLabel[payment.status] || payment.status}</Badge></div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3"><Fact icon={Wallet} label="Amount" value={formatMoney(payment.amount, payment.currency)} />{!isCourse && <Fact icon={Clock3} label="Free access" value={payment.allowed ? `Until ${formatDateTime(payment.freeUntil)}` : `Ended ${formatDateTime(payment.freeUntil)}`} />}<Fact icon={ShieldCheck} label="Status" value={payment.allowed ? 'Access active' : 'Payment required'} /></div>
             {!['paid', 'waived'].includes(payment.status) && <>
               <div className="mt-3 rounded-xl bg-green-50 p-3 text-sm"><p className="font-semibold text-brand-950">Pay using code {payment.paymentCode || course.payment.paymentCode}</p><p className="text-xs text-brand-900">Account name: {payment.paymentName || course.payment.paymentName || '—'}</p><p className="mt-1 text-xs leading-5 text-brand-800">{payment.instructions || course.payment.instructions || 'Submit your transaction reference after payment.'}</p></div>
               {payment.status === 'pending' ? <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2.5 text-sm text-blue-800">Your reference {payment.paymentReference ? `(${payment.paymentReference}) ` : ''}is under review. You will be notified when it is verified.</p> : <form onSubmit={submitPayment} className="mt-3 grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]"><input required minLength={3} maxLength={200} className="input" value={paymentForm.reference} onChange={(event) => setPaymentForm({ ...paymentForm, reference: event.target.value })} placeholder="Transaction reference" aria-label="Transaction reference" /><input maxLength={1000} className="input" value={paymentForm.note} onChange={(event) => setPaymentForm({ ...paymentForm, note: event.target.value })} placeholder="Optional note" aria-label="Payment note" /><button className="btn-primary" disabled={busy === 'payment'}>{busy === 'payment' ? <Spinner size={16} /> : <Send size={15} />}Submit</button></form>}
@@ -353,7 +358,7 @@ export default function CourseDetailPage() {
 
       <aside className="min-w-0 space-y-4">
         <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
-          <h2 className="text-sm font-bold text-slate-900">Training details</h2>
+          <h2 className="text-sm font-bold text-slate-900">{isCourse ? 'Course details' : 'Training details'}</h2>
           <div className="mt-3 space-y-2">
             <Fact icon={GraduationCap} label="Level" value={course.level} />
             <Fact icon={GraduationCap} label="Difficulty" value={course.difficulty} />
@@ -368,7 +373,7 @@ export default function CourseDetailPage() {
           </div>
         </section>
         {(course.learningObjectives?.length > 0 || course.prerequisites?.length > 0 || course.instructorBio) && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">{course.learningObjectives?.length > 0 && <div><h2 className="font-bold text-slate-900">What you will learn</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">{course.learningObjectives.map((objective, index) => <li key={index}>{objective}</li>)}</ul></div>}{course.prerequisites?.length > 0 && <div className="mt-4"><h2 className="font-bold text-slate-900">Before you begin</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">{course.prerequisites.map((requirement, index) => <li key={index}>{requirement}</li>)}</ul></div>}{course.instructorBio && <div className="mt-4"><h2 className="font-bold text-slate-900">About the instructor</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{course.instructorBio}</p></div>}</section>}
-        {course.description && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5"><h2 className="text-sm font-bold text-slate-900">About this training</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{course.description}</p></section>}
+        {course.description && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5"><h2 className="text-sm font-bold text-slate-900">About this {itemLabel}</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{course.description}</p></section>}
         <section className="rounded-2xl border border-green-100 bg-green-50 p-4 shadow-sm shadow-green-950/[0.03] sm:p-5">
           <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900"><FileCheck2 size={16} className="text-brand-700" />What you earn</h2>
           <ul className="mt-3 space-y-2 text-sm text-slate-600"><li className="flex items-start gap-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />Live trainer-led classes and attendance tracking</li><li className="flex items-start gap-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />Project review and structured feedback</li><li className="flex items-start gap-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />Certification assessment with up to {course.assessment?.attempts || 3} attempts</li><li className="flex items-start gap-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />A verifiable QuickLink certificate you can share</li></ul>
