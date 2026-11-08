@@ -47,6 +47,7 @@ function certificateJson(certificate) {
     completionDate: certificate.completionDate || certificate.issuedAt,
     issuedAt: certificate.issuedAt,
     issuedBy: certificate.issuedBy?.toString() || null,
+    printDetailsUpdatedAt: certificate.printDetailsUpdatedAt || null,
     revoked: Boolean(certificate.revokedAt),
     revokedAt: certificate.revokedAt || null,
     revocationReason: certificate.revocationReason || '',
@@ -292,6 +293,7 @@ export const updateCertificateName = asyncHandler(async (req, res) => {
   const certificate = await CourseCertificate.findById(req.params.id);
   if (!certificate) throw ApiError.notFound('Certificate not found.');
   if (certificate.revokedAt) throw ApiError.conflict('A revoked certificate cannot be edited.');
+  if (certificate.studentName !== req.body.studentName.trim()) certificate.printDetailsUpdatedAt = new Date();
   certificate.studentName = req.body.studentName.trim();
   await certificate.save();
   res.json({ success: true, data: { certificate: certificateJson(certificate) } });
@@ -301,6 +303,11 @@ export const updateCertificatePrintDetails = asyncHandler(async (req, res) => {
   const certificate = await CourseCertificate.findById(req.params.id);
   if (!certificate) throw ApiError.notFound('Certificate not found.');
   if (certificate.revokedAt) throw ApiError.conflict('A revoked certificate cannot be edited.');
+  if (
+    certificate.studentName !== req.body.studentName.trim()
+    || certificate.courseTitle !== req.body.courseTitle.trim()
+    || certificate.description !== req.body.description.trim()
+  ) certificate.printDetailsUpdatedAt = new Date();
   certificate.studentName = req.body.studentName.trim();
   certificate.courseTitle = req.body.courseTitle.trim();
   certificate.description = req.body.description.trim();
@@ -312,6 +319,7 @@ export const updateCertificateDescription = asyncHandler(async (req, res) => {
   const certificate = await CourseCertificate.findById(req.params.id);
   if (!certificate) throw ApiError.notFound('Certificate not found.');
   if (certificate.revokedAt) throw ApiError.conflict('A revoked certificate cannot be edited.');
+  if (certificate.description !== req.body.description.trim()) certificate.printDetailsUpdatedAt = new Date();
   certificate.description = req.body.description.trim();
   await certificate.save();
   res.json({ success: true, data: { certificate: certificateJson(certificate) } });

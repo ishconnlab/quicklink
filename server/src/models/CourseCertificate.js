@@ -28,6 +28,7 @@ const certificateSchema = new mongoose.Schema({
   completionDate: { type: Date, default: null },
   issuedAt: { type: Date, required: true, default: Date.now, index: true },
   issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  printDetailsUpdatedAt: { type: Date, default: null },
   revokedAt: { type: Date, default: null, index: true },
   revokedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   revocationReason: { type: String, default: '', trim: true, maxlength: 1000 },

@@ -75,6 +75,7 @@ export async function createCertificatePdf(certificate, verificationUrl) {
   drawCenteredWrapped(certificate.description?.trim() || 'has successfully completed', height - 330, regular, 11, BRAND_COLOR);
   drawCentered(certificate.courseTitle, height - 383, bold, 20, ACCENT_COLOR, width - 200);
   drawCentered(`${certificate.level}  ·  Issued ${new Date(certificate.issuedAt).toLocaleDateString('en-GB')}`, height - 407, regular, 11, BRAND_COLOR);
+  drawCentered('QuickLink Learning Portal', height - 423, regular, 8, BRAND_COLOR);
 
   const stampWidth = 76;
   const stampHeight = stamp.height * stampWidth / stamp.width;

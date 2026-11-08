@@ -13,6 +13,8 @@ import { useDialog } from '../context/DialogContext.jsx';
 import { formatDateTime } from '../lib/format.js';
 import { isAdmin } from '../lib/roles.js';
 
+const PAGE_SIZE = 10;
+
 export default function CertificatesPage() {
   const { user } = useAuth();
   const admin = isAdmin(user);
@@ -43,7 +45,7 @@ export default function CertificatesPage() {
     setLoading(true);
     try {
       if (admin) {
-        const response = await api.get('/certificates/all', { timeout: 90000, params: { page, limit: 15, ...(status ? { status } : {}), ...(courseId ? { courseId } : {}), ...(query ? { search: query } : {}) } });
+        const response = await api.get('/certificates/all', { timeout: 90000, params: { page, limit: PAGE_SIZE, ...(status ? { status } : {}), ...(courseId ? { courseId } : {}), ...(query ? { search: query } : {}) } });
         setCertificates(response.data.data.certificates);
         setTotal(response.data.data.total);
         setPages(response.data.data.pages);
@@ -177,7 +179,7 @@ export default function CertificatesPage() {
       setCertificates((current) => current.filter((item) => item.id !== certificate.id));
       const nextTotal = Math.max(0, total - 1);
       setTotal(nextTotal);
-      if (certificates.length === 1 && page > 1) setPage(Math.max(1, Math.ceil(nextTotal / 15)));
+      if (certificates.length === 1 && page > 1) setPage(Math.max(1, Math.ceil(nextTotal / PAGE_SIZE)));
       toast.success('Certificate record deleted.');
     } catch (error) { toast.error(apiError(error).message); }
     finally { setBusyId(''); }
@@ -230,9 +232,10 @@ export default function CertificatesPage() {
                 <div className="flex flex-wrap items-center gap-1.5"><h2 className="break-words font-bold text-slate-900">{certificate.courseTitle}</h2><Badge color={certificate.revoked ? 'red' : certificate.paymentStatus === 'pending' ? 'amber' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? 'slate' : 'green'}>{certificate.revoked ? 'Revoked' : certificate.paymentStatus === 'pending' ? 'Payment pending' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? `Payment ${certificate.paymentStatus}` : 'Valid'}</Badge><Badge color="slate">{certificate.level}</Badge>{certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}</div>
                 <p className="mt-1 text-sm text-slate-600">Awarded to <strong className="text-slate-800">{certificate.studentName}</strong></p>
                 <p className="mt-1 break-all text-xs text-slate-400">Code {certificate.code} · Issued {formatDateTime(certificate.issuedAt)}</p>
-                <button type="button" onClick={() => openPreview(certificate)} disabled={busyId === certificate.id || certificate.revoked || !['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required')} className="mt-3 block w-full max-w-sm rounded-xl border border-green-200 bg-white p-2 text-left transition hover:border-green-500 hover:bg-green-50/50 disabled:cursor-not-allowed disabled:opacity-60" aria-label={`Open full preview for ${certificate.studentName}'s ${certificate.courseTitle} certificate`}>
-                  <span className="block rounded-lg border border-slate-200 bg-white px-3 py-2 text-center"><span className="block text-[8px] font-bold uppercase tracking-[0.18em] text-green-800">IshConnect · Certificate</span><span className="mt-1 block truncate text-[10px] font-semibold text-slate-800">{certificate.studentName}</span><span className="block truncate text-[8px] text-slate-500">{certificate.description || 'has successfully completed'}</span><span className="block truncate text-[10px] font-bold text-green-900">{certificate.courseTitle}</span></span>
-                  <span className="mt-1 block text-center text-[10px] font-semibold text-green-800">{busyId === certificate.id ? 'Loading full preview…' : 'Click to view full certificate'}</span>
+                {certificate.printDetailsUpdatedAt && <p className="mt-1 text-[11px] font-medium text-amber-700">Admin edited · {formatDateTime(certificate.printDetailsUpdatedAt)}</p>}
+                <button type="button" onClick={() => openPreview(certificate)} disabled={busyId === certificate.id || certificate.revoked || !['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required')} className="mt-2 block w-full max-w-[13rem] rounded-lg border border-green-200 bg-white p-1.5 text-left transition hover:border-green-500 hover:bg-green-50/50 disabled:cursor-not-allowed disabled:opacity-60" aria-label={`Open full preview for ${certificate.studentName}'s ${certificate.courseTitle} certificate`}>
+                  <span className="block rounded-md border border-slate-200 bg-white px-2 py-1.5 text-center"><span className="block text-[7px] font-bold uppercase tracking-[0.14em] text-green-800">QuickLink · Certificate</span><span className="mt-0.5 block truncate text-[9px] font-semibold text-slate-800">{certificate.studentName}</span><span className="block truncate text-[7px] text-slate-500">{certificate.description || 'has successfully completed'}</span><span className="block truncate text-[9px] font-bold text-green-900">{certificate.courseTitle}</span></span>
+                  <span className="mt-1 block text-center text-[9px] font-semibold text-green-800">{busyId === certificate.id ? 'Loading full preview…' : 'Open certificate'}</span>
                 </button>
                 {certificate.paymentStatus && !['paid', 'not_required'].includes(certificate.paymentStatus) && <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">Certificate payment: {certificate.paymentStatus} · {certificate.paymentAmount} {certificate.paymentCurrency}{certificate.paymentReference ? ` · Ref ${certificate.paymentReference}` : ''}{certificate.paymentNote ? ` · ${certificate.paymentNote}` : ''}</p>}
                 {certificate.revoked && <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs leading-5 text-red-700">Revoked {formatDateTime(certificate.revokedAt)}{certificate.revocationReason ? `: ${certificate.revocationReason}` : '.'}</p>}
