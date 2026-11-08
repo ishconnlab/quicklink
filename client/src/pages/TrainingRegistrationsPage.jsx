@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ClipboardList, Copy, ExternalLink, Mail, MessageCircle, Plus, Radio, Trash2, UserPlus } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, ClipboardList, Copy, ExternalLink, Mail, MessageCircle, Plus, Radio, Trash2, UserPlus } from 'lucide-react';
 import api, { apiError, assetUrl } from '../api/client.js';
 import { Badge, Modal, PageHeader } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
@@ -15,6 +15,8 @@ const blankForm = () => ({
   fields: [],
 });
 
+const ENTRIES_PER_PAGE = 5;
+
 function whatsappLink(number, message) {
   const digits = String(number || '').replace(/\D/g, '');
   if (digits.length < 7) return '';
@@ -27,6 +29,7 @@ export default function TrainingRegistrationsPage() {
   const [classes, setClasses] = useState([]);
   const [selectedId, setSelectedId] = useState('');
   const [entries, setEntries] = useState([]);
+  const [entryPage, setEntryPage] = useState(1);
   const [currentClass, setCurrentClass] = useState(null);
   const [loading, setLoading] = useState(true);
   const [entryLoading, setEntryLoading] = useState(false);
@@ -42,6 +45,8 @@ export default function TrainingRegistrationsPage() {
   const [nextFieldId, setNextFieldId] = useState(1);
 
   const selectedForm = useMemo(() => forms.find((form) => form.id === selectedId) || null, [forms, selectedId]);
+  const entryPages = Math.max(1, Math.ceil(entries.length / ENTRIES_PER_PAGE));
+  const visibleEntries = entries.slice((entryPage - 1) * ENTRIES_PER_PAGE, entryPage * ENTRIES_PER_PAGE);
   const session = currentClass?.liveSession;
   const joinUrl = session ? `${window.location.origin}/classes/join/${session.sessionCode}` : '';
   const liveRoomUrl = session ? `/classes/sessions/${session.id}/live` : '';
@@ -63,6 +68,11 @@ export default function TrainingRegistrationsPage() {
   }, [selectedId, toast]);
 
   useEffect(() => { loadForms(); }, [loadForms]);
+
+  useEffect(() => { setEntryPage(1); }, [selectedId]);
+  useEffect(() => {
+    if (entryPage > entryPages) setEntryPage(entryPages);
+  }, [entryPage, entryPages]);
 
   const loadSelected = useCallback(async () => {
     if (!selectedForm) { setEntries([]); setCurrentClass(null); return; }
@@ -210,7 +220,7 @@ export default function TrainingRegistrationsPage() {
     {forms.length === 0 ? <EmptyState icon={ClipboardList} title="No registration forms yet" description="Create a public form for an active training. Registrants can verify their email, create a student account, and enroll themselves." action={<button className="btn-primary" onClick={() => setCreateOpen(true)}><Plus size={17} />Create registration form</button>} /> :
       <div className="grid gap-5 lg:grid-cols-[minmax(230px,0.8fr)_minmax(0,2fr)]">
         <section className="space-y-2">
-          {forms.map((form) => <button key={form.id} onClick={() => setSelectedId(form.id)} className={`w-full rounded-xl border p-4 text-left transition-colors ${selectedId === form.id ? 'border-brand-300 bg-brand-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+          {forms.map((form) => <button key={form.id} onClick={() => setSelectedId(form.id)} className={`w-full min-w-0 rounded-xl border p-4 text-left transition-colors ${selectedId === form.id ? 'border-brand-300 bg-brand-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
             <div className="flex items-start justify-between gap-2"><span className="font-semibold text-slate-900">{form.title}</span><Badge color={form.active ? 'green' : 'slate'}>{form.active ? 'Active' : 'Paused'}</Badge></div>
             <p className="mt-1 text-sm text-slate-500">{form.classTitle}</p>
             <p className="mt-3 text-xs text-slate-400">{form.registrationCount} registration{form.registrationCount === 1 ? '' : 's'}</p>
@@ -238,7 +248,7 @@ export default function TrainingRegistrationsPage() {
             <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="font-semibold text-slate-900">Registered people</h2><p className="text-sm text-slate-500">{entries.length} registration{entries.length === 1 ? '' : 's'}</p></div><button className="btn-secondary" disabled={entryLoading} onClick={loadSelected}>Refresh</button></div>
             <p className="mb-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">Enroll a registrant to create their student account and email access details. Enrolled students can receive an email invitation before or during a live class; WhatsApp opens a class-specific invitation for you to send.</p>
             {entryLoading ? <div className="py-8 text-center"><Spinner size={22} /></div> : entries.length === 0 ? <EmptyState icon={UserPlus} title="No one has registered yet" description="Share the form link with prospective trainees." /> : <div className="space-y-3">
-              {entries.map((entry) => {
+              {visibleEntries.map((entry) => {
                 const trainingClass = currentClass?.title || selectedForm.classTitle;
                 const classDetails = [currentClass?.subject, currentClass?.level, currentClass?.schedule].filter(Boolean).join(' · ');
                 const classUrl = session ? joinUrl : `${window.location.origin}/classes/${selectedForm.classId}`;
@@ -264,6 +274,14 @@ export default function TrainingRegistrationsPage() {
                 </article>;
               })}
             </div>}
+            {!entryLoading && entries.length > ENTRIES_PER_PAGE && <nav className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-4" aria-label="Registration entries pagination">
+              <p className="w-full text-xs text-slate-500 sm:w-auto">Showing {(entryPage - 1) * ENTRIES_PER_PAGE + 1}–{Math.min(entryPage * ENTRIES_PER_PAGE, entries.length)} of {entries.length}</p>
+              <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
+                <button type="button" className="btn-secondary min-h-9 px-3 text-xs" disabled={entryPage <= 1} onClick={() => setEntryPage((page) => page - 1)}><ChevronLeft size={15} />Previous</button>
+                <span className="text-xs font-medium text-slate-600">Page {entryPage} of {entryPages}</span>
+                <button type="button" className="btn-secondary min-h-9 px-3 text-xs" disabled={entryPage >= entryPages} onClick={() => setEntryPage((page) => page + 1)}>Next<ChevronRight size={15} /></button>
+              </div>
+            </nav>}
           </div>
         </section>}
       </div>}

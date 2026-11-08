@@ -17,9 +17,35 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>Sign in | QuickLink by IshConnect</title>
+    <style>
+      .startup-loader{display:grid;min-height:100dvh;place-items:center;padding:24px;background:radial-gradient(ellipse at 50% 35%,rgba(220,252,231,.7),transparent 58%),#f8fafc;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#0f172a}
+      .startup-loader-card{display:flex;width:min(100%,384px);box-sizing:border-box;flex-direction:column;align-items:center;border:1px solid rgba(226,232,240,.9);border-radius:24px;background:rgba(255,255,255,.94);padding:40px 32px;text-align:center;box-shadow:0 20px 50px rgba(15,23,42,.08)}
+      .startup-loader-mark{display:grid;width:56px;height:56px;place-items:center;border-radius:18px;background:#15803d;color:white;font-size:18px;font-weight:800;letter-spacing:-.06em;box-shadow:0 8px 18px rgba(21,128,61,.2)}
+      .startup-loader-brand{margin:16px 0 0;font-size:18px;font-weight:750;letter-spacing:-.025em}
+      .startup-loader-message{margin:6px 0 0;color:#64748b;font-size:14px;line-height:1.4}
+      .startup-loader-spinner{width:24px;height:24px;margin-top:24px;border:2px solid #dcfce7;border-top-color:#15803d;border-radius:50%;animation:startup-spin .8s linear infinite}
+      .startup-loader-retry{margin-top:20px;border-radius:12px;background:#15803d;padding:11px 18px;color:white;font-size:14px;font-weight:650;text-decoration:none}
+      @keyframes startup-spin{to{transform:rotate(360deg)}}
+      @media(prefers-reduced-motion:reduce){.startup-loader-spinner{animation-duration:1.8s}}
+    </style>
   </head>
   <body>
-    <div id="root"><main><p>Opening QuickLink sign in… <a href="/login">Continue</a></p></main></div>
+    <div id="root"><main class="startup-loader" role="status" aria-label="Loading QuickLink"><div class="startup-loader-card"><span class="startup-loader-mark" aria-hidden="true">QL</span><p class="startup-loader-brand">QuickLink</p><p class="startup-loader-message">Preparing your learning space</p><span class="startup-loader-spinner" aria-hidden="true"></span><noscript><p class="startup-loader-message">JavaScript is required to open QuickLink.</p><a href="/login">Continue to sign in</a></noscript></div></main></div>
+    <script>
+      window.setTimeout(() => {
+        const loader = document.querySelector('.startup-loader');
+        if (!loader?.isConnected) return;
+        const message = loader.querySelector('.startup-loader-message');
+        const spinner = loader.querySelector('.startup-loader-spinner');
+        if (message) message.textContent = 'This is taking longer than expected. Reload QuickLink to try again.';
+        spinner?.remove();
+        const retry = document.createElement('a');
+        retry.className = 'startup-loader-retry';
+        retry.href = window.location.href;
+        retry.textContent = 'Reload QuickLink';
+        loader.querySelector('.startup-loader-card')?.append(retry);
+      }, 15000);
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

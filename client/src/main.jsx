@@ -5,6 +5,7 @@ import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { DialogProvider } from './context/DialogContext.jsx';
+import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import '@fontsource-variable/geist/wght.css';
 import './index.css';
 
@@ -35,14 +36,16 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter future={{ v7_relativeSplatPath: true }}>
-      <ToastProvider>
-        <DialogProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </DialogProvider>
-      </ToastProvider>
-    </BrowserRouter>
+    <AppErrorBoundary>
+      <BrowserRouter future={{ v7_relativeSplatPath: true }}>
+        <ToastProvider>
+          <DialogProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </DialogProvider>
+        </ToastProvider>
+      </BrowserRouter>
+    </AppErrorBoundary>
   </React.StrictMode>
 );
