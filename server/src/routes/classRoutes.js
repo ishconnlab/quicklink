@@ -42,9 +42,12 @@ const paymentSchema = z.object({
   freeDays: z.number().int().min(0).max(60).optional(),
   amount: z.number().int().min(0).max(100000000).optional(),
   currency: z.string().trim().min(1).max(12).optional(),
-  paymentCode: z.string().trim().min(1).max(40).optional(),
-  paymentName: z.string().trim().min(1).max(120).optional(),
+  paymentCode: z.string().trim().max(40).optional(),
+  paymentName: z.string().trim().max(120).optional(),
   instructions: z.string().trim().max(2000).optional(),
+}).refine((payment) => !payment.enabled || Boolean(payment.paymentCode?.trim() && payment.paymentName?.trim()), {
+  message: 'Enter a payment code and account name when payment is enabled.',
+  path: ['paymentCode'],
 });
 const projectSchema = z.object({
   enabled: z.boolean().optional(),

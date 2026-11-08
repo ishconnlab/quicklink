@@ -195,8 +195,8 @@ export default function TrainingEditorPage() {
           <Field label="Free access days"><input type="number" min="0" max="60" className="input" value={form.payment.freeDays} onChange={(event) => set('payment', { ...form.payment, freeDays: event.target.value })} /></Field>
           <Field label="Amount"><input type="number" min="0" className="input" value={form.payment.amount} onChange={(event) => set('payment', { ...form.payment, amount: event.target.value })} /></Field>
           <Field label="Currency"><input className="input" maxLength={12} value={form.payment.currency} onChange={(event) => set('payment', { ...form.payment, currency: event.target.value })} /></Field>
-          <Field label="Payment code"><input className="input" maxLength={40} value={form.payment.paymentCode} onChange={(event) => set('payment', { ...form.payment, paymentCode: event.target.value })} placeholder="e.g. 699655" /></Field>
-          <Field label="Account name"><input className="input" maxLength={120} value={form.payment.paymentName} onChange={(event) => set('payment', { ...form.payment, paymentName: event.target.value })} placeholder="e.g. Jean Claude" /></Field>
+          <Field label="Payment code"><input className="input" required={form.payment.enabled} maxLength={40} value={form.payment.paymentCode} onChange={(event) => set('payment', { ...form.payment, paymentCode: event.target.value })} placeholder="e.g. 699655" /></Field>
+          <Field label="Account name"><input className="input" required={form.payment.enabled} maxLength={120} value={form.payment.paymentName} onChange={(event) => set('payment', { ...form.payment, paymentName: event.target.value })} placeholder="e.g. Jean Claude" /></Field>
           <Field label="Payment instructions" className="sm:col-span-2 lg:col-span-3"><textarea className="input min-h-20" maxLength={2000} value={form.payment.instructions} onChange={(event) => set('payment', { ...form.payment, instructions: event.target.value })} /></Field>
         </div>}
       </section>
