@@ -48,16 +48,36 @@ function renderCurriculumContent(value, label, path, codeBlocks, depth = 2) {
 
 function collectResources(value) {
   const resources = [];
-  const visit = (item) => {
-    if (!item || typeof item !== 'object') return;
-    if (Array.isArray(item)) {
-      item.forEach(visit);
+  const addResource = (title, rawUrl) => {
+    const url = String(rawUrl || '').replace(/[),.;!?]+$/, '');
+    if (!/^https?:\/\//i.test(url)) return;
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
       return;
     }
-    if (typeof item.url === 'string' && /^https?:\/\//i.test(item.url)) {
-      resources.push({ title: String(item.title || item.name || item.url).slice(0, 180), url: item.url.slice(0, 2000) });
+    if (!['http:', 'https:'].includes(parsed.protocol)) return;
+    resources.push({ title: String(title || url).slice(0, 180), url: url.slice(0, 2000) });
+  };
+  const visit = (item, label = '') => {
+    if (typeof item === 'string') {
+      const urlPattern = /https?:\/\/[^\s<>"']+/gi;
+      for (const match of item.matchAll(urlPattern)) {
+        const title = item.slice(0, match.index).replace(/[\s:–—-]+$/, '').trim();
+        addResource(title || label, match[0]);
+      }
+      return;
     }
-    Object.values(item).forEach(visit);
+    if (!item || typeof item !== 'object') return;
+    if (Array.isArray(item)) {
+      item.forEach((entry) => visit(entry, label));
+      return;
+    }
+    if (typeof item.url === 'string') addResource(item.title || item.name || label, item.url);
+    Object.entries(item).forEach(([key, child]) => {
+      if (key !== 'url') visit(child, labelFor(key));
+    });
   };
   visit(value);
   return resources.filter((resource, index) => resources.findIndex((entry) => entry.url === resource.url) === index).slice(0, 30);
@@ -106,7 +126,7 @@ export function parseCourseCurriculum(input) {
       videoUrl: '',
       imageUrl: '',
       imagePublicId: '',
-      resources: collectResources(day),
+      resources: collectResources(index === 0 ? [course.global_resources, day.resources] : day.resources),
       code: { language: '', source: '' },
       codeBlocks,
       knowledgeCheck: [],

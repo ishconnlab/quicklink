@@ -1,16 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, ImagePlus, Save, Users, Wallet } from 'lucide-react';
+import { ArrowLeft, BookOpen, CalendarClock, CheckCircle2, FileJson, ImagePlus, Save, Upload, Users, Wallet } from 'lucide-react';
 import api, { apiError, assetUrl } from '../api/client.js';
 import { PageHeader } from '../components/layout.jsx';
 import { PageLoader, Spinner } from '../components/ui.jsx';
 import PagedCheckboxList from '../components/PagedCheckboxList.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { parseCourseCurriculum } from '../lib/courseCurriculum.js';
 
 const blankForm = (offeringType = 'training') => ({
   offeringType,
   title: '', subject: '', trade: '', course: '', level: offeringType === 'course' ? 'L3' : 'Training', introduction: '', description: '',
   difficulty: 'Beginner', courseDuration: '', learningObjectives: [], prerequisites: [], language: 'English', slug: '', instructorName: '', instructorBio: '',
+  modules: [], lessonAccessMode: 'sequential',
   startsAt: '', endsAt: '', enrollmentOpensAt: '', enrollmentClosesAt: '', schedule: '',
   durationMinutes: 60, lateThresholdMinutes: 15, earlyThresholdPercent: 75, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg',
   maxStudents: 300, enrollmentOpen: true, allowCancellation: true, published: true,
@@ -58,6 +60,9 @@ export default function TrainingEditorPage() {
   const [loading, setLoading] = useState(editing);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [curriculumPreview, setCurriculumPreview] = useState(null);
+  const [curriculumError, setCurriculumError] = useState('');
+  const [curriculumLoading, setCurriculumLoading] = useState(false);
 
   useEffect(() => {
     if (!thumbnail) { setThumbnailPreview(''); return undefined; }
@@ -96,11 +101,73 @@ export default function TrainingEditorPage() {
 
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
 
+  const previewCurriculum = (source) => {
+    try {
+      setCurriculumPreview(parseCourseCurriculum(source));
+      setCurriculumError('');
+    } catch (error) {
+      setCurriculumPreview(null);
+      setCurriculumError(error.message || 'The curriculum JSON is invalid.');
+    }
+  };
+
+  const loadSuppliedCurriculum = async () => {
+    setCurriculumLoading(true);
+    setCurriculumError('');
+    try {
+      const response = await fetch('/IshConnect_ML_Curriculum.json');
+      if (!response.ok) throw new Error(`Could not load the supplied curriculum (${response.status}).`);
+      previewCurriculum(await response.text());
+    } catch (error) {
+      setCurriculumError(error.message || 'Could not load the supplied curriculum.');
+    } finally {
+      setCurriculumLoading(false);
+    }
+  };
+
+  const previewCurriculumFile = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    setCurriculumLoading(true);
+    try {
+      previewCurriculum(await file.text());
+    } catch (error) {
+      setCurriculumPreview(null);
+      setCurriculumError(error.message || 'Could not read the selected JSON file.');
+    } finally {
+      setCurriculumLoading(false);
+    }
+  };
+
+  const applyCurriculum = () => {
+    if (!curriculumPreview) return;
+    const imported = curriculumPreview.course;
+    setForm((current) => ({
+      ...current,
+      title: imported.title,
+      subject: imported.subject,
+      course: imported.course,
+      introduction: imported.introduction,
+      description: imported.description,
+      difficulty: imported.difficulty,
+      courseDuration: imported.courseDuration,
+      learningObjectives: imported.learningObjectives,
+      prerequisites: imported.prerequisites,
+      language: imported.language,
+      modules: imported.modules,
+      lessonAccessMode: imported.lessonAccessMode,
+      completionRequirements: { ...current.completionRequirements, requireAttendance: false },
+    }));
+    setErrors((current) => ({ ...current, title: '', thumbnail: '' }));
+    setCurriculumError('');
+  };
+
   const validate = () => {
     const next = {};
     if (form.title.trim().length < 2) next.title = `Enter a ${isCourse ? 'course' : 'training'} title.`;
     if (form.subject.trim().length < 2) next.subject = 'Enter a subject.';
-    if (!thumbnail && !form.thumbnailUrl) next.thumbnail = 'Choose a cover image before saving this course.';
+    if (!isCourse && !thumbnail && !form.thumbnailUrl) next.thumbnail = 'Choose a cover image before saving this training.';
     if (Number(form.maxStudents) < Math.max(1, form.studentIds.length)) next.maxStudents = 'Capacity must cover the selected students.';
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) next.endsAt = 'End must be after the start.';
     setErrors(next);
@@ -126,6 +193,24 @@ export default function TrainingEditorPage() {
       completionRequirements: { ...form.completionRequirements, requireAttendance: isCourse ? false : form.completionRequirements.requireAttendance, minimumScore: num(form.completionRequirements.minimumScore, 0) },
       payment: { ...form.payment, freeDays: isCourse ? 0 : num(form.payment.freeDays, 0), amount: num(form.payment.amount, 0) },
       projectSubmission: { ...form.projectSubmission },
+      ...(isCourse && form.modules.length ? {
+        lessonAccessMode: form.lessonAccessMode || 'sequential',
+        modules: form.modules.map((module) => ({
+          title: module.title,
+          lessons: module.lessons.map((lesson) => ({
+            title: lesson.title,
+            content: lesson.content,
+            availableAt: lesson.availableAt || null,
+            videoUrl: lesson.videoUrl || '',
+            resources: lesson.resources || [],
+            code: lesson.code || { language: '', source: '' },
+            codeBlocks: lesson.codeBlocks || [],
+            knowledgeCheck: lesson.knowledgeCheck || [],
+            passMark: lesson.passMark || 70,
+            assessmentAttempts: lesson.assessmentAttempts || 3,
+          })),
+        })),
+      } : {}),
     };
     try {
       let savedId = id;
@@ -161,26 +246,46 @@ export default function TrainingEditorPage() {
     />
 
     <form id="training-form" onSubmit={submit} className="space-y-5">
+      {!editing && isCourse && <section className="rounded-2xl border border-green-200 bg-green-50/60 p-4 shadow-sm sm:p-5">
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand-700 ring-1 ring-green-100"><FileJson size={19} /></span>
+          <div className="min-w-0 flex-1"><h2 className="text-base font-bold text-slate-900">Start from JSON or fill in the form</h2><p className="mt-1 text-sm leading-5 text-slate-600">Import curriculum JSON to fill course details and lessons automatically, or enter the course information manually below.</p></div>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={loadSuppliedCurriculum} disabled={curriculumLoading || saving} className="btn-secondary min-h-10">{curriculumLoading ? <Spinner size={15} /> : <FileJson size={15} />}Use supplied Machine Learning JSON</button>
+          <label className="btn-secondary min-h-10 cursor-pointer"><Upload size={15} />Upload course JSON<input type="file" accept=".json,application/json" className="sr-only" disabled={curriculumLoading || saving} onChange={previewCurriculumFile} /></label>
+          <a href="/IshConnect_ML_Curriculum.json" target="_blank" rel="noreferrer" className="btn-ghost min-h-10">View supplied JSON</a>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-slate-500">The importer expects JSON shaped like <code className="rounded bg-white px-1 py-0.5">{"{ course: { title, subtitle, prerequisites, learning_outcomes, days } }"}</code>; each day needs a number and title. Files are previewed and validated before they fill the form.</p>
+        {curriculumError && <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{curriculumError}</p>}
+        {curriculumPreview && <div className="mt-4 rounded-xl border border-green-200 bg-white p-3 sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0"><p className="text-sm font-bold text-slate-900">{curriculumPreview.course.title}</p><p className="mt-1 text-xs text-slate-600">{curriculumPreview.days.length} validated days · {curriculumPreview.days.reduce((total, day) => total + day.codeExamples, 0)} code examples</p></div>
+            <button type="button" onClick={applyCurriculum} className="btn-primary min-h-9 px-3 text-xs"><CheckCircle2 size={15} />Fill form with this JSON</button>
+          </div>
+          <ol className="mt-3 grid max-h-44 gap-1 overflow-y-auto text-xs text-slate-600 sm:grid-cols-2">{curriculumPreview.days.map((day, index) => <li key={`${day.title}-${index}`} className="flex min-w-0 items-start justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-2"><span className="min-w-0 break-words">{day.title}</span><span className="shrink-0">{day.codeExamples} code</span></li>)}</ol>
+        </div>}
+      </section>}
       <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><BookOpen size={18} className="text-brand-700" />{isCourse ? 'Course identity' : 'Training identity'}</h2>
         <p className="mt-1 text-sm text-slate-500">This is what students see in the catalog and on their certificate.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field label={`Full ${isCourse ? 'course' : 'training'} title`} hint="Use the official program name." className="sm:col-span-2"><input className={`input ${errors.title ? 'ring-2 ring-red-400' : ''}`} required minLength={2} maxLength={160} value={form.title} onChange={(event) => set('title', event.target.value)} placeholder={isCourse ? 'e.g. Machine Learning Foundations' : 'e.g. Professional Web Development Bootcamp'} />{errors.title && <span className="mt-1 block text-xs text-red-600">{errors.title}</span>}</Field>
-          <Field label="Subject"><input className={`input ${errors.subject ? 'ring-2 ring-red-400' : ''}`} required minLength={2} maxLength={120} value={form.subject} onChange={(event) => set('subject', event.target.value)} placeholder="e.g. Software Development" />{errors.subject && <span className="mt-1 block text-xs text-red-600">{errors.subject}</span>}</Field>
+          <Field label={`Full ${isCourse ? 'course' : 'training'} title`} hint={isCourse ? 'Matches course.title in the imported JSON.' : 'Use the official program name.'} className="sm:col-span-2"><input className={`input ${errors.title ? 'ring-2 ring-red-400' : ''}`} required minLength={2} maxLength={160} value={form.title} onChange={(event) => set('title', event.target.value)} placeholder={isCourse ? 'IshConnect Machine Learning Training' : 'e.g. Professional Web Development Bootcamp'} />{errors.title && <span className="mt-1 block text-xs text-red-600">{errors.title}</span>}</Field>
+          <Field label="Subject" hint={isCourse ? 'Mapped from the curriculum subject, or use a short topic name.' : undefined}><input className={`input ${errors.subject ? 'ring-2 ring-red-400' : ''}`} required minLength={2} maxLength={120} value={form.subject} onChange={(event) => set('subject', event.target.value)} placeholder={isCourse ? 'Machine Learning' : 'e.g. Software Development'} />{errors.subject && <span className="mt-1 block text-xs text-red-600">{errors.subject}</span>}</Field>
           <Field label="Trade / pathway" hint="Optional grouping for the catalog."><input className="input" maxLength={120} value={form.trade} onChange={(event) => set('trade', event.target.value)} placeholder="e.g. Technology" /></Field>
           <Field label="Level"><select className="input" value={form.level} onChange={(event) => set('level', event.target.value)}>{(isCourse ? ['L3', 'L4', 'L5', 'Bootcamp', 'Training'] : ['Bootcamp', 'Training']).map((level) => <option key={level}>{level}</option>)}</select></Field>
-          <Field label="Program / course label" hint="Optional internal program name."><input className="input" maxLength={160} value={form.course} onChange={(event) => set('course', event.target.value)} placeholder="e.g. Web Development" /></Field>
+          <Field label="Program / course label" hint="Optional internal program name."><input className="input" maxLength={160} value={form.course} onChange={(event) => set('course', event.target.value)} placeholder={isCourse ? 'Machine Learning' : 'e.g. Web Development'} /></Field>
           <Field label="Difficulty"><select className="input" value={form.difficulty} onChange={(event) => set('difficulty', event.target.value)}>{['Beginner', 'Intermediate', 'Advanced'].map((item) => <option key={item}>{item}</option>)}</select></Field>
           <Field label="Course duration" hint="Learning programme duration, separate from live session length."><input className="input" maxLength={120} value={form.courseDuration} onChange={(event) => set('courseDuration', event.target.value)} placeholder="e.g. 8 weeks" /></Field>
           <Field label="Course language"><input className="input" maxLength={80} value={form.language} onChange={(event) => set('language', event.target.value)} /></Field>
           <Field label="Instructor name"><input className="input" maxLength={160} value={form.instructorName} onChange={(event) => set('instructorName', event.target.value)} placeholder="Course instructor" /></Field>
           <Field label="Instructor information" className="sm:col-span-2"><textarea className="input min-h-20" maxLength={3000} value={form.instructorBio} onChange={(event) => set('instructorBio', event.target.value)} placeholder="Relevant experience and instructor background" /></Field>
           <Field label="Unique course slug" hint="Leave blank to create one automatically."><input className="input" maxLength={180} value={form.slug} onChange={(event) => set('slug', event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/--+/g, '-'))} placeholder="python-foundations" /></Field>
-          <Field label="Short introduction" hint="One or two lines shown on cards." className="sm:col-span-2"><input className="input" maxLength={500} value={form.introduction} onChange={(event) => set('introduction', event.target.value)} placeholder="A concise promise of what students will achieve." /></Field>
-          <Field label="Detailed description" className="sm:col-span-2"><textarea className="input min-h-32" maxLength={12000} value={form.description} onChange={(event) => set('description', event.target.value)} placeholder="Outcomes, who it is for, tools covered, and how learning is delivered." /></Field>
-          <Field label="Learning objectives" hint="One objective per line." className="sm:col-span-2"><textarea className="input min-h-24" value={(form.learningObjectives || []).join('\n')} onChange={(event) => set('learningObjectives', event.target.value.split('\n').map((line) => line.trim()).filter(Boolean))} placeholder="Build a responsive website\nUse Git to track changes" /></Field>
+          <Field label="Short introduction" hint={isCourse ? 'Matches course.subtitle in the imported JSON.' : 'One or two lines shown on cards.'} className="sm:col-span-2"><input className="input" maxLength={500} value={form.introduction} onChange={(event) => set('introduction', event.target.value)} placeholder={isCourse ? 'From Zero to Building Real ML Projects in 10 Days' : 'A concise promise of what students will achieve.'} /></Field>
+          <Field label="Detailed description" hint={isCourse ? 'Can describe course.level and course.target_audience.' : undefined} className="sm:col-span-2"><textarea className="input min-h-32" maxLength={12000} value={form.description} onChange={(event) => set('description', event.target.value)} placeholder={isCourse ? 'Beginner · Complete beginners with little or no prior Machine Learning experience…' : 'Outcomes, who it is for, tools covered, and how learning is delivered.'} /></Field>
+          <Field label="Learning objectives" hint={isCourse ? 'Imported from course.learning_outcomes; one objective per line.' : 'One objective per line.'} className="sm:col-span-2"><textarea className="input min-h-24" value={(form.learningObjectives || []).join('\n')} onChange={(event) => set('learningObjectives', event.target.value.split('\n').map((line) => line.trim()).filter(Boolean))} placeholder={isCourse ? 'Explain what AI and Machine Learning are in simple terms\nLoad, explore, clean and prepare real datasets' : 'Build a responsive website\nUse Git to track changes'} /></Field>
           <Field label="Prerequisites" hint="One requirement per line." className="sm:col-span-2"><textarea className="input min-h-20" value={(form.prerequisites || []).join('\n')} onChange={(event) => set('prerequisites', event.target.value.split('\n').map((line) => line.trim()).filter(Boolean))} placeholder="Basic computer literacy" /></Field>
-          <Field label="Cover image" hint="Required. PNG, JPEG, or WebP up to 3 MB." className="sm:col-span-2"><div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] sm:items-start"><div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl border border-slate-200 bg-green-50 sm:max-w-64">{(thumbnailPreview || form.thumbnailUrl) ? <img src={thumbnailPreview || assetUrl(form.thumbnailUrl)} alt={`Cover preview for ${form.title || 'this training'}`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <div className="grid h-full place-items-center text-sm text-green-800">Cover preview</div>}</div><div className="min-w-0"><label className="btn-secondary w-fit cursor-pointer"><ImagePlus size={16} />Choose image<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0] || null; if (file && (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024)) { toast.error('Choose a PNG, JPEG, or WebP image up to 3 MB.'); event.target.value = ''; return; } setThumbnail(file); setErrors((current) => ({ ...current, thumbnail: '' })); }} /></label>{thumbnail && <p className="mt-2 break-all text-xs text-slate-500">Selected: {thumbnail.name}</p>}{!thumbnail && form.thumbnailUrl && <p className="mt-2 text-xs text-green-800">Current cover image</p>}{errors.thumbnail && <p className="mt-2 text-xs text-red-600">{errors.thumbnail}</p>}<p className="mt-2 text-xs leading-5 text-slate-500">The preview shows exactly what will appear on the training card.</p></div></div></Field>
+          <Field label="Cover image" hint={isCourse ? 'Optional. PNG, JPEG, or WebP up to 3 MB.' : 'Required. PNG, JPEG, or WebP up to 3 MB.'} className="sm:col-span-2"><div className="grid min-w-0 gap-3 sm:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] sm:items-start"><div className="relative aspect-[16/9] w-full overflow-hidden rounded-xl border border-slate-200 bg-green-50 sm:max-w-64">{(thumbnailPreview || form.thumbnailUrl) ? <img src={thumbnailPreview || assetUrl(form.thumbnailUrl)} alt={`Cover preview for ${form.title || `this ${isCourse ? 'course' : 'training'}`}`} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : <div className="grid h-full place-items-center text-sm text-green-800">Cover preview</div>}</div><div className="min-w-0"><label className="btn-secondary w-fit cursor-pointer"><ImagePlus size={16} />Choose image<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0] || null; if (file && (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 3 * 1024 * 1024)) { toast.error('Choose a PNG, JPEG, or WebP image up to 3 MB.'); event.target.value = ''; return; } setThumbnail(file); setErrors((current) => ({ ...current, thumbnail: '' })); }} /></label>{thumbnail && <p className="mt-2 break-all text-xs text-slate-500">Selected: {thumbnail.name}</p>}{!thumbnail && form.thumbnailUrl && <p className="mt-2 text-xs text-green-800">Current cover image</p>}{errors.thumbnail && <p className="mt-2 text-xs text-red-600">{errors.thumbnail}</p>}<p className="mt-2 text-xs leading-5 text-slate-500">The preview shows exactly what will appear on the {isCourse ? 'course' : 'training'} card.</p></div></div></Field>
         </div>
       </section>
 
