@@ -38,14 +38,14 @@ export async function uploadCloudinaryBuffer({ buffer, folder, resourceType = 'a
   const sdk = getCloudinarySdk();
   if (!sdk) return null;
 
-  const resolvedFolder = folder || config.cloudinary.folderPrefix || 'quicklink';
+  const resolvedFolder = folder === undefined ? config.cloudinary.folderPrefix || 'quicklink' : folder;
   const resolvedPublicId = publicId || `${Date.now()}-${randomUUID()}`;
 
   return new Promise((resolve, reject) => {
     const options = {
-      folder: resolvedFolder,
       public_id: resolvedPublicId,
       resource_type: resourceType,
+      ...(resolvedFolder ? { folder: resolvedFolder } : {}),
     };
     const callback = (error, result) => {
       if (error) return reject(error);
@@ -57,7 +57,7 @@ export async function uploadCloudinaryBuffer({ buffer, folder, resourceType = 'a
         url: result?.secure_url ?? result?.url ?? '',
         secureUrl: result?.secure_url ?? result?.url ?? '',
         version: result?.version,
-        folder: result?.folder ?? resolvedFolder,
+        folder: result?.folder ?? resolvedFolder ?? '',
       });
     };
     sdk.uploader.upload_stream(options, callback).end(buffer);

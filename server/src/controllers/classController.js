@@ -435,7 +435,7 @@ export const updateCourseThumbnail = asyncHandler(async (req, res) => {
   if (config.cloudinary.enabled) {
     uploaded = await uploadCloudinaryBuffer({
       buffer: req.file.buffer,
-      folder: `${config.cloudinary.folderPrefix}/course-thumbnails`,
+      folder: null,
       resourceType: 'image',
     });
     item.thumbnailFile = '';
@@ -657,7 +657,7 @@ export const uploadLessonImage = asyncHandler(async (req, res) => {
   const module = course.modules.id(req.params.moduleId);
   const lesson = module?.lessons.id(req.params.lessonId);
   if (!lesson) throw ApiError.notFound('Lesson not found. Save the lesson before uploading its image.');
-  const uploaded = await uploadCloudinaryBuffer({ buffer: req.file.buffer, folder: `quicklink/courses/${course._id}/lessons`, resourceType: 'image' });
+  const uploaded = await uploadCloudinaryBuffer({ buffer: req.file.buffer, folder: null, resourceType: 'image' });
   if (!uploaded?.secureUrl) throw ApiError.conflict('Configure Cloudinary storage before uploading lesson images.');
   if (lesson.imagePublicId) await deleteCloudinaryAsset({ publicId: lesson.imagePublicId, resourceType: 'image' });
   lesson.imageUrl = uploaded.secureUrl;

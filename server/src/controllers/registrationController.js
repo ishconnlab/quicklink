@@ -321,7 +321,7 @@ export const uploadFormImage = asyncHandler(async (req, res) => {
   if (config.cloudinary.enabled) {
     uploaded = await uploadCloudinaryBuffer({
       buffer: req.file.buffer,
-      folder: `${config.cloudinary.folderPrefix}/registration-forms`,
+      folder: null,
       resourceType: 'image',
     });
     form.imageFile = '';
