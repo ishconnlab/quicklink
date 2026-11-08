@@ -26,7 +26,7 @@ export default function StudentDashboard() {
     ]).then(async ([coursesResponse, certificatesResponse, classesResponse]) => {
       const courses = coursesResponse.data.data.courses;
       const completionPairs = await Promise.all(courses.map(async (course) => {
-        const [completion, learning] = await Promise.allSettled([api.get(`/courses/${course.id}/completion`), api.get(`/courses/${course.id}/learning`)]);
+        const [completion, learning] = await Promise.allSettled([api.get(`/courses/${course.id}/completion`), api.get(`/classes/${course.id}/learning`)]);
         return [course.id, {
           completion: completion.status === 'fulfilled' ? completion.value.data.data : null,
           learning: learning.status === 'fulfilled' ? learning.value.data.data : null,
@@ -55,7 +55,8 @@ export default function StudentDashboard() {
   const liveClasses = state.classes.filter((item) => item.liveSession);
   const upcoming = state.classes.filter((item) => !item.liveSession && item.startsAt && new Date(item.startsAt) > new Date()).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)).slice(0, 4);
   const paymentDue = state.courses.filter((course) => course.enrollment?.payment && !course.enrollment.payment.allowed).length;
-  const validCertificates = state.certificates.filter((certificate) => !certificate.revoked);
+  const validCertificates = state.certificates.filter((certificate) => !certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required'));
+  const certificatesAwaitingPayment = state.certificates.some((certificate) => !certificate.revoked && !['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required'));
   const completedTrainings = Object.values(state.completion).filter((item) => item?.eligible).length;
 
   const progressFor = (course) => {
@@ -82,7 +83,7 @@ export default function StudentDashboard() {
 
     <section className="mb-7">
       <SectionHeader title="Your snapshot" description="A quick view of your current learning." icon={Sparkles} />
-      <div className="quicklink-dashboard-stats grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="quicklink-dashboard-stats student-dashboard-stats grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatCard label="Active trainings" value={state.courses.length} icon={GraduationCap} hint="Enrolled and in progress" />
         <StatCard label="Live now" value={liveClasses.length} icon={Radio} accent="red" hint={liveClasses.length ? 'Join from My live classes' : 'No sessions live'} />
         <StatCard label="Completed" value={completedTrainings} icon={CheckCircle2} accent="green" hint="Requirements fully met" />
@@ -92,12 +93,12 @@ export default function StudentDashboard() {
 
     <section className="mb-8">
       <SectionHeader title="Continue your trainings" description="Pick up where you left off." action={<Link to="/courses" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700">Browse all <ArrowRight size={15} /></Link>} icon={GraduationCap} />
-      {state.courses.length ? <div className="grid gap-4 md:grid-cols-2">
+      {state.courses.length ? <div className="grid min-w-0 gap-3 sm:gap-4 md:grid-cols-2">
         {state.courses.map((course) => {
           const progress = progressFor(course);
           const payment = course.enrollment?.payment;
           return <article key={course.id} className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            <CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="aspect-[16/7] w-full" />
+            <CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="aspect-[16/5] w-full sm:aspect-[16/7]" />
             <div className="min-w-0 p-4 sm:p-5">
               <div className="flex flex-wrap items-center gap-2"><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{liveClasses.some((item) => item.id === course.id) && <Badge color="red">Live now</Badge>}</div>
               <h3 className="mt-3 break-words text-base font-bold leading-6 text-slate-950">{course.title}</h3>
@@ -108,7 +109,7 @@ export default function StudentDashboard() {
                 {course.startsAt && <span className="inline-flex items-center gap-1 text-slate-500"><CalendarClock size={13} />{formatDateTime(course.startsAt)}</span>}
                 {payment?.required && <span className="font-semibold text-amber-700">{formatMoney(payment.amount, payment.currency)} due</span>}
               </div>
-              <div className="mt-4 flex gap-2"><Link to={state.learning[course.id]?.progress?.totalLessons ? `/courses/${course.id}/learn` : `/courses/${course.id}`} className="btn-primary flex-1">{state.learning[course.id]?.progress?.totalLessons ? 'Continue learning' : 'Open training'}</Link><Link to={`/classes/${course.id}`} className="btn-secondary"><Video size={16} />Classroom</Link></div>
+              <div className="mt-4 grid min-w-0 grid-cols-1 gap-2 min-[360px]:grid-cols-[minmax(0,1fr)_auto]"><Link to={state.learning[course.id]?.progress?.totalLessons ? `/courses/${course.id}/learn` : `/courses/${course.id}`} className="btn-primary min-w-0">{state.learning[course.id]?.progress?.totalLessons ? 'Continue learning' : 'Open training'}</Link><Link to={`/classes/${course.id}`} className="btn-secondary min-w-0"><Video size={16} />Classroom</Link></div>
             </div>
           </article>;
         })}
@@ -126,7 +127,7 @@ export default function StudentDashboard() {
 
       <section>
         <SectionHeader title="Certificates" description="Your verified achievements." icon={Award} action={validCertificates.length > 0 ? <Link to="/certificates" className="text-sm font-semibold text-brand-700">Open certificates</Link> : null} />
-        {validCertificates.length ? <div className="space-y-2">{validCertificates.slice(0, 3).map((certificate) => <Link key={certificate.id} to="/certificates" className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-green-200"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700"><Award size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{certificate.courseTitle}</span><span className="block text-xs text-slate-500">{certificate.level} · Issued {formatDateTime(certificate.issuedAt)}</span></span><FileCheck2 size={16} className="text-emerald-600" /></Link>)}</div> : <EmptyState icon={Award} title="No certificates yet" description="Complete your training requirements to unlock your certificate." />}
+        {validCertificates.length ? <div className="space-y-2">{validCertificates.slice(0, 3).map((certificate) => <Link key={certificate.id} to="/certificates" className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-green-200 sm:p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700"><Award size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{certificate.courseTitle}</span><span className="block truncate text-xs text-slate-500">{certificate.level} · Issued {formatDateTime(certificate.issuedAt)}</span></span><FileCheck2 size={16} className="shrink-0 text-emerald-600" /></Link>)}</div> : <EmptyState icon={Award} title={certificatesAwaitingPayment ? 'Certificate awaiting payment approval' : 'No certificates yet'} description={certificatesAwaitingPayment ? 'Your certificate will appear here once its payment is approved by an administrator. You can check or submit payment from the training page.' : 'Complete your training requirements to unlock your certificate.'} />}
       </section>
     </div>
 

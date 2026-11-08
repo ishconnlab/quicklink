@@ -88,8 +88,8 @@ export default function CourseLearningPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const requests = [api.get(`/courses/${id}/learning`), api.get(`/courses/${id}`)];
-      if (admin) requests.push(api.get(`/courses/${id}/learning/analytics`));
+      const requests = [api.get(`/classes/${id}/learning`), api.get(`/courses/${id}`)];
+      if (admin) requests.push(api.get(`/classes/${id}/learning/analytics`));
       const [learningResponse, courseResponse, analyticsResponse] = await Promise.all(requests);
       const next = learningResponse.data.data;
       setData(next);
@@ -109,7 +109,7 @@ export default function CourseLearningPage() {
 
   const recordEvent = useCallback(async (type) => {
     if (!current?.id || admin) return;
-    try { await api.post(`/courses/${id}/learning/lessons/${current.id}/events`, { type }); } catch { /* retain the assessment flow if event logging is temporarily unavailable */ }
+    try { await api.post(`/classes/${id}/learning/lessons/${current.id}/events`, { type }); } catch { /* retain the assessment flow if event logging is temporarily unavailable */ }
   }, [admin, current?.id, id]);
 
   useEffect(() => {
@@ -159,7 +159,7 @@ export default function CourseLearningPage() {
   };
   const markComplete = async () => {
     setBusy(true);
-    try { await api.put(`/courses/${id}/learning/lessons/${current.id}/complete`); toast.success('Lesson marked complete.'); await load(); }
+    try { await api.put(`/classes/${id}/learning/lessons/${current.id}/complete`); toast.success('Lesson marked complete.'); await load(); }
     catch (error) { toast.error(apiError(error).message); }
     finally { setBusy(false); }
   };
@@ -171,7 +171,7 @@ export default function CourseLearningPage() {
     if (!current || current.questions.some((_, index) => answers[index] === undefined)) { toast.error('Answer every question before submitting.'); return; }
     setBusy(true);
     try {
-      const response = await api.post(`/courses/${id}/learning/lessons/${current.id}/assessment`, { answers: current.questions.map((_, index) => ({ optionIndex: Number(answers[index]) })) });
+      const response = await api.post(`/classes/${id}/learning/lessons/${current.id}/assessment`, { answers: current.questions.map((_, index) => ({ optionIndex: Number(answers[index]) })) });
       setResult(response.data.data.result);
       toast.success(response.data.data.result.passed ? 'Assessment passed.' : 'Assessment submitted. Review the answers and try again.');
       await load();
