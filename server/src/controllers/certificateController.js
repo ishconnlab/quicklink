@@ -20,8 +20,8 @@ import { recordActivity } from '../services/activityLog.js';
 import { CourseLearningProgress } from '../models/CourseLearningProgress.js';
 
 const COURSE_FIELDS = [
-  'title', 'level', 'active', 'published', 'students', 'learningMaterials', 'modules', 'completionRequirements',
-  'certificationAssessmentEnabled', 'certificationQuestions', 'assessmentAttempts', 'assessmentPassMark',
+  'title', 'level', 'active', 'published', 'students', 'learningMaterials', 'modules', 'certificatePayment', 'completionRequirements',
+  'certificationAssessmentEnabled', 'certificationQuestions', 'assessmentAttempts', 'assessmentPassMark', 'certificationAssessmentTimeLimitMinutes',
   'assessmentLockdown', 'minimumAttendanceSessions', 'projectSubmission', 'payment', 'startsAt', 'createdAt',
 ].join(' ');
 
@@ -36,6 +36,13 @@ function certificateJson(certificate) {
     studentName: certificate.studentName,
     courseTitle: certificate.courseTitle,
     description: certificate.description || '',
+    paymentStatus: certificate.paymentStatus || 'not_required',
+    paymentAmount: certificate.paymentAmount || 0,
+    paymentCurrency: certificate.paymentCurrency || 'RWF',
+    paymentReference: certificate.paymentReference || '',
+    paymentNote: certificate.paymentNote || '',
+    paymentSubmittedAt: certificate.paymentSubmittedAt || null,
+    paymentVerifiedAt: certificate.paymentVerifiedAt || null,
     level: certificate.level,
     completionDate: certificate.completionDate || certificate.issuedAt,
     issuedAt: certificate.issuedAt,
@@ -81,6 +88,9 @@ async function findOrIssueCertificate(course, student, registeredName = student.
           completionDate: new Date(),
           issuedAt: new Date(),
           issuedBy,
+          paymentStatus: course.certificatePayment?.enabled ? 'unpaid' : 'not_required',
+          paymentAmount: course.certificatePayment?.enabled ? (course.certificatePayment.amount || 0) : 0,
+          paymentCurrency: course.certificatePayment?.currency || 'RWF',
         },
       },
       { upsert: true, new: true, runValidators: true },
@@ -176,6 +186,36 @@ export const listCourseCertificates = asyncHandler(async (req, res) => {
   if (!course) throw ApiError.notFound('Training not found.');
   const certificates = await CourseCertificate.find({ course: course._id }).sort({ issuedAt: -1 }).limit(500).lean();
   res.json({ success: true, data: { certificates: certificates.map(certificateJson) } });
+});
+
+export const submitCertificatePaymentReference = asyncHandler(async (req, res) => {
+  if (req.user.role !== 'student') throw ApiError.forbidden('Only enrolled students can submit certificate payments.');
+  const course = await LearningClass.findById(req.params.id).select('students certificatePayment');
+  if (!course) throw ApiError.notFound('Training not found.');
+  if (!course.students.some((student) => student.toString() === req.user._id.toString())) throw ApiError.forbidden('You are not enrolled in this training.');
+  if (!course.certificatePayment?.enabled) throw ApiError.conflict('This training issues certificates for free.');
+  const certificate = await CourseCertificate.findOne({ course: course._id, student: req.user._id });
+  if (!certificate) throw ApiError.conflict('Complete the course requirements before submitting a certificate payment.');
+  if (certificate.paymentStatus === 'paid' || certificate.paymentStatus === 'not_required') throw ApiError.conflict('This certificate does not need another payment.');
+  certificate.paymentStatus = 'pending';
+  certificate.paymentReference = req.body.reference;
+  certificate.paymentNote = req.body.note || '';
+  certificate.paymentSubmittedAt = new Date();
+  certificate.paymentVerifiedAt = null;
+  await certificate.save();
+  res.status(201).json({ success: true, data: { certificate: certificateJson(certificate) } });
+});
+
+export const reviewCertificatePayment = asyncHandler(async (req, res) => {
+  const certificate = await CourseCertificate.findOne({ _id: req.params.certificateId, course: req.params.id });
+  if (!certificate) throw ApiError.notFound('Certificate payment record not found.');
+  if (certificate.paymentStatus !== 'pending') throw ApiError.conflict('Only pending certificate payments can be reviewed.');
+  certificate.paymentStatus = req.body.status;
+  certificate.paymentNote = req.body.note || '';
+  certificate.paymentVerifiedAt = req.body.status === 'paid' ? new Date() : null;
+  certificate.paymentReviewedBy = req.user._id;
+  await certificate.save();
+  res.json({ success: true, data: { certificate: certificateJson(certificate) } });
 });
 
 export const listCertificateCandidates = asyncHandler(async (req, res) => {
@@ -294,7 +334,7 @@ export const reissueCertificate = asyncHandler(async (req, res) => {
 });
 
 export const getCertificationAssessmentSettings = asyncHandler(async (req, res) => {
-  const course = await LearningClass.findById(req.params.id).select('certificationAssessmentEnabled certificationQuestions assessmentAttempts assessmentPassMark assessmentLockdown projectSubmission');
+  const course = await LearningClass.findById(req.params.id).select('certificationAssessmentEnabled certificationQuestions assessmentAttempts assessmentPassMark assessmentLockdown certificationAssessmentTimeLimitMinutes projectSubmission certificatePayment');
   if (!course) throw ApiError.notFound('Training not found.');
   res.json({
     success: true,
@@ -303,27 +343,43 @@ export const getCertificationAssessmentSettings = asyncHandler(async (req, res) 
       questions: course.certificationQuestions || [],
       attempts: course.assessmentAttempts ?? 3,
       passMark: course.assessmentPassMark ?? 80,
+      timeLimitMinutes: course.certificationAssessmentTimeLimitMinutes ?? 0,
       lockdown: course.assessmentLockdown !== false,
       projectSubmission: course.projectSubmission || {},
+      certificatePayment: course.certificatePayment || {},
       attemptsStarted: await CertificationAssessmentAttempt.exists({ course: course._id }),
     },
   });
 });
 
 export const saveCertificationAssessmentSettings = asyncHandler(async (req, res) => {
-  const course = await LearningClass.findById(req.params.id).select('certificationAssessmentEnabled certificationQuestions assessmentAttempts assessmentPassMark assessmentLockdown');
+  const course = await LearningClass.findById(req.params.id).select('certificationAssessmentEnabled certificationQuestions assessmentAttempts assessmentPassMark assessmentLockdown certificationAssessmentTimeLimitMinutes certificatePayment');
   if (!course) throw ApiError.notFound('Training not found.');
   const questionChanged = course.certificationAssessmentEnabled !== req.body.enabled
     || JSON.stringify(course.certificationQuestions.map((question) => question.toObject())) !== JSON.stringify(req.body.questions);
   if (questionChanged && await CertificationAssessmentAttempt.exists({ course: course._id })) {
     throw ApiError.conflict('The assessment questions cannot be changed after students have attempted it. You can still update attempts and the pass mark.');
   }
+  if (req.body.timeLimitMinutes !== undefined && req.body.timeLimitMinutes !== course.certificationAssessmentTimeLimitMinutes && await CertificationAssessmentAttempt.exists({ course: course._id })) throw ApiError.conflict('The time limit cannot be changed after students have attempted this assessment.');
   course.certificationAssessmentEnabled = req.body.enabled;
   course.certificationQuestions = req.body.questions;
   if (req.body.attempts !== undefined) course.assessmentAttempts = req.body.attempts;
   if (req.body.passMark !== undefined) course.assessmentPassMark = req.body.passMark;
   if (req.body.lockdown !== undefined) course.assessmentLockdown = req.body.lockdown;
+  if (req.body.timeLimitMinutes !== undefined) course.certificationAssessmentTimeLimitMinutes = req.body.timeLimitMinutes;
+  if (req.body.certificatePayment) {
+    course.certificatePayment = req.body.certificatePayment;
+  }
   await course.save();
+  if (req.body.certificatePayment) {
+    const payment = course.certificatePayment;
+    if (payment.enabled) {
+      await CourseCertificate.updateMany({ course: course._id, paymentStatus: { $in: ['not_required', 'unpaid', 'rejected'] } }, { $set: { paymentStatus: 'unpaid', paymentAmount: payment.amount, paymentCurrency: payment.currency } });
+      await CourseCertificate.updateMany({ course: course._id, paymentStatus: 'pending' }, { $set: { paymentAmount: payment.amount, paymentCurrency: payment.currency } });
+    } else {
+      await CourseCertificate.updateMany({ course: course._id, paymentStatus: { $in: ['not_required', 'unpaid', 'pending', 'rejected'] } }, { $set: { paymentStatus: 'not_required', paymentAmount: 0, paymentCurrency: payment.currency || 'RWF', paymentReference: '', paymentNote: '', paymentSubmittedAt: null, paymentVerifiedAt: null } });
+    }
+  }
   res.json({
     success: true,
     data: {
@@ -331,7 +387,9 @@ export const saveCertificationAssessmentSettings = asyncHandler(async (req, res)
       questionCount: course.certificationQuestions.length,
       attempts: course.assessmentAttempts,
       passMark: course.assessmentPassMark,
+      timeLimitMinutes: course.certificationAssessmentTimeLimitMinutes,
       lockdown: course.assessmentLockdown,
+      certificatePayment: course.certificatePayment,
     },
   });
 });
@@ -370,7 +428,7 @@ function randomizedQuestions(questions, draft) {
 }
 
 function assessmentPayload(course, state, project, questions = [], lessons = { total: 0, completed: 0, complete: true }) {
-  const configured = course.certificationQuestions?.length === 10;
+  const configured = (course.certificationQuestions?.length || 0) > 0;
   const canStart = Boolean(
     course.certificationAssessmentEnabled
     && configured
@@ -382,6 +440,7 @@ function assessmentPayload(course, state, project, questions = [], lessons = { t
   return {
     title: course.title,
     enabled: course.certificationAssessmentEnabled,
+    questionCount: course.certificationQuestions?.length || 0,
     configured,
     projectSubmissionRequired: project.required,
     projectSubmitted: project.complete,
@@ -393,6 +452,10 @@ function assessmentPayload(course, state, project, questions = [], lessons = { t
     attemptsRemaining: state.attemptsRemaining,
     maxAttempts: state.maxAttempts,
     passMark: course.assessmentPassMark ?? 80,
+    timeLimitMinutes: course.certificationAssessmentTimeLimitMinutes ?? 0,
+    expiresAt: state.draft && course.certificationAssessmentTimeLimitMinutes > 0
+      ? new Date(new Date(state.draft.startedAt).getTime() + course.certificationAssessmentTimeLimitMinutes * 60_000)
+      : null,
     lockdown: course.assessmentLockdown !== false,
     latestAttempt: state.attempts.at(-1) ? {
       score: state.attempts.at(-1).score,
@@ -404,6 +467,7 @@ function assessmentPayload(course, state, project, questions = [], lessons = { t
       answers: state.draft.answers,
       currentIndex: state.draft.currentIndex,
       fullscreenExitCount: state.draft.fullscreenExitCount,
+      interruptions: state.draft.interruptions || [],
       startedAt: state.draft.startedAt,
       lastSavedAt: state.draft.lastSavedAt,
     } : null,
@@ -422,10 +486,10 @@ export const getCertificationAssessment = asyncHandler(async (req, res) => {
 
 export const startCertificationAssessment = asyncHandler(async (req, res) => {
   const course = await assessmentAccess(req.params.id, req.user);
-  const state = await assessmentState(course, req.user._id);
+  let state = await assessmentState(course, req.user._id);
   const project = await projectCompleteFor(course, req.user._id);
   const lessons = await lessonCompletion(course, req.user._id);
-  if (!course.certificationAssessmentEnabled || course.certificationQuestions?.length !== 10) {
+  if (!course.certificationAssessmentEnabled || !course.certificationQuestions?.length) {
     throw ApiError.conflict('The administrator has not configured this training assessment.');
   }
   if (state.passed) throw ApiError.conflict('You have already passed this assessment.');
@@ -434,12 +498,20 @@ export const startCertificationAssessment = asyncHandler(async (req, res) => {
   if (!lessons.complete) throw ApiError.conflict('Complete every course lesson before taking the final assessment.');
   let draft = await AssessmentDraft.findOne({ student: req.user._id, course: course._id });
   let created = false;
+  if (draft && course.certificationAssessmentTimeLimitMinutes > 0 && Date.now() >= new Date(draft.startedAt).getTime() + course.certificationAssessmentTimeLimitMinutes * 60_000) {
+    const attemptNumber = state.attemptsUsed + 1;
+    await CertificationAssessmentAttempt.create({ student: req.user._id, course: course._id, attemptNumber, answers: [], score: 0, passed: false, interruptions: [...(draft.interruptions || []), { type: 'time-expired', occurredAt: new Date() }] });
+    await draft.deleteOne();
+    state = await assessmentState(course, req.user._id);
+    if (state.attemptsRemaining <= 0) throw ApiError.conflict('The assessment time expired and no attempts remain.');
+    draft = null;
+  }
   if (!draft) {
-    draft = await AssessmentDraft.create({ student: req.user._id, course: course._id, answers: [], currentIndex: 0, questionOrder: shuffledIndices(10), optionOrders: course.certificationQuestions.map((question) => shuffledIndices(question.options.length)) });
+    draft = await AssessmentDraft.create({ student: req.user._id, course: course._id, answers: [], currentIndex: 0, questionOrder: shuffledIndices(course.certificationQuestions.length), optionOrders: course.certificationQuestions.map((question) => shuffledIndices(question.options.length)) });
     created = true;
   }
   if (!draft.questionOrder?.length || !draft.optionOrders?.length) {
-    draft.questionOrder = draft.answers.length ? Array.from({ length: 10 }, (_, index) => index) : shuffledIndices(10);
+    draft.questionOrder = draft.answers.length ? Array.from({ length: course.certificationQuestions.length }, (_, index) => index) : shuffledIndices(course.certificationQuestions.length);
     draft.optionOrders = draft.answers.length ? course.certificationQuestions.map((question) => question.options.map((_, index) => index)) : course.certificationQuestions.map((question) => shuffledIndices(question.options.length));
     await draft.save();
   }
@@ -453,6 +525,7 @@ export const saveAssessmentDraft = asyncHandler(async (req, res) => {
   if (state.passed) throw ApiError.conflict('You have already passed this assessment.');
   if (state.attemptsRemaining <= 0) throw ApiError.conflict('No assessment attempts remain.');
   if (!state.draft) throw ApiError.conflict('Start the assessment before saving progress.');
+  if (course.certificationAssessmentTimeLimitMinutes > 0 && Date.now() >= new Date(state.draft.startedAt).getTime() + course.certificationAssessmentTimeLimitMinutes * 60_000) throw ApiError.conflict('The assessment time has expired.');
   const draft = await AssessmentDraft.findOneAndUpdate(
     { student: req.user._id, course: course._id },
     {
@@ -460,6 +533,7 @@ export const saveAssessmentDraft = asyncHandler(async (req, res) => {
         answers: req.body.answers,
         currentIndex: req.body.currentIndex,
         fullscreenExitCount: req.body.fullscreenExitCount || 0,
+        ...(req.body.interruptions ? { interruptions: req.body.interruptions.map((event) => ({ type: event.type, occurredAt: event.occurredAt || new Date() })) } : {}),
         lastSavedAt: new Date(),
       },
     },
@@ -471,7 +545,7 @@ export const saveAssessmentDraft = asyncHandler(async (req, res) => {
 
 export const submitCertificationAssessment = asyncHandler(async (req, res) => {
   const course = await assessmentAccess(req.params.id, req.user);
-  if (!course.certificationAssessmentEnabled || course.certificationQuestions?.length !== 10) {
+  if (!course.certificationAssessmentEnabled || !course.certificationQuestions?.length) {
     throw ApiError.conflict('The administrator has not configured this training assessment.');
   }
   const project = await projectCompleteFor(course, req.user._id);
@@ -479,10 +553,15 @@ export const submitCertificationAssessment = asyncHandler(async (req, res) => {
   if (!project.complete) throw ApiError.conflict('Submit your project before taking the assessment.');
   if (!lessons.complete) throw ApiError.conflict('Complete every course lesson before taking the final assessment.');
   const state = await assessmentState(course, req.user._id);
+  if (!state.draft) throw ApiError.conflict('Start the assessment before submitting answers.');
   if (state.passed) throw ApiError.conflict('You have already passed this assessment.');
   if (state.attemptsRemaining <= 0) throw ApiError.conflict('No assessment attempts remain. Contact the administrator.');
   const attemptNumber = state.attemptsUsed + 1;
   const passMark = course.assessmentPassMark ?? 80;
+  const timeLimit = course.certificationAssessmentTimeLimitMinutes || 0;
+  const expiresAt = timeLimit ? new Date(new Date(state.draft.startedAt).getTime() + timeLimit * 60_000) : null;
+  if (expiresAt && Date.now() > expiresAt.getTime() + 15_000) throw ApiError.conflict('The assessment time has expired.');
+  if (!timeLimit && req.body.answers.length !== course.certificationQuestions.length) throw ApiError.badRequest(`Answer all ${course.certificationQuestions.length} questions before submitting.`);
   const draft = state.draft;
   const canonicalAnswers = req.body.answers.map(({ questionIndex, optionIndex }) => {
     const originalQuestion = draft?.questionOrder?.[questionIndex] ?? questionIndex;
@@ -497,6 +576,7 @@ export const submitCertificationAssessment = asyncHandler(async (req, res) => {
       course: course._id,
       attemptNumber,
       answers: canonicalAnswers,
+      interruptions: [...(draft.interruptions || []), ...(expiresAt && Date.now() >= expiresAt.getTime() ? [{ type: 'time-expired', occurredAt: new Date() }] : [])],
       score,
       passed,
     });
@@ -518,6 +598,7 @@ export const submitCertificationAssessment = asyncHandler(async (req, res) => {
     data: {
       score,
       correctCount,
+      questionCount: course.certificationQuestions.length,
       passed,
       attemptNumber,
       attemptsRemaining: Math.max(0, state.maxAttempts - attemptNumber),
@@ -622,6 +703,7 @@ export const reviewProjectSubmission = asyncHandler(async (req, res) => {
 export const verifyCertificate = asyncHandler(async (req, res) => {
   const certificate = await CourseCertificate.findOne({ code: req.params.code }).lean();
   if (!certificate) return res.status(404).json({ success: true, data: { valid: false, status: 'not-found' } });
+  if (!['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required')) return res.json({ success: true, data: { valid: false, status: 'payment-required' } });
   res.json({
     success: true,
     data: {
@@ -644,6 +726,7 @@ export const verifyCertificate = asyncHandler(async (req, res) => {
 export const shareCertificate = asyncHandler(async (req, res) => {
   const certificate = await CourseCertificate.findOne({ code: req.params.code }).lean();
   if (!certificate) throw ApiError.notFound('Certificate not found.');
+  if (!['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required')) throw ApiError.notFound('Certificate not found.');
   const appUrl = config.mail.appUrl || config.corsOrigin[0];
   if (!appUrl) throw ApiError.conflict('The public application URL is not configured.');
   const verificationUrl = new URL(`/verify/${certificate.code}`, appUrl).toString();
@@ -677,7 +760,7 @@ export const downloadCertificate = asyncHandler(async (req, res) => {
   const certificate = /^[0-9a-fA-F]{24}$/.test(req.params.id)
     ? await CourseCertificate.findById(req.params.id)
     : await CourseCertificate.findOne({ code: req.params.id });
-  if (!certificate || certificate.revokedAt) throw ApiError.notFound('Certificate is unavailable.');
+  if (!certificate || certificate.revokedAt || !['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required')) throw ApiError.notFound('Certificate is unavailable.');
   if (req.user.role !== 'admin' && certificate.student.toString() !== req.user._id.toString()) throw ApiError.forbidden('You cannot download another student certificate.');
   const appUrl = config.mail.appUrl || config.corsOrigin[0];
   if (!appUrl) throw ApiError.conflict('The public application URL is not configured.');

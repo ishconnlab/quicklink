@@ -123,6 +123,14 @@ function classJson(item, options = {}) {
       paymentName: item.payment?.paymentName || '',
       instructions: item.payment?.instructions || '',
     },
+    certificatePayment: {
+      enabled: Boolean(item.certificatePayment?.enabled),
+      amount: item.certificatePayment?.amount || 0,
+      currency: item.certificatePayment?.currency || 'RWF',
+      paymentCode: item.certificatePayment?.paymentCode || '',
+      paymentName: item.certificatePayment?.paymentName || '',
+      instructions: item.certificatePayment?.instructions || '',
+    },
     startsAt: item.startsAt,
     endsAt: item.endsAt || null,
     enrollmentOpensAt: item.enrollmentOpensAt || null,
@@ -514,6 +522,7 @@ export const createClass = asyncHandler(async (req, res) => {
     allowCancellation: req.body.allowCancellation,
     published: req.body.published !== false,
     payment: { ...platformSettings.payment, ...(req.body.payment || {}) },
+    certificatePayment: req.body.certificatePayment || {},
     projectSubmission: req.body.projectSubmission || {},
     certificationAssessmentEnabled: Boolean(req.body.certificationAssessmentEnabled),
     assessmentAttempts: req.body.assessmentAttempts ?? platformSettings.assessment.attempts,
@@ -551,7 +560,7 @@ export const updateClass = asyncHandler(async (req, res) => {
     'slug', 'difficulty', 'courseDuration', 'learningObjectives', 'prerequisites', 'language', 'instructorName', 'instructorBio', 'modules',
     'active', 'published', 'startsAt', 'endsAt', 'enrollmentOpensAt', 'enrollmentClosesAt', 'schedule',
     'durationMinutes', 'lateThresholdMinutes', 'earlyThresholdPercent', 'timezone', 'maxStudents',
-    'enrollmentOpen', 'allowCancellation', 'certificationAssessmentEnabled', 'assessmentAttempts',
+    'enrollmentOpen', 'allowCancellation', 'certificatePayment', 'certificationAssessmentEnabled', 'assessmentAttempts',
     'assessmentPassMark', 'assessmentLockdown', 'minimumAttendanceSessions',
   ];
   for (const field of fields) if (req.body[field] !== undefined) item[field] = req.body[field];

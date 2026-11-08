@@ -10,6 +10,15 @@ const paymentSettingsSchema = new mongoose.Schema({
   instructions: { type: String, default: '', trim: true, maxlength: 2000 },
 }, { _id: false });
 
+const certificatePaymentSchema = new mongoose.Schema({
+  enabled: { type: Boolean, default: false },
+  amount: { type: Number, default: 0, min: 0, max: 100000000 },
+  currency: { type: String, default: 'RWF', trim: true, maxlength: 12 },
+  paymentCode: { type: String, default: '', trim: true, maxlength: 40 },
+  paymentName: { type: String, default: '', trim: true, maxlength: 120 },
+  instructions: { type: String, default: '', trim: true, maxlength: 2000 },
+}, { _id: false });
+
 const projectSubmissionSettingsSchema = new mongoose.Schema({
   enabled: { type: Boolean, default: false },
   required: { type: Boolean, default: false },
@@ -35,6 +44,7 @@ const lessonSchema = new mongoose.Schema({
   imagePublicId: { type: String, default: '', trim: true, maxlength: 255 },
   resources: [{ title: { type: String, trim: true, maxlength: 180 }, url: { type: String, trim: true, maxlength: 2000 } }],
   code: { language: { type: String, default: '', trim: true, maxlength: 40 }, source: { type: String, default: '', maxlength: 20000 } },
+  codeBlocks: [{ language: { type: String, default: '', trim: true, maxlength: 40 }, source: { type: String, default: '', maxlength: 20000 }, explanation: { type: String, default: '', trim: true, maxlength: 2000 } }],
   knowledgeCheck: { type: [lessonQuestionSchema], default: [], validate: { validator: (questions) => questions.length === 0 || questions.length === 10, message: 'An intermediate assessment must contain exactly 10 questions.' } },
   passMark: { type: Number, default: 70, min: 1, max: 100 },
   assessmentAttempts: { type: Number, default: 3, min: 1, max: 10 },
@@ -81,14 +91,16 @@ const learningClassSchema = new mongoose.Schema({
       correctOption: { type: Number, required: true, min: 0, max: 3 },
     }],
     default: [],
-    validate: { validator: (questions) => questions.length === 0 || questions.length === 10, message: 'A certification assessment must contain exactly 10 questions.' },
+    validate: { validator: (questions) => questions.length <= 100, message: 'A certification assessment can contain at most 100 questions.' },
   },
   assessmentAttempts: { type: Number, default: 3, min: 1, max: 10 },
   assessmentPassMark: { type: Number, default: 80, min: 1, max: 100 },
+  certificationAssessmentTimeLimitMinutes: { type: Number, default: 0, min: 0, max: 240 },
   assessmentLockdown: { type: Boolean, default: true },
   minimumAttendanceSessions: { type: Number, default: 2, min: 0, max: 100 },
   projectSubmission: { type: projectSubmissionSettingsSchema, default: () => ({}) },
   payment: { type: paymentSettingsSchema, default: () => ({}) },
+  certificatePayment: { type: certificatePaymentSchema, default: () => ({}) },
   course: { type: String, default: '', trim: true, maxlength: 160 },
   level: { type: String, default: 'Training', enum: ['L3', 'L4', 'L5', 'Bootcamp', 'Training'], index: true },
   description: { type: String, default: '', trim: true, maxlength: 12000 },

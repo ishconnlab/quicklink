@@ -77,15 +77,15 @@ export async function evaluateCourseCompletion(course, studentId) {
   }
 
   if (assessmentEnabled) {
-    const configured = course.certificationQuestions?.length === 10;
+    const configured = (course.certificationQuestions?.length || 0) > 0;
     const passed = configured && await CertificationAssessmentAttempt.exists({ student: studentId, course: course._id, passed: true });
     checks.push({
       key: 'certificationAssessment',
-      label: 'Pass the 10-question certification assessment',
+      label: 'Pass the final certification assessment',
       complete: Boolean(passed),
       detail: configured
         ? (passed ? 'Passed' : `Not passed yet (${course.assessmentPassMark || settings.assessment.passMark}% required)`)
-        : 'The administrator must configure all 10 questions',
+        : 'The administrator must configure the assessment questions',
     });
   }
 

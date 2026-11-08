@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const draftAnswerSchema = new mongoose.Schema({
-  questionIndex: { type: Number, required: true, min: 0, max: 9 },
+  questionIndex: { type: Number, required: true, min: 0, max: 99 },
   optionIndex: { type: Number, required: true, min: 0, max: 3 },
 }, { _id: false });
 
@@ -11,8 +11,9 @@ const assessmentDraftSchema = new mongoose.Schema({
   answers: { type: [draftAnswerSchema], default: [] },
   questionOrder: { type: [Number], default: [] },
   optionOrders: { type: [[Number]], default: [] },
-  currentIndex: { type: Number, default: 0, min: 0, max: 9 },
+  currentIndex: { type: Number, default: 0, min: 0, max: 99 },
   fullscreenExitCount: { type: Number, default: 0, min: 0 },
+  interruptions: [{ type: { type: String, enum: ['tab-hidden', 'window-blur', 'fullscreen-exit', 'copy', 'context-menu', 'time-expired'], required: true }, occurredAt: { type: Date, default: Date.now } }],
   startedAt: { type: Date, default: Date.now },
   lastSavedAt: { type: Date, default: Date.now },
 }, { timestamps: true });

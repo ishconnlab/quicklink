@@ -21,9 +21,11 @@ function trainingWithQuestions(certificationQuestions) {
   });
 }
 
-test('certification assessments accept exactly 10 four-option questions', () => {
+test('certification assessments support configurable question counts with four options', () => {
   assert.equal(trainingWithQuestions(questions).validateSync(), undefined);
-  assert.ok(trainingWithQuestions(questions.slice(0, 9)).validateSync());
+  assert.equal(trainingWithQuestions(questions.slice(0, 1)).validateSync(), undefined);
+  assert.equal(trainingWithQuestions(Array.from({ length: 100 }, (_, index) => ({ ...questions[0], prompt: `Question ${index + 1}` }))).validateSync(), undefined);
+  assert.ok(trainingWithQuestions(Array.from({ length: 101 }, (_, index) => ({ ...questions[0], prompt: `Question ${index + 1}` }))).validateSync());
 
   const invalidOptions = questions.map((question) => ({ ...question, options: ['A', 'B', 'C'] }));
   const validationError = trainingWithQuestions(invalidOptions).validateSync();

@@ -49,6 +49,7 @@ export default function CourseDetailPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [paymentForm, setPaymentForm] = useState({ reference: '', note: '' });
+  const [certificatePaymentForm, setCertificatePaymentForm] = useState({ reference: '', note: '' });
   const [projectForm, setProjectForm] = useState({ linkUrl: '', description: '' });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reviewing, setReviewing] = useState(null);
@@ -142,7 +143,19 @@ export default function CourseDetailPage() {
     try {
       const response = await api.post(`/courses/${id}/certificate`);
       setCertificates((current) => [response.data.data.certificate, ...current.filter((item) => item.id !== response.data.data.certificate.id)]);
-      toast.success('Certificate issued.');
+      toast.success(response.data.data.certificate.paymentStatus === 'unpaid' ? 'Certificate earned. Submit its payment reference to unlock the PDF.' : 'Certificate issued.');
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setBusy(''); }
+  };
+
+  const submitCertificatePayment = async (event) => {
+    event.preventDefault();
+    setBusy('certificate-payment');
+    try {
+      const response = await api.post(`/courses/${id}/certificate/payment-reference`, certificatePaymentForm);
+      setCertificates((current) => [response.data.data.certificate, ...current.filter((item) => item.id !== response.data.data.certificate.id)]);
+      setCertificatePaymentForm({ reference: '', note: '' });
+      toast.success('Certificate payment submitted for review.');
     } catch (error) { toast.error(apiError(error).message); }
     finally { setBusy(''); }
   };
@@ -284,7 +297,7 @@ export default function CourseDetailPage() {
             <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="eyebrow">Training overview</p><h2 className="mt-1 text-base font-bold text-slate-950">Operations snapshot</h2></div><Link to={`/enrollments?search=${encodeURIComponent(course.title)}`} className="btn-secondary">Enrollment ledger</Link></div>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Fact icon={Users} label="Enrolled" value={`${course.enrolledCount} / ${course.maxStudents}`} />
-              <Fact icon={Target} label="Assessment" value={assessmentConfigured ? `${course.assessment.questionCount}/10 questions` : 'Not enabled'} />
+              <Fact icon={Target} label="Assessment" value={assessmentConfigured ? `${course.assessment.questionCount} questions` : 'Not enabled'} />
               <Fact icon={ClipboardCheck} label="Project" value={course.projectSubmission?.enabled ? (course.projectSubmission.required ? 'Required' : 'Optional') : 'Disabled'} />
               <Fact icon={Wallet} label="Payment" value={course.payment?.enabled ? `${formatMoney(course.payment.amount, course.payment.currency)} · ${course.payment.freeDays} days free` : 'Not required'} />
             </div>
@@ -333,7 +346,7 @@ export default function CourseDetailPage() {
 
           {course.enrolled && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Certification</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><Award size={18} className="text-brand-700" />Your certificate</h2></div>{certificate && <Badge color={certificate.revoked ? 'red' : 'green'}>{certificate.revoked ? 'Revoked' : 'Valid'}</Badge>}</div>
-            {certificate ? <div className="mt-3"><p className="text-sm text-slate-600">{certificate.studentName} · {certificate.courseTitle}</p><p className="mt-1 text-xs text-slate-400">Issued {formatDateTime(certificate.issuedAt)} · {certificate.code}</p><div className="mt-3 flex flex-wrap gap-2"><button className="btn-primary" onClick={() => download(certificate)}><Download size={15} />Download PDF</button><button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button><Link to={`/verify/${certificate.code}`} className="btn-secondary"><ShieldCheck size={15} />Verify</Link></div>{certificate.revoked && <p className="mt-2 text-xs text-red-700">This certificate was revoked{certificate.revocationReason ? `: ${certificate.revocationReason}` : '.'}</p>}</div> : completion?.eligible ? <div className="mt-3"><p className="text-sm text-slate-600">All requirements are complete. Issue your verified certificate now.</p><button className="btn-primary mt-3" onClick={issueCertificate} disabled={busy === 'certificate'}>{busy === 'certificate' ? <Spinner size={16} /> : <Award size={16} />}Issue certificate</button></div> : <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Complete all requirements above to unlock your certificate.</div>}
+            {certificate ? <div className="mt-3"><p className="text-sm text-slate-600">{certificate.studentName} · {certificate.courseTitle}</p><p className="mt-1 text-xs text-slate-400">Issued {formatDateTime(certificate.issuedAt)} · {certificate.code}</p>{certificate.revoked ? <p className="mt-2 text-xs text-red-700">This certificate was revoked{certificate.revocationReason ? `: ${certificate.revocationReason}` : '.'}</p> : ['unpaid', 'pending', 'rejected'].includes(certificate.paymentStatus) ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3"><p className="font-semibold text-amber-950">Certificate payment · {certificate.paymentStatus === 'pending' ? 'Under review' : formatMoney(certificate.paymentAmount, certificate.paymentCurrency)}</p>{certificate.paymentStatus === 'pending' ? <p className="mt-1 text-sm text-amber-900">Reference {certificate.paymentReference} was submitted and is awaiting administrator confirmation.</p> : <><p className="mt-1 text-sm text-amber-900">Pay using code {course.certificatePayment?.paymentCode} · account {course.certificatePayment?.paymentName}.</p>{course.certificatePayment?.instructions && <p className="mt-1 text-xs leading-5 text-amber-900">{course.certificatePayment.instructions}</p>}{certificate.paymentStatus === 'rejected' && certificate.paymentNote && <p className="mt-2 text-xs text-red-800">Review note: {certificate.paymentNote}</p>}<form onSubmit={submitCertificatePayment} className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><input required minLength={3} maxLength={200} className="input bg-white" value={certificatePaymentForm.reference} onChange={(event) => setCertificatePaymentForm({ ...certificatePaymentForm, reference: event.target.value })} placeholder="Payment reference" aria-label="Certificate payment reference"/><input maxLength={1000} className="input bg-white" value={certificatePaymentForm.note} onChange={(event) => setCertificatePaymentForm({ ...certificatePaymentForm, note: event.target.value })} placeholder="Optional note" aria-label="Certificate payment note"/><button className="btn-primary" disabled={busy === 'certificate-payment'}>{busy === 'certificate-payment' ? <Spinner size={15}/> : <Send size={15}/>}Submit</button></form></>}</div> : <><div className="mt-3 flex flex-wrap gap-2"><button className="btn-primary" onClick={() => download(certificate)}><Download size={15} />Download PDF</button><button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button><Link to={`/verify/${certificate.code}`} className="btn-secondary"><ShieldCheck size={15} />Verify</Link></div></>}</div> : completion?.eligible ? <div className="mt-3"><p className="text-sm text-slate-600">All requirements are complete. {course.certificatePayment?.enabled ? 'Earn your certificate, then submit its payment reference to unlock the verified PDF.' : 'Your certificate will be free.'}</p><button className="btn-primary mt-3" onClick={issueCertificate} disabled={busy === 'certificate'}>{busy === 'certificate' ? <Spinner size={16} /> : <Award size={16} />}Generate certificate</button></div> : <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Complete all requirements above to unlock your certificate.</div>}
           </section>}
         </>}
       </div>

@@ -11,6 +11,7 @@ const uploadThumbnail = multer({ storage: multer.memoryStorage(), limits: { file
 const objectId = z.string().regex(/^[0-9a-fA-F]{24}$/);
 const idParams = z.object({ id: objectId });
 const projectParams = z.object({ id: objectId, submissionId: objectId });
+const certificatePaymentParams = z.object({ id: objectId, certificateId: objectId });
 const optionalLevel = z.preprocess((value) => value === '' ? undefined : value, z.enum(['L3', 'L4', 'L5', 'Bootcamp', 'Training']).optional());
 const listQuery = z.object({
   level: optionalLevel,
@@ -42,22 +43,25 @@ const certificationQuestion = z.object({
 });
 const certificationSettings = z.object({
   enabled: z.boolean(),
-  questions: z.array(certificationQuestion).length(10).or(z.array(certificationQuestion).length(0)),
+  questions: z.array(certificationQuestion).max(100),
   attempts: z.number().int().min(1).max(10).optional(),
   passMark: z.number().int().min(1).max(100).optional(),
+  timeLimitMinutes: z.number().int().min(0).max(240).optional(),
   lockdown: z.boolean().optional(),
-}).refine((value) => !value.enabled || value.questions.length === 10, { message: 'An enabled assessment must contain exactly 10 questions.' });
+  certificatePayment: z.object({ enabled: z.boolean(), amount: z.number().int().min(0).max(100000000), currency: z.string().trim().min(1).max(12), paymentCode: z.string().trim().max(40), paymentName: z.string().trim().max(120), instructions: z.string().trim().max(2000) }).refine((value) => !value.enabled || (value.amount > 0 && Boolean(value.paymentCode && value.paymentName)), { message: 'Enter an amount above zero, payment code, and account name for paid certificates.' }).optional(),
+}).refine((value) => !value.enabled || value.questions.length > 0, { message: 'An enabled assessment must contain at least one question.' });
 const answer = z.object({
-  questionIndex: z.number().int().min(0).max(9),
+  questionIndex: z.number().int().min(0).max(99),
   optionIndex: z.number().int().min(0).max(3),
 });
 const certificationAnswers = z.object({
-  answers: z.array(answer).length(10).refine((answers) => new Set(answers.map((item) => item.questionIndex)).size === 10),
+  answers: z.array(answer).max(100).refine((answers) => new Set(answers.map((item) => item.questionIndex)).size === answers.length),
 });
 const assessmentDraft = z.object({
-  answers: z.array(answer).max(10).refine((answers) => new Set(answers.map((item) => item.questionIndex)).size === answers.length),
-  currentIndex: z.number().int().min(0).max(9),
+  answers: z.array(answer).max(100).refine((answers) => new Set(answers.map((item) => item.questionIndex)).size === answers.length),
+  currentIndex: z.number().int().min(0).max(99),
   fullscreenExitCount: z.number().int().min(0).max(1000).optional(),
+  interruptions: z.array(z.object({ type: z.enum(['tab-hidden', 'window-blur', 'fullscreen-exit', 'copy', 'context-menu', 'time-expired']), occurredAt: z.string().datetime().optional() })).max(100).optional(),
 });
 const projectSubmissionBody = z.object({
   linkUrl: z.string().trim().min(5).max(2000),
@@ -71,6 +75,8 @@ const paymentReferenceBody = z.object({
   reference: z.string().trim().min(3).max(200),
   note: z.string().trim().max(1000).optional().default(''),
 });
+const certificatePaymentReferenceBody = z.object({ reference: z.string().trim().min(3).max(200), note: z.string().trim().max(1000).optional().default('') });
+const certificatePaymentReviewBody = z.object({ status: z.enum(['paid', 'rejected']), note: z.string().trim().max(1000).optional().default('') });
 
 router.get('/:id/thumbnail', validate(idParams, 'params'), courses.getCourseThumbnail);
 router.use(requireAuth);
@@ -89,9 +95,11 @@ router.post('/:id/project-submission', validate(idParams, 'params'), validate(pr
 router.get('/:id/project-submissions', requireAdmin, validate(idParams, 'params'), validate(projectListQuery, 'query'), certificates.listProjectSubmissions);
 router.patch('/:id/project-submissions/:submissionId', requireAdmin, validate(projectParams, 'params'), validate(projectReviewBody), certificates.reviewProjectSubmission);
 router.get('/:id/certificates', requireAdmin, validate(idParams, 'params'), certificates.listCourseCertificates);
+router.patch('/:id/certificates/:certificateId/payment', requireAdmin, validate(certificatePaymentParams, 'params'), validate(certificatePaymentReviewBody), certificates.reviewCertificatePayment);
 router.get('/:id/certificate-candidates', requireAdmin, validate(idParams, 'params'), validate(candidateQuery, 'query'), certificates.listCertificateCandidates);
 router.post('/:id/certificates/issue', requireAdmin, validate(idParams, 'params'), validate(issueCertificatesBody), certificates.issueCertificates);
 router.post('/:id/certificate', validate(idParams, 'params'), certificates.issueCertificate);
+router.post('/:id/certificate/payment-reference', validate(idParams, 'params'), validate(certificatePaymentReferenceBody), certificates.submitCertificatePaymentReference);
 router.post('/:id/payment-reference', validate(idParams, 'params'), validate(paymentReferenceBody), courses.submitPaymentReference);
 router.delete('/:id/enroll', validate(idParams, 'params'), courses.cancelEnrollment);
 router.post('/:id/enroll', validate(idParams, 'params'), courses.enrollInCourse);

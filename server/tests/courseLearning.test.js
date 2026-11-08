@@ -3,6 +3,7 @@ import test from 'node:test';
 import mongoose from 'mongoose';
 import { LearningClass } from '../src/models/LearningClass.js';
 import { CourseLearningProgress } from '../src/models/CourseLearningProgress.js';
+import { CourseCertificate } from '../src/models/CourseCertificate.js';
 
 const questions = Array.from({ length: 10 }, (_, index) => ({
   prompt: `Question ${index + 1}`,
@@ -26,4 +27,11 @@ test('course learning progress is unique per student and course', () => {
   assert.equal(progress.validateSync(), undefined);
   assert.deepEqual(progress.completedLessons, []);
   assert.deepEqual(progress.assessmentAttempts, []);
+});
+
+test('certificate payment is free by default and can be held for payment review', () => {
+  const course = new LearningClass({ title: 'Web foundations', subject: 'Programming', level: 'Training' });
+  assert.equal(course.certificatePayment.enabled, false);
+  const certificate = new CourseCertificate({ code: 'a'.repeat(32), student: new mongoose.Types.ObjectId(), course: new mongoose.Types.ObjectId(), studentName: 'Learner', courseTitle: 'Web foundations', paymentStatus: 'pending', paymentAmount: 5000, paymentCurrency: 'RWF', paymentReference: 'TX-100' });
+  assert.equal(certificate.validateSync(), undefined);
 });

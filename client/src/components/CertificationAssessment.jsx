@@ -5,12 +5,14 @@ import { Badge, ProgressBar } from './layout.jsx';
 import { Spinner } from './ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useDialog } from '../context/DialogContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const answerMap = (answers = []) => Object.fromEntries(answers.map((item) => [item.questionIndex, item.optionIndex]));
 
 export default function CertificationAssessment({ courseId, initial, onRefresh }) {
   const toast = useToast();
   const dialog = useDialog();
+  const { user } = useAuth();
   const [payload, setPayload] = useState(initial);
   const [taking, setTaking] = useState(false);
   const [questions, setQuestions] = useState(initial?.questions || []);
@@ -22,16 +24,27 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
   const [warning, setWarning] = useState('');
+  const [remainingSeconds, setRemainingSeconds] = useState(null);
+  const [interruptions, setInterruptions] = useState([]);
+  const [assessmentHidden, setAssessmentHidden] = useState(false);
   const startedRef = useRef(false);
   const answersRef = useRef(answers);
   const currentRef = useRef(current);
   const exitRef = useRef(exitCount);
   const saveTimer = useRef(null);
+  const expiredSubmitRef = useRef(false);
 
   useEffect(() => { setPayload(initial); }, [initial]);
   useEffect(() => { answersRef.current = answers; }, [answers]);
   useEffect(() => { currentRef.current = current; }, [current]);
   useEffect(() => { exitRef.current = exitCount; }, [exitCount]);
+  useEffect(() => {
+    if (!taking || !payload?.expiresAt) { setRemainingSeconds(null); return undefined; }
+    const update = () => setRemainingSeconds(Math.max(0, Math.ceil((new Date(payload.expiresAt).getTime() - Date.now()) / 1000)));
+    update();
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [taking, payload?.expiresAt]);
 
   const answeredCount = Object.keys(answers).length;
   const progress = questions.length ? Math.round(answeredCount / questions.length * 100) : 0;
@@ -44,6 +57,7 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
         answers: Object.entries(answersRef.current).map(([questionIndex, optionIndex]) => ({ questionIndex: Number(questionIndex), optionIndex })),
         currentIndex: currentRef.current,
         fullscreenExitCount: exitRef.current,
+        interruptions: interruptions.slice(-100),
       });
     } catch {
       // Silent autosave failure should not interrupt an active assessment.
@@ -58,19 +72,28 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
     saveTimer.current = setTimeout(saveDraft, 700);
     return () => clearTimeout(saveTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answers, current, exitCount, taking]);
+  }, [answers, current, exitCount, interruptions, taking]);
 
   useEffect(() => {
     if (!taking || !payload?.lockdown) return undefined;
     const onChange = () => {
       if (!document.fullscreenElement) {
         setExitCount((value) => value + 1);
-        setWarning('You left fullscreen. This was recorded with your assessment attempt. Return to fullscreen to continue.');
+        recordInterruption('fullscreen-exit', 'You left fullscreen. This was recorded with your assessment attempt. Return to fullscreen to continue.');
       }
     };
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, [taking, payload?.lockdown]);
+
+  useEffect(() => {
+    if (!taking) return undefined;
+    const onVisibility = () => { setAssessmentHidden(document.hidden); if (document.hidden) recordInterruption('tab-hidden', 'You switched tabs. The interruption was recorded.'); };
+    const onBlur = () => recordInterruption('window-blur', 'Window focus changed during this assessment. The event was recorded.');
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('blur', onBlur);
+    return () => { document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('blur', onBlur); };
+  }, [taking]);
 
   useEffect(() => () => {
     if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
@@ -80,6 +103,11 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
     if (!payload?.lockdown) return;
     try { if (document.documentElement.requestFullscreen && !document.fullscreenElement) await document.documentElement.requestFullscreen(); }
     catch { setWarning('Fullscreen could not be enabled. The browser may require a direct tap.'); }
+  };
+
+  const recordInterruption = (type, message) => {
+    setWarning(message);
+    setInterruptions((events) => [...events, { type, occurredAt: new Date().toISOString() }].slice(-100));
   };
 
   const begin = async () => {
@@ -94,6 +122,8 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
       setExitCount(next.draft?.fullscreenExitCount || 0);
       setResult(null);
       setWarning('');
+      setInterruptions(next.draft?.interruptions || []);
+      expiredSubmitRef.current = false;
       startedRef.current = true;
       setTaking(true);
       setTimeout(enterFullscreen, 80);
@@ -111,14 +141,17 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
     onRefresh?.();
   };
 
-  const submit = async () => {
-    if (answeredCount < 10) { toast.error(`Answer all 10 questions first. ${10 - answeredCount} remaining.`); return; }
-    const approved = await dialog.confirm({ title: 'Submit your assessment?', message: 'Your answers will be graded immediately and this attempt cannot be changed.', confirmLabel: 'Submit now', tone: 'danger' });
-    if (!approved) return;
+  const submit = async (automatic = false) => {
+    const currentAnswers = answersRef.current;
+    if (Object.keys(currentAnswers).length < questions.length && !(automatic && payload?.timeLimitMinutes > 0)) { toast.error(`Answer all ${questions.length} questions first. ${questions.length - Object.keys(currentAnswers).length} remaining.`); return; }
+    if (!automatic) {
+      const approved = await dialog.confirm({ title: 'Submit your assessment?', message: 'Your answers will be graded immediately and this attempt cannot be changed.', confirmLabel: 'Submit now', tone: 'danger' });
+      if (!approved) return;
+    }
     setSubmitting(true);
     try {
       const response = await api.post(`/courses/${courseId}/certification-assessment`, {
-        answers: Object.entries(answers).map(([questionIndex, optionIndex]) => ({ questionIndex: Number(questionIndex), optionIndex })),
+        answers: Object.entries(currentAnswers).map(([questionIndex, optionIndex]) => ({ questionIndex: Number(questionIndex), optionIndex })),
       });
       setResult(response.data.data);
       startedRef.current = false;
@@ -127,6 +160,13 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
     } catch (error) { toast.error(apiError(error).message); }
     finally { setSubmitting(false); }
   };
+
+  useEffect(() => {
+    if (!taking || remainingSeconds !== 0 || !payload?.timeLimitMinutes || submitting || expiredSubmitRef.current) return;
+    expiredSubmitRef.current = true;
+    recordInterruption('time-expired', 'Time is up. Your selected answers are being submitted automatically.');
+    submit(true);
+  }, [taking, remainingSeconds, payload?.timeLimitMinutes, submitting]);
 
   const finish = () => {
     setTaking(false);
@@ -138,7 +178,7 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
   const status = useMemo(() => {
     if (payload?.passed) return { tone: 'green', label: 'Passed', text: 'You have passed the certification assessment.' };
     if (!payload?.enabled) return { tone: 'slate', label: 'Not configured', text: 'The administrator has not enabled this assessment.' };
-    if (!payload?.configured) return { tone: 'amber', label: 'Setup needed', text: 'The administrator must add all 10 questions.' };
+    if (!payload?.configured) return { tone: 'amber', label: 'Setup needed', text: 'The administrator must add assessment questions.' };
     if (payload?.projectSubmissionRequired && !payload?.projectSubmitted) return { tone: 'amber', label: 'Project first', text: 'Submit your project to unlock the assessment.' };
     if (payload?.attemptsRemaining <= 0) return { tone: 'red', label: 'No attempts left', text: 'Contact the administrator to discuss another attempt.' };
     if (payload?.draft) return { tone: 'brand', label: 'In progress', text: `Draft saved${payload.draft.lastSavedAt ? ` · ${new Date(payload.draft.lastSavedAt).toLocaleString()}` : ''}` };
@@ -148,32 +188,33 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
   return <>
     <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/[0.03]">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><p className="eyebrow">Certification assessment</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><Target size={18} className="text-brand-700" />10-question final assessment</h2><p className="mt-1 text-sm text-slate-500">Pass mark {payload?.passMark ?? 80}% · {payload?.attemptsUsed ?? 0} of {payload?.maxAttempts ?? 3} attempts used</p></div>
+        <div><p className="eyebrow">Certification assessment</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><Target size={18} className="text-brand-700" />Final assessment</h2><p className="mt-1 text-sm text-slate-500">{payload?.questionCount || 0} questions · Pass mark {payload?.passMark ?? 80}% · {payload?.attemptsUsed ?? 0} of {payload?.maxAttempts ?? 3} attempts used</p></div>
         <Badge color={status.tone}>{status.label}</Badge>
       </div>
       <p className="mt-3 text-sm text-slate-600">{status.text}</p>
       {payload?.latestAttempt && <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs text-slate-600">Latest attempt: <span className="font-bold text-slate-900">{payload.latestAttempt.score}%</span> · {payload.latestAttempt.passed ? 'Passed' : 'Not passed'} · {new Date(payload.latestAttempt.submittedAt).toLocaleString()}</div>}
-      {payload?.lockdown && <p className="mt-3 flex items-start gap-2 rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900"><LockKeyhole size={14} className="mt-0.5 shrink-0" />Lockdown mode: fullscreen is requested, leaving fullscreen is recorded, and copying question text is disabled.</p>}
+      {payload?.lockdown && <p className="mt-3 flex items-start gap-2 rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900"><LockKeyhole size={14} className="mt-0.5 shrink-0" />Lockdown mode records tab changes, focus loss, and fullscreen exits. Browser checks cannot prevent screenshots taken outside the browser.</p>}
       <div className="mt-4 flex flex-wrap gap-2"><button className="btn-primary" onClick={begin} disabled={starting || !payload?.canStart}>{starting ? <Spinner size={16} /> : payload?.draft ? <RefreshCw size={16} /> : <Play size={16} />}{payload?.draft ? 'Resume assessment' : 'Start assessment'}</button>{payload?.passed && <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"><CheckCircle2 size={16} />Assessment complete</span>}</div>
-      {!payload?.canStart && !payload?.passed && <p className="mt-2 text-xs text-slate-400">{!payload?.enabled ? 'Administrator setup required.' : !payload?.configured ? 'All 10 questions must be configured.' : !payload?.lessonsComplete ? `Complete all course lessons first (${payload?.lessonsCompleted || 0}/${payload?.lessonsRequired || 0}).` : payload?.projectSubmissionRequired && !payload?.projectSubmitted ? 'Submit the project above to unlock this assessment.' : payload?.attemptsRemaining <= 0 ? 'No attempts remain.' : 'You cannot start this assessment right now.'}</p>}
+      {!payload?.canStart && !payload?.passed && <p className="mt-2 text-xs text-slate-400">{!payload?.enabled ? 'Administrator setup required.' : !payload?.configured ? 'Assessment questions must be configured.' : !payload?.lessonsComplete ? `Complete all course lessons first (${payload?.lessonsCompleted || 0}/${payload?.lessonsRequired || 0}).` : payload?.projectSubmissionRequired && !payload?.projectSubmitted ? 'Submit the project above to unlock this assessment.' : payload?.attemptsRemaining <= 0 ? 'No attempts remain.' : 'You cannot start this assessment right now.'}</p>}
     </section>
 
-    {taking && <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#fffaf5]" onCopy={(event) => event.preventDefault()} onContextMenu={(event) => event.preventDefault()}>
+    {taking && <div className="fixed inset-0 z-[100] overflow-y-auto bg-white" onCopy={(event) => { event.preventDefault(); recordInterruption('copy', 'Copying is disabled and the attempt was recorded.'); }} onContextMenu={(event) => { event.preventDefault(); recordInterruption('context-menu', 'Right-click is disabled and the attempt was recorded.'); }}>
       <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-4 sm:px-6 sm:py-6">
         <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-100 bg-white/95 p-3 shadow-sm backdrop-blur sm:p-4">
           <div><p className="eyebrow">Certification assessment</p><p className="mt-0.5 text-sm font-bold text-slate-900">{payload?.title}</p></div>
           <div className="flex items-center gap-2">
+            {remainingSeconds !== null && <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold tabular-nums ${remainingSeconds < 60 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-800'}`}><Clock3 size={13}/>{Math.floor(remainingSeconds / 60).toString().padStart(2, '0')}:{(remainingSeconds % 60).toString().padStart(2, '0')}</span>}
             <span className="hidden items-center gap-1 text-xs text-slate-500 sm:inline-flex">{payload?.lockdown ? <LockKeyhole size={13} /> : <ShieldCheck size={13} />}{payload?.lockdown ? 'Lockdown active' : 'Standard mode'}</span>
             <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{saving ? <Spinner size={12} /> : <Clock3 size={12} />}{saving ? 'Saving' : 'Saved'}</span>
             <button className="btn-secondary min-h-0 px-3 py-1.5 text-xs" onClick={closeAssessment}><X size={14} />Save & exit</button>
           </div>
         </header>
 
-        {warning && <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><span className="flex-1">{warning}</span><button className="font-semibold underline" onClick={enterFullscreen}>Return to fullscreen</button></div>}
+        {warning && <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900"><AlertTriangle size={16} className="mt-0.5 shrink-0" /><span className="flex-1">{warning}</span>{payload?.lockdown && <button className="font-semibold underline" onClick={enterFullscreen}>Return to fullscreen</button>}</div>}
 
         <div className="mt-4 grid flex-1 gap-4 lg:grid-cols-[1fr_220px]">
-          <main className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
-            <div className="mb-4 flex items-center justify-between gap-3"><Badge color="brand">Question {current + 1} of {questions.length}</Badge><span className="text-xs font-semibold text-slate-500">{answeredCount}/10 answered</span></div>
+          <main className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-sm select-none sm:p-7"><span className="pointer-events-none absolute right-4 top-4 z-10 rotate-[-12deg] text-[10px] font-semibold text-slate-500/20">{user?.name} · {user?.id}</span>{assessmentHidden && <div className="absolute inset-0 z-20 grid place-items-center bg-white/95 p-6 text-center"><div><ShieldCheck className="mx-auto text-green-800"/><p className="mt-2 font-semibold text-slate-900">Assessment hidden</p><p className="mt-1 text-sm text-slate-600">Return to this tab to continue. The interruption has been recorded.</p></div></div>}
+            <div className="mb-4 flex items-center justify-between gap-3"><Badge color="brand">Question {current + 1} of {questions.length}</Badge><span className="text-xs font-semibold text-slate-500">{answeredCount}/{questions.length} answered</span></div>
             <ProgressBar value={progress} />
             <h1 className="mt-6 select-none text-lg font-bold leading-8 text-slate-950 sm:text-xl">{questions[current]?.prompt}</h1>
             <div className="mt-5 space-y-2.5 select-none">
@@ -181,7 +222,7 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
             </div>
             <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
               <button className="btn-secondary" disabled={current === 0} onClick={() => setCurrent((value) => Math.max(0, value - 1))}><ChevronLeft size={16} />Previous</button>
-              {current < questions.length - 1 ? <button className="btn-primary" onClick={() => setCurrent((value) => Math.min(questions.length - 1, value + 1))}>Next<ChevronRight size={16} /></button> : <button className="btn-primary" disabled={submitting || answeredCount < 10} onClick={submit}>{submitting ? <Spinner size={16} /> : <CheckCircle2 size={16} />}{submitting ? 'Submitting…' : 'Submit assessment'}</button>}
+              {current < questions.length - 1 ? <button className="btn-primary" onClick={() => setCurrent((value) => Math.min(questions.length - 1, value + 1))}>Next<ChevronRight size={16} /></button> : <button className="btn-primary" disabled={submitting || answeredCount < questions.length} onClick={submit}>{submitting ? <Spinner size={16} /> : <CheckCircle2 size={16} />}{submitting ? 'Submitting…' : 'Submit assessment'}</button>}
             </div>
           </main>
           <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -200,7 +241,7 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
         <h2 className="mt-4 text-xl font-black text-slate-950">{result.passed ? 'Assessment passed' : 'Attempt complete'}</h2>
         <p className="mt-1 text-sm text-slate-500">Attempt {result.attemptNumber} · Pass mark {result.passMark}%</p>
         <p className="mt-4 text-4xl font-black tracking-tight text-slate-950">{result.score}%</p>
-        <p className="mt-1 text-sm text-slate-500">{result.correctCount} of 10 correct · {result.attemptsRemaining} attempt{result.attemptsRemaining === 1 ? '' : 's'} remaining</p>
+        <p className="mt-1 text-sm text-slate-500">{result.correctCount} of {result.questionCount} correct · {result.attemptsRemaining} attempt{result.attemptsRemaining === 1 ? '' : 's'} remaining</p>
         {!result.passed && <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900">Review your notes and try again while attempts remain. Your latest score is shown on the training page.</p>}
         <button className="btn-primary mt-5 w-full" onClick={finish}>{result.passed ? 'Continue to certificate' : 'Return to training'}<ArrowRight size={16} /></button>
       </div>

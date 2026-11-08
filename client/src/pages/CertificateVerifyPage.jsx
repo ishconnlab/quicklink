@@ -29,6 +29,7 @@ export default function CertificateVerifyPage() {
   const result = state.result;
   const valid = Boolean(result?.valid);
   const revoked = result?.status === 'revoked';
+  const paymentRequired = result?.status === 'payment-required';
   const share = async () => {
     const url = `${window.location.origin}${result?.verificationPath || `/verify/${code}`}`;
     try {
@@ -65,8 +66,8 @@ export default function CertificateVerifyPage() {
           <div className="mt-5 rounded-xl bg-emerald-50 px-3 py-2.5 text-center text-xs leading-5 text-emerald-800"><CheckCircle2 size={14} className="mr-1 inline" />This verification confirms the certificate code exists and has not been revoked. Certificate ID: <span className="break-all font-mono font-semibold">{result.certificateId}</span></div>
         </> : <div className="mt-10 text-center">
           <span className={`mx-auto flex h-16 w-16 items-center justify-center rounded-3xl ${revoked ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'}`}>{revoked ? <ShieldX size={30} /> : <ShieldX size={30} />}</span>
-          <h1 className="mt-5 text-2xl font-black tracking-tight text-slate-950">{revoked ? 'This certificate was revoked' : 'Certificate not found'}</h1>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">{revoked ? 'The certificate record exists but is no longer valid. Contact the training administrator or QuickLink for assistance.' : state.error || 'No certificate matches this verification code. Check the link or QR code and try again.'}</p>
+          <h1 className="mt-5 text-2xl font-black tracking-tight text-slate-950">{revoked ? 'This certificate was revoked' : paymentRequired ? 'Certificate payment is pending' : 'Certificate not found'}</h1>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">{revoked ? 'The certificate record exists but is no longer valid. Contact the training administrator or QuickLink for assistance.' : paymentRequired ? 'This certificate is not publicly valid yet. The learner must complete the certificate payment process before verification is available.' : state.error || 'No certificate matches this verification code. Check the link or QR code and try again.'}</p>
           {revoked && result?.courseTitle && <p className="mt-4 text-sm text-slate-500">{result.studentName} · {result.courseTitle}</p>}
           {revoked && result?.revocationReason && <p className="mx-auto mt-3 max-w-md rounded-xl bg-red-50 px-3 py-2.5 text-xs leading-5 text-red-800">Reason: {result.revocationReason}</p>}
         </div>}

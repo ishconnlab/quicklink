@@ -166,6 +166,16 @@ export default function CertificatesPage() {
     finally { setBusyId(''); }
   };
 
+  const reviewPayment = async (certificate, status) => {
+    setBusyId(certificate.id);
+    try {
+      const response = await api.patch(`/courses/${certificate.courseId}/certificates/${certificate.id}/payment`, { status, note: status === 'rejected' ? 'Payment could not be verified. Contact the administrator for help.' : '' });
+      setCertificates((current) => current.map((item) => item.id === certificate.id ? response.data.data.certificate : item));
+      toast.success(status === 'paid' ? 'Certificate payment approved. The certificate is now available.' : 'Certificate payment rejected.');
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setBusyId(''); }
+  };
+
   const validCount = certificates.filter((certificate) => !certificate.revoked).length;
   const revokedCount = certificates.filter((certificate) => certificate.revoked).length;
 
@@ -200,18 +210,20 @@ export default function CertificatesPage() {
             <div className="flex min-w-0 items-start gap-3">
               <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${certificate.revoked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-brand-700'}`}>{certificate.revoked ? <ShieldX size={21} /> : <Award size={21} />}</span>
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5"><h2 className="break-words font-bold text-slate-900">{certificate.courseTitle}</h2><Badge color={certificate.revoked ? 'red' : 'green'}>{certificate.revoked ? 'Revoked' : 'Valid'}</Badge><Badge color="slate">{certificate.level}</Badge>{certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}</div>
+                <div className="flex flex-wrap items-center gap-1.5"><h2 className="break-words font-bold text-slate-900">{certificate.courseTitle}</h2><Badge color={certificate.revoked ? 'red' : certificate.paymentStatus === 'pending' ? 'amber' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? 'slate' : 'green'}>{certificate.revoked ? 'Revoked' : certificate.paymentStatus === 'pending' ? 'Payment pending' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? `Payment ${certificate.paymentStatus}` : 'Valid'}</Badge><Badge color="slate">{certificate.level}</Badge>{certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}</div>
                 <p className="mt-1 text-sm text-slate-600">Awarded to <strong className="text-slate-800">{certificate.studentName}</strong></p>
                 <p className="mt-1 break-all text-xs text-slate-400">Code {certificate.code} · Issued {formatDateTime(certificate.issuedAt)}</p>
+                {certificate.paymentStatus && !['paid', 'not_required'].includes(certificate.paymentStatus) && <p className="mt-2 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">Certificate payment: {certificate.paymentStatus} · {certificate.paymentAmount} {certificate.paymentCurrency}{certificate.paymentReference ? ` · Ref ${certificate.paymentReference}` : ''}{certificate.paymentNote ? ` · ${certificate.paymentNote}` : ''}</p>}
                 {certificate.revoked && <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs leading-5 text-red-700">Revoked {formatDateTime(certificate.revokedAt)}{certificate.revocationReason ? `: ${certificate.revocationReason}` : '.'}</p>}
               </div>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
-              {!certificate.revoked && <button className="btn-primary" onClick={() => download(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <Download size={15} />}PDF</button>}
-              {!certificate.revoked && <button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button>}
-              <a className="btn-secondary" href={verifyUrl(certificate)} target="_blank" rel="noreferrer"><ExternalLink size={15} />Verify</a>
+              {!certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <button className="btn-primary" onClick={() => download(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <Download size={15} />}PDF</button>}
+              {!certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button>}
+              {['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <a className="btn-secondary" href={verifyUrl(certificate)} target="_blank" rel="noreferrer"><ExternalLink size={15} />Verify</a>}
               {admin && <>
                 <Link to={`/courses/${certificate.courseId}`} className="btn-secondary"><Award size={15} />Training</Link>
+                {certificate.paymentStatus === 'pending' && <><button className="btn-primary" onClick={() => reviewPayment(certificate, 'paid')} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <BadgeCheck size={15} />}Approve payment</button><button className="btn-secondary text-red-700" onClick={() => reviewPayment(certificate, 'rejected')} disabled={busyId === certificate.id}>Reject payment</button></>}
                 {!certificate.revoked && <button className="btn-secondary" onClick={() => openRename(certificate)}><FilePenLine size={15} />Name</button>}
                 {!certificate.revoked && <button className="btn-secondary" onClick={() => { setDescriptionTarget(certificate); setDescriptionValue(certificate.description || ''); }}>Description</button>}
                 {!certificate.revoked && <button className="btn-ghost text-red-600" onClick={() => { setRevokeTarget(certificate); setRevokeReason(''); }}>Revoke</button>}

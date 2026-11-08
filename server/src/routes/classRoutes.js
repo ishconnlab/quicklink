@@ -58,6 +58,10 @@ const projectSchema = z.object({
   allowOtherLinks: z.boolean().optional(),
   requireDescription: z.boolean().optional(),
 });
+const certificatePaymentSchema = z.object({
+  enabled: z.boolean(), amount: z.number().int().min(0).max(100000000), currency: z.string().trim().min(1).max(12),
+  paymentCode: z.string().trim().max(40), paymentName: z.string().trim().max(120), instructions: z.string().trim().max(2000).optional().default(''),
+}).refine((value) => !value.enabled || (value.amount > 0 && Boolean(value.paymentCode && value.paymentName)), { message: 'Enter an amount above zero, payment code, and account name for paid certificates.' });
 const completionSchema = z.object({
   requireReading: z.boolean().optional().default(false),
   requireTheory: z.boolean().optional().default(false),
@@ -73,6 +77,7 @@ const lesson = z.object({
   imagePublicId: z.string().max(255).optional().default(''),
   resources: z.array(z.object({ title: z.string().trim().max(180), url: z.string().url().max(2000) })).max(30).optional().default([]),
   code: z.object({ language: z.string().max(40).optional().default(''), source: z.string().max(20000).optional().default('') }).optional().default({}),
+  codeBlocks: z.array(z.object({ language: z.string().max(40).optional().default(''), source: z.string().max(20000), explanation: z.string().max(2000).optional().default('') })).max(20).optional().default([]),
   knowledgeCheck: z.array(lessonQuestion).length(10).or(z.array(lessonQuestion).length(0)).optional().default([]),
   passMark: z.number().int().min(1).max(100).optional().default(70),
   assessmentAttempts: z.number().int().min(1).max(10).optional().default(3),
@@ -111,6 +116,7 @@ const classFields = {
   allowCancellation: z.boolean().optional().default(true),
   published: z.boolean().optional().default(true),
   payment: paymentSchema.optional(),
+  certificatePayment: certificatePaymentSchema.optional(),
   projectSubmission: projectSchema.optional(),
   certificationAssessmentEnabled: z.boolean().optional(),
   assessmentAttempts: z.number().int().min(1).max(10).optional(),

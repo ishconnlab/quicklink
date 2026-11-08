@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const answerSchema = new mongoose.Schema({
-  questionIndex: { type: Number, required: true, min: 0, max: 9 },
+  questionIndex: { type: Number, required: true, min: 0, max: 99 },
   optionIndex: { type: Number, required: true, min: 0, max: 3 },
 }, { _id: false });
 
@@ -10,6 +10,7 @@ const certificationAssessmentAttemptSchema = new mongoose.Schema({
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningClass', required: true, index: true },
   attemptNumber: { type: Number, required: true, min: 1, max: 20 },
   answers: { type: [answerSchema], default: [] },
+  interruptions: [{ type: { type: String, enum: ['tab-hidden', 'window-blur', 'fullscreen-exit', 'copy', 'context-menu', 'time-expired'], required: true }, occurredAt: { type: Date, default: Date.now } }],
   score: { type: Number, required: true, min: 0, max: 100 },
   passed: { type: Boolean, required: true, index: true },
   submittedAt: { type: Date, default: Date.now, index: true },

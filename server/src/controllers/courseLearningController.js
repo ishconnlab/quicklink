@@ -29,6 +29,7 @@ function safeCourse(course, progress, reveal = false) {
         ...(reveal ? { imagePublicId: lesson.imagePublicId || '' } : {}),
         resources: isUnlocked || done || reveal ? lesson.resources : [],
         code: isUnlocked || done || reveal ? lesson.code : { language: '', source: '' },
+        codeBlocks: isUnlocked || done || reveal ? ((lesson.codeBlocks || []).length ? lesson.codeBlocks : (lesson.code?.source ? [{ language: lesson.code.language, source: lesson.code.source, explanation: '' }] : [])) : [],
         questions: (isUnlocked || done || reveal) ? (lesson.knowledgeCheck || []).map((question) => ({ prompt: question.prompt, options: question.options, ...(reveal ? { correctOption: question.correctOption } : {}), explanation: latest?.passed || reveal ? question.explanation : '' })) : [],
         hasAssessment: (lesson.knowledgeCheck || []).length > 0,
         passMark: lesson.passMark,

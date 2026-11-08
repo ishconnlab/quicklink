@@ -36,6 +36,8 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     const completeLesson = await fetch(`${root}/api/courses/0123456789abcdef01234567/learning/lessons/0123456789abcdef01234567/complete`, { method: 'PUT' });
     const lessonAssessment = await fetch(`${root}/api/courses/0123456789abcdef01234567/learning/lessons/0123456789abcdef01234567/assessment`, { method: 'POST' });
     const lessonSecurityEvent = await fetch(`${root}/api/courses/0123456789abcdef01234567/learning/lessons/0123456789abcdef01234567/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'tab-hidden' }) });
+    const certificatePaymentReference = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificate/payment-reference`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reference: 'TX-123' }) });
+    const certificatePaymentReview = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificates/0123456789abcdef01234567/payment`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'paid' }) });
     const issue = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificate`, { method: 'POST' });
     const download = await fetch(`${root}/api/certificates/verify/not-a-valid-code`);
     const downloadByCode = await fetch(`${root}/api/certificates/${'a'.repeat(32)}.pdf`);
@@ -71,6 +73,8 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     assert.equal(completeLesson.status, 401);
     assert.equal(lessonAssessment.status, 401);
     assert.equal(lessonSecurityEvent.status, 401);
+    assert.equal(certificatePaymentReference.status, 401);
+    assert.equal(certificatePaymentReview.status, 401);
     assert.equal(completion.headers.get('x-robots-tag'), 'noindex, nofollow, nosnippet');
     assert.equal(issue.status, 401);
     assert.equal(download.status, 400);
