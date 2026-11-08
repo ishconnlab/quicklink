@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  AlertCircle, ArrowLeft, Award, BadgeCheck, CalendarClock, CheckCircle2, ClipboardCheck, Clock3, Download,
+  AlertCircle, ArrowLeft, Award, BadgeCheck, BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, Clock3, Download,
   ExternalLink, FileCheck2, GraduationCap, Link2, Loader2, LockKeyhole, Pencil, PlayCircle, Send, Share2,
   ShieldCheck, Target, Trash2, Users, Video, Wallet,
 } from 'lucide-react';
@@ -261,12 +261,14 @@ export default function CourseDetailPage() {
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
             {admin ? <>
+              <Link to={`/courses/${id}/learn`} className="btn-secondary"><ClipboardCheck size={16} />Manage lessons</Link>
               <Link to={`/courses/${id}/edit`} className="btn-primary"><Pencil size={16} />Edit training</Link>
               <Link to={`/classes/${id}`} className="btn-secondary"><Video size={16} />Live classroom</Link>
               <button className="btn-secondary" onClick={() => setSettingsOpen(true)}><Target size={16} />Assessment setup</button>
               <button className="btn-secondary" onClick={toggleArchive} disabled={busy === 'archive'}>{busy === 'archive' ? <Spinner size={15} /> : course.active ? <LockKeyhole size={15} /> : <PlayCircle size={15} />}{course.active ? 'Archive' : 'Restore'}</button>
               <button className="btn-ghost text-red-700" onClick={deleteTraining} disabled={busy === 'delete'}>{busy === 'delete' ? <Spinner size={15} /> : <Trash2 size={15} />}Delete permanently</button>
             </> : course.enrolled ? <>
+              <Link to={`/courses/${id}/learn`} className="btn-primary"><BookOpen size={16} />Continue learning</Link>
               <Link to={`/classes/${id}`} className="btn-primary"><Video size={16} />Open classroom</Link>
               {course.allowCancellation && <button className="btn-secondary" onClick={leaveTraining} disabled={busy === 'leave'}>{busy === 'leave' ? <Spinner size={15} /> : null}Leave training</button>}
             </> : <button className="btn-primary" onClick={enroll} disabled={busy === 'enroll' || course.enrollmentStatus !== 'open'}>{busy === 'enroll' ? <Spinner size={16} /> : <Users size={16} />}{course.enrollmentStatus === 'open' ? 'Enroll in this training' : course.enrollmentStatus === 'closed' ? 'Enrollment closed' : course.enrollmentStatus === 'full' ? 'Training full' : course.enrollmentStatus}</button>}
@@ -341,6 +343,10 @@ export default function CourseDetailPage() {
           <h2 className="text-sm font-bold text-slate-900">Training details</h2>
           <div className="mt-3 space-y-2">
             <Fact icon={GraduationCap} label="Level" value={course.level} />
+            <Fact icon={GraduationCap} label="Difficulty" value={course.difficulty} />
+            {course.courseDuration && <Fact icon={Clock3} label="Course duration" value={course.courseDuration} />}
+            {course.language && <Fact icon={BookOpen} label="Language" value={course.language} />}
+            {course.instructorName && <Fact icon={Users} label="Instructor" value={course.instructorName} />}
             <Fact icon={CalendarClock} label="Starts" value={course.startsAt ? formatDateTime(course.startsAt) : 'Self-paced / not scheduled'} />
             <Fact icon={Clock3} label="Session length" value={`${course.durationMinutes} minutes`} />
             <Fact icon={Users} label="Capacity" value={`${course.enrolledCount} of ${course.maxStudents} seats filled`} />
@@ -348,6 +354,7 @@ export default function CourseDetailPage() {
             <Fact icon={ShieldCheck} label="Time zone" value={course.timezone} />
           </div>
         </section>
+        {(course.learningObjectives?.length > 0 || course.prerequisites?.length > 0 || course.instructorBio) && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">{course.learningObjectives?.length > 0 && <div><h2 className="font-bold text-slate-900">What you will learn</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">{course.learningObjectives.map((objective, index) => <li key={index}>{objective}</li>)}</ul></div>}{course.prerequisites?.length > 0 && <div className="mt-4"><h2 className="font-bold text-slate-900">Before you begin</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-600">{course.prerequisites.map((requirement, index) => <li key={index}>{requirement}</li>)}</ul></div>}{course.instructorBio && <div className="mt-4"><h2 className="font-bold text-slate-900">About the instructor</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{course.instructorBio}</p></div>}</section>}
         {course.description && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5"><h2 className="text-sm font-bold text-slate-900">About this training</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{course.description}</p></section>}
         <section className="rounded-2xl border border-green-100 bg-green-50 p-4 shadow-sm shadow-green-950/[0.03] sm:p-5">
           <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900"><FileCheck2 size={16} className="text-brand-700" />What you earn</h2>

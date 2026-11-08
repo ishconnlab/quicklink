@@ -20,6 +20,31 @@ const projectSubmissionSettingsSchema = new mongoose.Schema({
   requireDescription: { type: Boolean, default: true },
 }, { _id: false });
 
+const lessonQuestionSchema = new mongoose.Schema({
+  prompt: { type: String, required: true, trim: true, maxlength: 1200 },
+  options: { type: [{ type: String, required: true, trim: true, maxlength: 500 }], validate: { validator: (options) => options.length === 4, message: 'Each lesson question must have four answer options.' } },
+  correctOption: { type: Number, required: true, min: 0, max: 3 },
+  explanation: { type: String, default: '', trim: true, maxlength: 2000 },
+}, { _id: false });
+
+const lessonSchema = new mongoose.Schema({
+  title: { type: String, required: true, trim: true, maxlength: 180 },
+  content: { type: String, default: '', maxlength: 30000 },
+  videoUrl: { type: String, default: '', trim: true, maxlength: 2000 },
+  imageUrl: { type: String, default: '', trim: true, maxlength: 1000 },
+  imagePublicId: { type: String, default: '', trim: true, maxlength: 255 },
+  resources: [{ title: { type: String, trim: true, maxlength: 180 }, url: { type: String, trim: true, maxlength: 2000 } }],
+  code: { language: { type: String, default: '', trim: true, maxlength: 40 }, source: { type: String, default: '', maxlength: 20000 } },
+  knowledgeCheck: { type: [lessonQuestionSchema], default: [], validate: { validator: (questions) => questions.length === 0 || questions.length === 10, message: 'An intermediate assessment must contain exactly 10 questions.' } },
+  passMark: { type: Number, default: 70, min: 1, max: 100 },
+  assessmentAttempts: { type: Number, default: 3, min: 1, max: 10 },
+}, { _id: true });
+
+const moduleSchema = new mongoose.Schema({
+  title: { type: String, required: true, trim: true, maxlength: 180 },
+  lessons: { type: [lessonSchema], default: [] },
+}, { _id: true });
+
 const learningClassSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 160 },
   subject: { type: String, required: true, trim: true, maxlength: 120 },
@@ -29,6 +54,15 @@ const learningClassSchema = new mongoose.Schema({
   thumbnailPublicId: { type: String, default: '', maxlength: 255 },
   thumbnailUrl: { type: String, default: '', maxlength: 1000 },
   learningMaterials: [{ type: mongoose.Schema.Types.ObjectId, ref: 'LearningBook' }],
+  slug: { type: String, trim: true, lowercase: true, maxlength: 180, sparse: true, unique: true },
+  difficulty: { type: String, enum: ['Beginner', 'Intermediate', 'Advanced'], default: 'Beginner' },
+  courseDuration: { type: String, trim: true, maxlength: 120, default: '' },
+  learningObjectives: [{ type: String, trim: true, maxlength: 500 }],
+  prerequisites: [{ type: String, trim: true, maxlength: 500 }],
+  language: { type: String, trim: true, maxlength: 80, default: 'English' },
+  instructorName: { type: String, trim: true, maxlength: 160, default: '' },
+  instructorBio: { type: String, trim: true, maxlength: 3000, default: '' },
+  modules: { type: [moduleSchema], default: [] },
   completionRequirements: {
     requireReading: { type: Boolean, default: false },
     requireTheory: { type: Boolean, default: false },

@@ -1,8 +1,11 @@
-export function sanitizeAssessmentQuestions(questions) {
-  return questions.map((question, index) => ({
-    id: index,
-    prompt: question.prompt,
-    options: question.options,
+export function sanitizeAssessmentQuestions(questions, questionOrder = [], optionOrders = []) {
+  const order = questionOrder.length === questions.length ? questionOrder : questions.map((_, index) => index);
+  return order.map((originalIndex, displayIndex) => ({
+    id: displayIndex,
+    prompt: questions[originalIndex].prompt,
+    options: (optionOrders[originalIndex]?.length === questions[originalIndex].options.length
+      ? optionOrders[originalIndex]
+      : questions[originalIndex].options.map((_, index) => index)).map((optionIndex) => questions[originalIndex].options[optionIndex]),
   }));
 }
 

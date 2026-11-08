@@ -65,11 +65,33 @@ const completionSchema = z.object({
   requireAttendance: z.boolean().optional().default(false),
   minimumScore: z.number().min(0).max(100).optional().default(0),
 });
+const lessonQuestion = z.object({ prompt: z.string().trim().min(1).max(1200), options: z.array(z.string().trim().min(1).max(500)).length(4), correctOption: z.number().int().min(0).max(3), explanation: z.string().max(2000).optional().default('') });
+const lesson = z.object({
+  _id: objectId.optional(), title: z.string().trim().min(2).max(180), content: z.string().max(30000).optional().default(''),
+  videoUrl: z.string().max(2000).optional().default(''),
+  imageUrl: z.string().max(1000).optional().default(''),
+  imagePublicId: z.string().max(255).optional().default(''),
+  resources: z.array(z.object({ title: z.string().trim().max(180), url: z.string().url().max(2000) })).max(30).optional().default([]),
+  code: z.object({ language: z.string().max(40).optional().default(''), source: z.string().max(20000).optional().default('') }).optional().default({}),
+  knowledgeCheck: z.array(lessonQuestion).length(10).or(z.array(lessonQuestion).length(0)).optional().default([]),
+  passMark: z.number().int().min(1).max(100).optional().default(70),
+  assessmentAttempts: z.number().int().min(1).max(10).optional().default(3),
+});
+const modulesSchema = z.array(z.object({ _id: objectId.optional(), title: z.string().trim().min(2).max(180), lessons: z.array(lesson).max(100).default([]) })).max(100);
 const classFields = {
   title: z.string().trim().min(2).max(160),
   subject: z.string().trim().min(2).max(120),
   trade: z.string().trim().max(120).optional().default(''),
   introduction: z.string().trim().max(500).optional().default(''),
+  slug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(180).optional(),
+  difficulty: z.enum(['Beginner', 'Intermediate', 'Advanced']).optional(),
+  courseDuration: z.string().trim().max(120).optional(),
+  learningObjectives: z.array(z.string().trim().min(1).max(500)).max(30).optional(),
+  prerequisites: z.array(z.string().trim().min(1).max(500)).max(30).optional(),
+  language: z.string().trim().max(80).optional(),
+  instructorName: z.string().trim().max(160).optional(),
+  instructorBio: z.string().trim().max(3000).optional(),
+  modules: modulesSchema.optional(),
   completionRequirements: completionSchema.optional(),
   course: z.string().trim().max(160).optional().default(''),
   level: z.enum(['L3', 'L4', 'L5', 'Bootcamp', 'Training']),
@@ -118,6 +140,11 @@ router.delete('/sessions/:sessionId/attendance/:studentId', requireAdmin, valida
 router.get('/sessions/:sessionId', validate(sessionParams, 'params'), classes.getSession);
 router.get('/', classes.listClasses);
 router.get('/:id/report.pdf', requireAdmin, validate(idParams, 'params'), validate(pdfQuery, 'query'), attendanceReports.downloadAttendancePdf);
+router.get('/:id/learning', validate(idParams, 'params'), classes.getLearningCourse);
+router.get('/:id/learning/analytics', requireAdmin, validate(idParams, 'params'), classes.getLearningAnalytics);
+router.put('/:id/learning/lessons/:lessonId/complete', validate(z.object({ id: objectId, lessonId: objectId }), 'params'), classes.completeLesson);
+router.post('/:id/learning/lessons/:lessonId/assessment', validate(z.object({ id: objectId, lessonId: objectId }), 'params'), validate(z.object({ answers: z.array(z.object({ optionIndex: z.number().int().min(0).max(3) })).length(10) })), classes.submitLessonAssessment);
+router.post('/:id/learning/lessons/:lessonId/events', validate(z.object({ id: objectId, lessonId: objectId }), 'params'), validate(z.object({ type: z.enum(['tab-hidden', 'window-blur', 'fullscreen-exit', 'copy', 'context-menu']) })), classes.logAssessmentEvent);
 router.get('/:id/invitations', requireAdmin, validate(idParams, 'params'), invitations.listInvitations);
 router.post('/:id/invitations', requireAdmin, validate(idParams, 'params'), validate(z.object({ studentIds: z.array(objectId).min(1).max(100) })), invitations.sendInvitations);
 router.post('/:id/invitations/:invitationId/resend', requireAdmin, validate(invitationParams, 'params'), invitations.resendInvitation);

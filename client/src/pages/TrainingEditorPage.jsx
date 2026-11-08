@@ -9,6 +9,7 @@ import { useToast } from '../context/ToastContext.jsx';
 
 const blankForm = () => ({
   title: '', subject: '', trade: '', course: '', level: 'Training', introduction: '', description: '',
+  difficulty: 'Beginner', courseDuration: '', learningObjectives: [], prerequisites: [], language: 'English', slug: '', instructorName: '', instructorBio: '',
   startsAt: '', endsAt: '', enrollmentOpensAt: '', enrollmentClosesAt: '', schedule: '',
   durationMinutes: 60, lateThresholdMinutes: 15, earlyThresholdPercent: 75, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg',
   maxStudents: 300, enrollmentOpen: true, allowCancellation: true, published: true,
@@ -87,6 +88,7 @@ export default function TrainingEditorPage() {
     const next = {};
     if (form.title.trim().length < 2) next.title = 'Enter a training title.';
     if (form.subject.trim().length < 2) next.subject = 'Enter a subject.';
+    if (!thumbnail && !form.thumbnailUrl) next.thumbnail = 'Choose a cover image before saving this course.';
     if (Number(form.maxStudents) < Math.max(1, form.studentIds.length)) next.maxStudents = 'Capacity must cover the selected students.';
     if (form.startsAt && form.endsAt && new Date(form.endsAt) <= new Date(form.startsAt)) next.endsAt = 'End must be after the start.';
     setErrors(next);
@@ -100,6 +102,7 @@ export default function TrainingEditorPage() {
     const payload = {
       title: form.title.trim(), subject: form.subject.trim(), trade: form.trade || '', course: form.course || '',
       level: form.level, introduction: form.introduction || '', description: form.description || '',
+      difficulty: form.difficulty || 'Beginner', courseDuration: form.courseDuration || '', learningObjectives: form.learningObjectives || [], prerequisites: form.prerequisites || [], language: form.language || 'English', instructorName: form.instructorName || '', instructorBio: form.instructorBio || '', ...(form.slug ? { slug: form.slug } : {}),
       studentIds: form.studentIds,
       startsAt: toIso(form.startsAt), endsAt: toIso(form.endsAt),
       enrollmentOpensAt: toIso(form.enrollmentOpensAt), enrollmentClosesAt: toIso(form.enrollmentClosesAt),
@@ -154,9 +157,17 @@ export default function TrainingEditorPage() {
           <Field label="Trade / pathway" hint="Optional grouping for the catalog."><input className="input" maxLength={120} value={form.trade} onChange={(event) => set('trade', event.target.value)} placeholder="e.g. Technology" /></Field>
           <Field label="Level"><select className="input" value={form.level} onChange={(event) => set('level', event.target.value)}>{['Bootcamp', 'Training'].map((level) => <option key={level}>{level}</option>)}</select></Field>
           <Field label="Program / course label" hint="Optional internal program name."><input className="input" maxLength={160} value={form.course} onChange={(event) => set('course', event.target.value)} placeholder="e.g. Web Development" /></Field>
+          <Field label="Difficulty"><select className="input" value={form.difficulty} onChange={(event) => set('difficulty', event.target.value)}>{['Beginner', 'Intermediate', 'Advanced'].map((item) => <option key={item}>{item}</option>)}</select></Field>
+          <Field label="Course duration" hint="Learning programme duration, separate from live session length."><input className="input" maxLength={120} value={form.courseDuration} onChange={(event) => set('courseDuration', event.target.value)} placeholder="e.g. 8 weeks" /></Field>
+          <Field label="Course language"><input className="input" maxLength={80} value={form.language} onChange={(event) => set('language', event.target.value)} /></Field>
+          <Field label="Instructor name"><input className="input" maxLength={160} value={form.instructorName} onChange={(event) => set('instructorName', event.target.value)} placeholder="Course instructor" /></Field>
+          <Field label="Instructor information" className="sm:col-span-2"><textarea className="input min-h-20" maxLength={3000} value={form.instructorBio} onChange={(event) => set('instructorBio', event.target.value)} placeholder="Relevant experience and instructor background" /></Field>
+          <Field label="Unique course slug" hint="Leave blank to create one automatically."><input className="input" maxLength={180} value={form.slug} onChange={(event) => set('slug', event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/--+/g, '-'))} placeholder="python-foundations" /></Field>
           <Field label="Short introduction" hint="One or two lines shown on cards." className="sm:col-span-2"><input className="input" maxLength={500} value={form.introduction} onChange={(event) => set('introduction', event.target.value)} placeholder="A concise promise of what students will achieve." /></Field>
           <Field label="Detailed description" className="sm:col-span-2"><textarea className="input min-h-32" maxLength={12000} value={form.description} onChange={(event) => set('description', event.target.value)} placeholder="Outcomes, who it is for, tools covered, and how learning is delivered." /></Field>
-          <Field label="Cover image" hint="PNG, JPEG, or WebP up to 3 MB. A plain green cover is used when no image is uploaded." className="sm:col-span-2"><div className="flex flex-wrap items-center gap-3"><label className="btn-secondary cursor-pointer"><ImagePlus size={16} />Choose image<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => setThumbnail(event.target.files?.[0] || null)} /></label>{thumbnail && <span className="min-w-0 truncate text-xs text-slate-500">{thumbnail.name}</span>}</div></Field>
+          <Field label="Learning objectives" hint="One objective per line." className="sm:col-span-2"><textarea className="input min-h-24" value={(form.learningObjectives || []).join('\n')} onChange={(event) => set('learningObjectives', event.target.value.split('\n').map((line) => line.trim()).filter(Boolean))} placeholder="Build a responsive website\nUse Git to track changes" /></Field>
+          <Field label="Prerequisites" hint="One requirement per line." className="sm:col-span-2"><textarea className="input min-h-20" value={(form.prerequisites || []).join('\n')} onChange={(event) => set('prerequisites', event.target.value.split('\n').map((line) => line.trim()).filter(Boolean))} placeholder="Basic computer literacy" /></Field>
+          <Field label="Cover image" hint="Required. PNG, JPEG, or WebP up to 3 MB." className="sm:col-span-2"><div className="flex flex-wrap items-center gap-3"><label className="btn-secondary cursor-pointer"><ImagePlus size={16} />Choose image<input type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" onChange={(event) => setThumbnail(event.target.files?.[0] || null)} /></label>{thumbnail && <span className="min-w-0 truncate text-xs text-slate-500">{thumbnail.name}</span>}{!thumbnail && form.thumbnailUrl && <span className="text-xs text-green-800">Current cover is set.</span>}{errors.thumbnail && <span className="text-xs text-red-600">{errors.thumbnail}</span>}</div></Field>
         </div>
       </section>
 

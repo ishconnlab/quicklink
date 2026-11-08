@@ -33,6 +33,15 @@ test('student assessment payloads do not expose correct answers', () => {
   assert.equal('correctOption' in safeQuestions[0], false);
 });
 
+test('final assessment can randomize question and option order without exposing answer keys', () => {
+  const order = questions.slice(0, 10).map((_, index) => 9 - index);
+  const optionOrders = questions.slice(0, 10).map(() => [3, 2, 1, 0]);
+  const safeQuestions = sanitizeAssessmentQuestions(questions.slice(0, 10), order, optionOrders);
+  assert.equal(safeQuestions[0].prompt, 'Question 10');
+  assert.deepEqual(safeQuestions[0].options, ['D', 'C', 'B', 'A']);
+  assert.equal('correctOption' in safeQuestions[0], false);
+});
+
 test('10-question certification assessments pass at 80 percent and omit answer keys', () => {
   const certificationQuestions = questions.slice(0, 10);
   const answers = certificationQuestions.map((question, questionIndex) => ({

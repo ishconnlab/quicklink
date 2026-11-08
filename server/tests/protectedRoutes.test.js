@@ -32,6 +32,10 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
   const root = `http://127.0.0.1:${address.port}`;
   try {
     const completion = await fetch(`${root}/api/courses/0123456789abcdef01234567/completion`);
+    const learningCourse = await fetch(`${root}/api/courses/0123456789abcdef01234567/learning`);
+    const completeLesson = await fetch(`${root}/api/courses/0123456789abcdef01234567/learning/lessons/0123456789abcdef01234567/complete`, { method: 'PUT' });
+    const lessonAssessment = await fetch(`${root}/api/courses/0123456789abcdef01234567/learning/lessons/0123456789abcdef01234567/assessment`, { method: 'POST' });
+    const lessonSecurityEvent = await fetch(`${root}/api/courses/0123456789abcdef01234567/learning/lessons/0123456789abcdef01234567/events`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'tab-hidden' }) });
     const issue = await fetch(`${root}/api/courses/0123456789abcdef01234567/certificate`, { method: 'POST' });
     const download = await fetch(`${root}/api/certificates/verify/not-a-valid-code`);
     const downloadByCode = await fetch(`${root}/api/certificates/${'a'.repeat(32)}.pdf`);
@@ -63,6 +67,10 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     const deleteCertificate = await fetch(`${root}/api/certificates/0123456789abcdef01234567`, { method: 'DELETE' });
     const deleteRegistration = await fetch(`${root}/api/registrations/0123456789abcdef01234567/entries/0123456789abcdef01234567`, { method: 'DELETE' });
     assert.equal(completion.status, 401);
+    assert.equal(learningCourse.status, 401);
+    assert.equal(completeLesson.status, 401);
+    assert.equal(lessonAssessment.status, 401);
+    assert.equal(lessonSecurityEvent.status, 401);
     assert.equal(completion.headers.get('x-robots-tag'), 'noindex, nofollow, nosnippet');
     assert.equal(issue.status, 401);
     assert.equal(download.status, 400);

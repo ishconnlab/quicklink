@@ -14,7 +14,7 @@ const paymentTone = { not_required: 'slate', unpaid: 'amber', pending: 'brand', 
 export default function StudentDashboard() {
   const { user } = useAuth();
   const toast = useToast();
-  const [state, setState] = useState({ loading: true, courses: [], certificates: [], classes: [], completion: {} });
+  const [state, setState] = useState({ loading: true, courses: [], certificates: [], classes: [], completion: {}, learning: {} });
 
   useEffect(() => {
     let active = true;
@@ -25,12 +25,11 @@ export default function StudentDashboard() {
     ]).then(async ([coursesResponse, certificatesResponse, classesResponse]) => {
       const courses = coursesResponse.data.data.courses;
       const completionPairs = await Promise.all(courses.map(async (course) => {
-        try {
-          const result = await api.get(`/courses/${course.id}/completion`);
-          return [course.id, result.data.data];
-        } catch {
-          return [course.id, null];
-        }
+        const [completion, learning] = await Promise.allSettled([api.get(`/courses/${course.id}/completion`), api.get(`/courses/${course.id}/learning`)]);
+        return [course.id, {
+          completion: completion.status === 'fulfilled' ? completion.value.data.data : null,
+          learning: learning.status === 'fulfilled' ? learning.value.data.data : null,
+        }];
       }));
       if (!active) return;
       setState({
@@ -38,7 +37,8 @@ export default function StudentDashboard() {
         courses,
         certificates: certificatesResponse.data.data.certificates,
         classes: classesResponse.data.data.classes || [],
-        completion: Object.fromEntries(completionPairs),
+        completion: Object.fromEntries(completionPairs.map(([courseId, value]) => [courseId, value.completion])),
+        learning: Object.fromEntries(completionPairs.map(([courseId, value]) => [courseId, value.learning])),
       });
     }).catch((error) => {
       if (!active) return;
@@ -58,6 +58,8 @@ export default function StudentDashboard() {
   const completedTrainings = Object.values(state.completion).filter((item) => item?.eligible).length;
 
   const progressFor = (course) => {
+    const learningProgress = state.learning[course.id]?.progress;
+    if (learningProgress?.totalLessons > 0) return learningProgress.percent;
     const completion = state.completion[course.id];
     if (!completion?.checks?.length) return 0;
     return Math.round(completion.checks.filter((check) => check.complete).length / completion.checks.length * 100);
@@ -105,7 +107,7 @@ export default function StudentDashboard() {
                 {course.startsAt && <span className="inline-flex items-center gap-1 text-slate-500"><CalendarClock size={13} />{formatDateTime(course.startsAt)}</span>}
                 {payment?.required && <span className="font-semibold text-amber-700">{formatMoney(payment.amount, payment.currency)} due</span>}
               </div>
-              <div className="mt-4 flex gap-2"><Link to={`/courses/${course.id}`} className="btn-primary flex-1">Open training</Link><Link to={`/classes/${course.id}`} className="btn-secondary"><Video size={16} />Classroom</Link></div>
+              <div className="mt-4 flex gap-2"><Link to={state.learning[course.id]?.progress?.totalLessons ? `/courses/${course.id}/learn` : `/courses/${course.id}`} className="btn-primary flex-1">{state.learning[course.id]?.progress?.totalLessons ? 'Continue learning' : 'Open training'}</Link><Link to={`/classes/${course.id}`} className="btn-secondary"><Video size={16} />Classroom</Link></div>
             </div>
           </article>;
         })}

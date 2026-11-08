@@ -17,6 +17,7 @@ const ClassReportPage = lazy(() => import('./pages/ClassReportPage.jsx'));
 const ClassInvitationPage = lazy(() => import('./pages/ClassInvitationPage.jsx'));
 const CoursesPage = lazy(() => import('./pages/CoursesPage.jsx'));
 const CourseDetailPage = lazy(() => import('./pages/CourseDetailPage.jsx'));
+const CourseLearningPage = lazy(() => import('./pages/CourseLearningPage.jsx'));
 const TrainingEditorPage = lazy(() => import('./pages/TrainingEditorPage.jsx'));
 const AdminEnrollmentsPage = lazy(() => import('./pages/AdminEnrollmentsPage.jsx'));
 const StudentDashboard = lazy(() => import('./pages/StudentDashboard.jsx'));
@@ -84,6 +85,7 @@ export default function App() {
           <Route path="/courses" element={<CoursesPage />} />
           <Route path="/courses/new" element={<AdminOnly><TrainingEditorPage /></AdminOnly>} />
           <Route path="/courses/:id" element={<CourseDetailPage />} />
+          <Route path="/courses/:id/learn" element={<CourseLearningPage />} />
           <Route path="/courses/:id/edit" element={<AdminOnly><TrainingEditorPage /></AdminOnly>} />
           <Route path="/classes" element={<ClassesPage />} />
           <Route path="/classes/join/:sessionCode" element={<JoinClassPage />} />

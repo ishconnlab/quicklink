@@ -76,6 +76,7 @@ router.get('/:id/thumbnail', validate(idParams, 'params'), courses.getCourseThum
 router.use(requireAuth);
 router.get('/', validate(listQuery, 'query'), courses.listCourses);
 router.post('/:id/thumbnail', requireAdmin, validate(idParams, 'params'), uploadThumbnail.single('thumbnail'), courses.updateCourseThumbnail);
+router.post('/:id/modules/:moduleId/lessons/:lessonId/image', requireAdmin, validate(z.object({ id: objectId, moduleId: objectId, lessonId: objectId }), 'params'), uploadThumbnail.single('image'), courses.uploadLessonImage);
 router.get('/:id/completion', validate(idParams, 'params'), certificates.getCourseCompletion);
 router.get('/:id/certification-assessment/settings', requireAdmin, validate(idParams, 'params'), certificates.getCertificationAssessmentSettings);
 router.put('/:id/certification-assessment/settings', requireAdmin, validate(idParams, 'params'), validate(certificationSettings), certificates.saveCertificationAssessmentSettings);

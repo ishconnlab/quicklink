@@ -4,6 +4,7 @@ import { CertificationAssessmentAttempt } from '../models/CertificationAssessmen
 import { LiveSession } from '../models/LiveSession.js';
 import { ProjectSubmission } from '../models/ProjectSubmission.js';
 import { getPlatformSettings } from './settings.js';
+import { CourseLearningProgress } from '../models/CourseLearningProgress.js';
 
 export const REQUIRED_ATTENDANCE_SESSIONS = 2;
 
@@ -54,6 +55,7 @@ export async function evaluateCourseCompletion(course, studentId) {
   const rules = course.completionRequirements || {};
   const assessmentEnabled = Boolean(course.certificationAssessmentEnabled);
   const projectSettings = course.projectSubmission || {};
+  const lessonCount = (course.modules || []).reduce((total, module) => total + (module.lessons || []).length, 0);
   const projectRequired = Boolean(projectSettings.enabled && projectSettings.required);
   const attendanceRequired = Boolean(rules.requireAttendance);
   const minimumAttendance = Math.max(1, Number(course.minimumAttendanceSessions || settings.assessment.minimumAttendanceSessions || REQUIRED_ATTENDANCE_SESSIONS));
@@ -64,8 +66,15 @@ export async function evaluateCourseCompletion(course, studentId) {
       type: { $in: ['quiz', 'practical', 'assignment'] },
     }).select('_id type passMark maxPoints').lean()
     : [];
-  const requirementsConfigured = Boolean(assessmentEnabled || projectRequired || attendanceRequired || assignments.length || rules.minimumScore > 0);
+  const requirementsConfigured = Boolean(assessmentEnabled || projectRequired || attendanceRequired || assignments.length || rules.minimumScore > 0 || lessonCount > 0);
   const checks = [];
+
+  if (lessonCount) {
+    const progress = await CourseLearningProgress.findOne({ student: studentId, course: course._id }).select('completedLessons').lean();
+    const lessonIds = new Set((course.modules || []).flatMap((module) => (module.lessons || []).map((lesson) => lesson._id?.toString())).filter(Boolean));
+    const completed = new Set((progress?.completedLessons || []).map((item) => item.toString()).filter((id) => lessonIds.has(id))).size;
+    checks.push({ key: 'lessons', label: 'Complete all course lessons', complete: completed === lessonCount, detail: `${completed} of ${lessonCount} lessons completed` });
+  }
 
   if (assessmentEnabled) {
     const configured = course.certificationQuestions?.length === 10;

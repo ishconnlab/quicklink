@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomInt } from 'node:crypto';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../utils/ApiError.js';
 import { User } from '../models/User.js';
@@ -17,9 +17,10 @@ import config from '../config/env.js';
 import { isAdmin } from '../security/roles.js';
 import { notifyUsers } from '../services/notifications.js';
 import { recordActivity } from '../services/activityLog.js';
+import { CourseLearningProgress } from '../models/CourseLearningProgress.js';
 
 const COURSE_FIELDS = [
-  'title', 'level', 'active', 'published', 'students', 'learningMaterials', 'completionRequirements',
+  'title', 'level', 'active', 'published', 'students', 'learningMaterials', 'modules', 'completionRequirements',
   'certificationAssessmentEnabled', 'certificationQuestions', 'assessmentAttempts', 'assessmentPassMark',
   'assessmentLockdown', 'minimumAttendanceSessions', 'projectSubmission', 'payment', 'startsAt', 'createdAt',
 ].join(' ');
@@ -346,14 +347,37 @@ async function assessmentAccess(courseId, user) {
   return course;
 }
 
-function assessmentPayload(course, state, project, questions = []) {
+async function lessonCompletion(course, studentId) {
+  const total = (course.modules || []).reduce((count, module) => count + (module.lessons || []).length, 0);
+  if (!total) return { total: 0, completed: 0, complete: true };
+  const progress = await CourseLearningProgress.findOne({ student: studentId, course: course._id }).select('completedLessons').lean();
+  const lessonIds = new Set((course.modules || []).flatMap((module) => (module.lessons || []).map((lesson) => lesson._id?.toString())).filter(Boolean));
+  const completed = new Set((progress?.completedLessons || []).map((item) => item.toString()).filter((id) => lessonIds.has(id))).size;
+  return { total, completed, complete: completed === total };
+}
+
+function shuffledIndices(length) {
+  const values = Array.from({ length }, (_, index) => index);
+  for (let index = values.length - 1; index > 0; index -= 1) {
+    const swap = randomInt(index + 1);
+    [values[index], values[swap]] = [values[swap], values[index]];
+  }
+  return values;
+}
+
+function randomizedQuestions(questions, draft) {
+  return sanitizeAssessmentQuestions(questions, draft.questionOrder || [], draft.optionOrders || []);
+}
+
+function assessmentPayload(course, state, project, questions = [], lessons = { total: 0, completed: 0, complete: true }) {
   const configured = course.certificationQuestions?.length === 10;
   const canStart = Boolean(
     course.certificationAssessmentEnabled
     && configured
     && !state.passed
     && state.attemptsRemaining > 0
-    && project.complete,
+    && project.complete
+    && lessons.complete,
   );
   return {
     title: course.title,
@@ -361,6 +385,9 @@ function assessmentPayload(course, state, project, questions = []) {
     configured,
     projectSubmissionRequired: project.required,
     projectSubmitted: project.complete,
+    lessonsRequired: lessons.total,
+    lessonsCompleted: lessons.completed,
+    lessonsComplete: lessons.complete,
     passed: state.passed,
     attemptsUsed: state.attemptsUsed,
     attemptsRemaining: state.attemptsRemaining,
@@ -388,27 +415,35 @@ export const getCertificationAssessment = asyncHandler(async (req, res) => {
   const course = await assessmentAccess(req.params.id, req.user);
   const state = await assessmentState(course, req.user._id);
   const project = await projectCompleteFor(course, req.user._id);
-  const questions = state.draft ? sanitizeAssessmentQuestions(course.certificationQuestions || []) : [];
-  res.json({ success: true, data: assessmentPayload(course, state, project, questions) });
+  const lessons = await lessonCompletion(course, req.user._id);
+  const questions = state.draft ? randomizedQuestions(course.certificationQuestions || [], state.draft) : [];
+  res.json({ success: true, data: assessmentPayload(course, state, project, questions, lessons) });
 });
 
 export const startCertificationAssessment = asyncHandler(async (req, res) => {
   const course = await assessmentAccess(req.params.id, req.user);
   const state = await assessmentState(course, req.user._id);
   const project = await projectCompleteFor(course, req.user._id);
+  const lessons = await lessonCompletion(course, req.user._id);
   if (!course.certificationAssessmentEnabled || course.certificationQuestions?.length !== 10) {
     throw ApiError.conflict('The administrator has not configured this training assessment.');
   }
   if (state.passed) throw ApiError.conflict('You have already passed this assessment.');
   if (state.attemptsRemaining <= 0) throw ApiError.conflict('No assessment attempts remain. Contact the administrator.');
   if (!project.complete) throw ApiError.conflict('Submit your project before taking the assessment.');
+  if (!lessons.complete) throw ApiError.conflict('Complete every course lesson before taking the final assessment.');
   let draft = await AssessmentDraft.findOne({ student: req.user._id, course: course._id });
   let created = false;
   if (!draft) {
-    draft = await AssessmentDraft.create({ student: req.user._id, course: course._id, answers: [], currentIndex: 0 });
+    draft = await AssessmentDraft.create({ student: req.user._id, course: course._id, answers: [], currentIndex: 0, questionOrder: shuffledIndices(10), optionOrders: course.certificationQuestions.map((question) => shuffledIndices(question.options.length)) });
     created = true;
   }
-  const payload = assessmentPayload(course, { ...state, draft: draft.toObject() }, project, sanitizeAssessmentQuestions(course.certificationQuestions));
+  if (!draft.questionOrder?.length || !draft.optionOrders?.length) {
+    draft.questionOrder = draft.answers.length ? Array.from({ length: 10 }, (_, index) => index) : shuffledIndices(10);
+    draft.optionOrders = draft.answers.length ? course.certificationQuestions.map((question) => question.options.map((_, index) => index)) : course.certificationQuestions.map((question) => shuffledIndices(question.options.length));
+    await draft.save();
+  }
+  const payload = assessmentPayload(course, { ...state, draft: draft.toObject() }, project, randomizedQuestions(course.certificationQuestions, draft), lessons);
   res.status(created ? 201 : 200).json({ success: true, data: payload });
 });
 
@@ -440,20 +475,28 @@ export const submitCertificationAssessment = asyncHandler(async (req, res) => {
     throw ApiError.conflict('The administrator has not configured this training assessment.');
   }
   const project = await projectCompleteFor(course, req.user._id);
+  const lessons = await lessonCompletion(course, req.user._id);
   if (!project.complete) throw ApiError.conflict('Submit your project before taking the assessment.');
+  if (!lessons.complete) throw ApiError.conflict('Complete every course lesson before taking the final assessment.');
   const state = await assessmentState(course, req.user._id);
   if (state.passed) throw ApiError.conflict('You have already passed this assessment.');
   if (state.attemptsRemaining <= 0) throw ApiError.conflict('No assessment attempts remain. Contact the administrator.');
   const attemptNumber = state.attemptsUsed + 1;
   const passMark = course.assessmentPassMark ?? 80;
-  const { score, passed, correctCount } = gradeAssessment(course.certificationQuestions, req.body.answers, passMark);
+  const draft = state.draft;
+  const canonicalAnswers = req.body.answers.map(({ questionIndex, optionIndex }) => {
+    const originalQuestion = draft?.questionOrder?.[questionIndex] ?? questionIndex;
+    const originalOption = draft?.optionOrders?.[originalQuestion]?.[optionIndex] ?? optionIndex;
+    return { questionIndex: originalQuestion, optionIndex: originalOption };
+  });
+  const { score, passed, correctCount } = gradeAssessment(course.certificationQuestions, canonicalAnswers, passMark);
   let attempt;
   try {
     attempt = await CertificationAssessmentAttempt.create({
       student: req.user._id,
       course: course._id,
       attemptNumber,
-      answers: req.body.answers,
+      answers: canonicalAnswers,
       score,
       passed,
     });
@@ -462,6 +505,14 @@ export const submitCertificationAssessment = asyncHandler(async (req, res) => {
     throw error;
   }
   await AssessmentDraft.deleteOne({ student: req.user._id, course: course._id });
+  let certificate = null;
+  if (passed) {
+    const completion = await evaluateCourseCompletion(course, req.user._id);
+    if (completion.eligible) {
+      const registeredNames = await registeredNamesFor(course._id, [req.user]);
+      certificate = certificateJson(await findOrIssueCertificate(course, req.user, registeredNames.get(req.user.email.toLowerCase()) || req.user.name));
+    }
+  }
   res.status(201).json({
     success: true,
     data: {
@@ -471,6 +522,7 @@ export const submitCertificationAssessment = asyncHandler(async (req, res) => {
       attemptNumber,
       attemptsRemaining: Math.max(0, state.maxAttempts - attemptNumber),
       passMark,
+      certificate,
     },
   });
 });

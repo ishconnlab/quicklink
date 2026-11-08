@@ -17,6 +17,7 @@ import { assertCanAttend, getEnrollment, paymentState } from '../services/classA
 import { getPlatformSettings } from '../services/settings.js';
 import { AccessToken, TrackSource } from 'livekit-server-sdk';
 import config from '../config/env.js';
+import * as courseLearning from './courseLearningController.js';
 
 const COURSE_IMAGE_DIR = path.resolve(process.env.COURSE_IMAGE_DIR || fileURLToPath(new URL('../../course-images/', import.meta.url)));
 const IMAGE_FORMATS = [
@@ -82,6 +83,15 @@ function classJson(item, options = {}) {
     subject: item.subject,
     trade: item.trade || '',
     introduction: item.introduction || '',
+    slug: item.slug || '',
+    difficulty: item.difficulty || 'Beginner',
+    courseDuration: item.courseDuration || '',
+    learningObjectives: item.learningObjectives || [],
+    prerequisites: item.prerequisites || [],
+    language: item.language || 'English',
+    instructorName: item.instructorName || '',
+    instructorBio: item.instructorBio || '',
+    modules: (item.modules || []).map((module) => ({ id: module._id?.toString(), title: module.title, lessons: (module.lessons || []).map((lesson) => ({ id: lesson._id?.toString(), title: lesson.title })) })),
     thumbnailUrl: item.thumbnailUrl || (item.thumbnailFile ? `/api/courses/${item._id}/thumbnail` : ''),
     course: item.course || '',
     level: item.level,
@@ -468,12 +478,23 @@ export const createClass = asyncHandler(async (req, res) => {
   const students = await resolveStudents(req.body.studentIds || []);
   if (students.length > (req.body.maxStudents || 300)) throw ApiError.badRequest('The selected students exceed the training capacity.');
   const platformSettings = await getPlatformSettings();
+  const slugBase = (req.body.slug || req.body.title).toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 150) || 'training';
+  if (req.body.slug && await LearningClass.exists({ slug: req.body.slug })) throw ApiError.conflict('That course slug is already in use.');
   const item = new LearningClass({
     ...(requestId ? { _id: requestId } : {}),
     title: req.body.title,
     subject: req.body.subject,
     trade: req.body.trade || '',
     introduction: req.body.introduction || '',
+    slug: req.body.slug || `${slugBase}-${randomBytes(3).toString('hex')}`,
+    difficulty: req.body.difficulty || 'Beginner',
+    courseDuration: req.body.courseDuration || '',
+    learningObjectives: req.body.learningObjectives || [],
+    prerequisites: req.body.prerequisites || [],
+    language: req.body.language || 'English',
+    instructorName: req.body.instructorName || '',
+    instructorBio: req.body.instructorBio || '',
+    modules: req.body.modules || [],
     completionRequirements: req.body.completionRequirements || {},
     course: req.body.course || '',
     level: req.body.level || 'Training',
@@ -521,11 +542,13 @@ export const createClass = asyncHandler(async (req, res) => {
 export const updateClass = asyncHandler(async (req, res) => {
   const item = await LearningClass.findById(req.params.id);
   if (!item) throw ApiError.notFound('Training not found.');
+  if (req.body.slug && req.body.slug !== item.slug && await LearningClass.exists({ slug: req.body.slug, _id: { $ne: item._id } })) throw ApiError.conflict('That course slug is already in use.');
   if (req.body.studentIds !== undefined && await LiveSession.exists({ learningClass: item._id, status: 'live' })) {
     throw ApiError.conflict('End the live session before changing the student roster.');
   }
   const fields = [
     'title', 'subject', 'trade', 'introduction', 'completionRequirements', 'course', 'level', 'description',
+    'slug', 'difficulty', 'courseDuration', 'learningObjectives', 'prerequisites', 'language', 'instructorName', 'instructorBio', 'modules',
     'active', 'published', 'startsAt', 'endsAt', 'enrollmentOpensAt', 'enrollmentClosesAt', 'schedule',
     'durationMinutes', 'lateThresholdMinutes', 'earlyThresholdPercent', 'timezone', 'maxStudents',
     'enrollmentOpen', 'allowCancellation', 'certificationAssessmentEnabled', 'assessmentAttempts',
@@ -581,6 +604,30 @@ export const updateClass = asyncHandler(async (req, res) => {
     message: `Updated training ${item.title}${additions.length ? ` and added ${additions.map((student) => student.name).join(', ')}` : ''}.`,
   });
   res.json({ success: true, data: { class: classJson(item, { user: req.user, includeRoster: true }) } });
+});
+
+export const getLearningCourse = courseLearning.getLearningCourse;
+export const completeLesson = courseLearning.completeLesson;
+export const submitLessonAssessment = courseLearning.submitLessonAssessment;
+export const logAssessmentEvent = courseLearning.logAssessmentEvent;
+export const getLearningAnalytics = courseLearning.getLearningAnalytics;
+
+export const uploadLessonImage = asyncHandler(async (req, res) => {
+  const course = await LearningClass.findById(req.params.id);
+  if (!course) throw ApiError.notFound('Training not found.');
+  if (!req.file?.buffer) throw ApiError.badRequest('Choose an image file to upload.');
+  const format = IMAGE_FORMATS.find((candidate) => candidate.matches(req.file.buffer));
+  if (!format) throw ApiError.badRequest('Use a valid PNG, JPEG, or WebP image.');
+  const module = course.modules.id(req.params.moduleId);
+  const lesson = module?.lessons.id(req.params.lessonId);
+  if (!lesson) throw ApiError.notFound('Lesson not found. Save the lesson before uploading its image.');
+  const uploaded = await uploadCloudinaryBuffer({ buffer: req.file.buffer, folder: `quicklink/courses/${course._id}/lessons`, resourceType: 'image' });
+  if (!uploaded?.secureUrl) throw ApiError.conflict('Configure Cloudinary storage before uploading lesson images.');
+  if (lesson.imagePublicId) await deleteCloudinaryAsset({ publicId: lesson.imagePublicId, resourceType: 'image' });
+  lesson.imageUrl = uploaded.secureUrl;
+  lesson.imagePublicId = uploaded.publicId;
+  await course.save();
+  res.json({ success: true, data: { imageUrl: lesson.imageUrl, imagePublicId: lesson.imagePublicId } });
 });
 
 export const getClass = asyncHandler(async (req, res) => {
