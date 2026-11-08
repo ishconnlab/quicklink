@@ -47,10 +47,10 @@ export default function RegisterPage() {
       <section className="order-2 hidden lg:block">
         <AuthLearningVisual />
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-green-600 to-amber-600 text-sm font-black text-white shadow-xl shadow-green-900/20">IC</span>
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-sm font-black text-white shadow-xl shadow-green-900/20">IC</span>
           <div><p className="text-lg font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-700">QuickLink Learning Portal</p></div>
         </div>
-        <h1 className="mt-12 max-w-md text-4xl font-black leading-[1.08] tracking-tight text-slate-950">Start your next<br /><span className="bg-gradient-to-r from-brand-600 to-amber-500 bg-clip-text text-transparent">professional chapter.</span></h1>
+        <h1 className="mt-12 max-w-md text-4xl font-black leading-[1.08] tracking-tight text-slate-950">Start your next<br /><span className="bg-green-50 text-brand-800">professional chapter.</span></h1>
         <p className="mt-5 max-w-md text-base leading-7 text-slate-600">Create your student account to enroll in trainings, join live classes, complete projects, and earn certificates.</p>
         <ul className="mt-8 space-y-3 text-sm text-slate-600">
           {['Apply for open trainings in a few clicks', 'Attend live sessions from any device', 'Track assessment attempts and project feedback', 'Download and share verified certificates'].map((item) => <li key={item} className="flex items-center gap-2.5"><span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-100 text-[11px] font-bold text-brand-700">✓</span>{item}</li>)}
@@ -59,7 +59,7 @@ export default function RegisterPage() {
 
       <section className="order-1 mx-auto w-full max-w-xl">
         <div className="mb-6 flex items-center gap-3 lg:hidden">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-green-600 to-amber-600 text-xs font-black text-white shadow-lg shadow-green-900/20">IC</span>
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-green-50 text-xs font-black text-white shadow-lg shadow-green-900/20">IC</span>
           <div><p className="font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">QuickLink Learning</p></div>
         </div>
         <div className="rounded-3xl border border-green-100 bg-white/95 p-6 shadow-2xl shadow-green-950/[0.07] backdrop-blur sm:p-8">

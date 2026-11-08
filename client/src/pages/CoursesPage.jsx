@@ -19,7 +19,7 @@ function CourseCard({ course, admin }) {
   return <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03] transition duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md">
     <div className="relative aspect-[16/9] overflow-hidden">
       <CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="absolute inset-0 transition duration-300 group-hover:scale-[1.02]" />
-      <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-slate-950/45 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-16 bg-green-50" />
       <div className="absolute left-3 top-3 flex flex-wrap gap-1.5"><Badge color="dark">{course.level}</Badge>{course.enrolled && <Badge color="green">Enrolled</Badge>}{!course.active && <Badge color="red">Archived</Badge>}</div>
       <p className="absolute bottom-3 left-3 text-xs font-semibold text-white/90">{course.subject}</p>
     </div>
@@ -78,7 +78,7 @@ export default function CoursesPage() {
       <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-400"><SlidersHorizontal size={14} className="text-brand-700" />Refine results</div>
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <label className="relative sm:col-span-2 lg:col-span-1"><Search size={16} className="absolute left-3 top-3.5 text-slate-400" /><input className="input pl-9" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Search trainings" aria-label="Search trainings" /></label>
-        <select className="input" value={filters.level} onChange={(event) => setFilters({ ...filters, level: event.target.value })} aria-label="Filter by level"><option value="">All levels</option>{['L3', 'L4', 'L5', 'Bootcamp', 'Training'].map((level) => <option key={level}>{level}</option>)}</select>
+        <select className="input" value={filters.level} onChange={(event) => setFilters({ ...filters, level: event.target.value })} aria-label="Filter by level"><option value="">All levels</option>{['Bootcamp', 'Training'].map((level) => <option key={level}>{level}</option>)}</select>
         <select className="input" value={filters.subject} onChange={(event) => setFilters({ ...filters, subject: event.target.value })} aria-label="Filter by subject"><option value="">All subjects</option>{result.subjects.map((subject) => <option key={subject}>{subject}</option>)}</select>
         <select className="input" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })} aria-label="Sort trainings"><option value="newest">Recently updated</option><option value="title">Title A–Z</option><option value="popular">Most enrolled</option><option value="level">Level</option></select>
       </div>

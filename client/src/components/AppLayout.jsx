@@ -11,7 +11,7 @@ import { isAdmin, roleLabel } from '../lib/roles.js';
 function Brand({ compact = false }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-brand-500 via-orange-600 to-amber-600 text-xs font-black tracking-tight text-white shadow-lg shadow-orange-900/25 ring-1 ring-white/25">
+      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-green-50 text-xs font-black tracking-tight text-white shadow-lg shadow-orange-900/25 ring-1 ring-white/25">
         <span className="relative z-10">IC</span>
         <span className="absolute -right-2 -top-2 h-5 w-5 rounded-full bg-white/20" />
       </div>
@@ -49,12 +49,12 @@ function AccountMenu({ placement = 'down', compact = false }) {
   };
   return <div className="relative" ref={ref}>
     <button ref={triggerRef} type="button" onClick={() => setOpen((value) => !value)} className={compact ? 'flex w-full items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-2 text-left transition hover:border-brand-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60' : 'flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition hover:bg-orange-50'} aria-label="Account menu" aria-haspopup="true" aria-expanded={open} aria-controls={open ? menuId : undefined}>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-amber-600 text-xs font-bold text-white shadow-sm">{user?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-white shadow-sm">{user?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
       {compact && <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-800">{user?.name}</span><span className="block truncate text-xs text-slate-400">{roleLabel(user?.role)}</span></span>}
       <ChevronDown size={compact ? 16 : 14} className={classNames('shrink-0 text-slate-400 transition-transform', open && 'rotate-180')} />
     </button>
     {open && <div id={menuId} className={classNames('absolute right-0 z-50 w-64 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-2xl shadow-slate-900/10', placement === 'up' ? 'bottom-full mb-2' : 'top-full mt-2')}>
-      <div className="flex items-center gap-3 rounded-xl bg-orange-50/70 px-3 py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-amber-600 text-xs font-bold text-white">{user?.name?.slice(0, 1)?.toUpperCase() || '?'}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{user?.name}</p><p className="truncate text-xs text-slate-400">{user?.email}</p></div></div>
+      <div className="flex items-center gap-3 rounded-xl bg-orange-50/70 px-3 py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-white">{user?.name?.slice(0, 1)?.toUpperCase() || '?'}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{user?.name}</p><p className="truncate text-xs text-slate-400">{user?.email}</p></div></div>
       <div className="mt-1 space-y-0.5">
         <button type="button" onClick={() => { setOpen(false); navigate('/settings'); }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"><Settings size={15} /> Settings</button>
         <button type="button" onClick={signOut} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"><LogOut size={15} /> Sign out</button>
@@ -105,7 +105,7 @@ export default function AppLayout() {
     localStorage.setItem('quicklink.sidebar.collapsed', next ? '1' : '0');
     return next;
   });
-  return <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top_left,_rgba(255,237,213,0.8),_transparent_34%),radial-gradient(circle_at_85%_10%,_rgba(254,215,170,0.45),_transparent_30%),linear-gradient(180deg,#fdfcfb_0%,#f8fafc_100%)]">
+  return <div className="min-h-[100dvh] bg-white">
     {collapsed && <button onClick={toggleSidebar} title="Show sidebar" className="fixed left-0 top-1/2 z-40 hidden -translate-y-1/2 rounded-r-xl border border-l-0 border-slate-200 bg-white py-3 pl-1.5 pr-1 text-slate-400 shadow-sm transition hover:text-slate-700 lg:block"><PanelLeftOpen size={18} /></button>}
     <aside className={classNames('fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-orange-100/80 bg-white/95 shadow-xl shadow-orange-950/5 backdrop-blur', !collapsed && 'lg:flex')}>
       <div className="flex h-16 items-center justify-between border-b border-slate-100 px-5"><NavLink to="/dashboard"><Brand /></NavLink><button onClick={toggleSidebar} title="Hide sidebar" className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><PanelLeftClose size={18} /></button></div>

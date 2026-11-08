@@ -24,7 +24,7 @@ export default function CertificateVerifyPage() {
     return () => { active = false; };
   }, [code]);
 
-  if (state.loading) return <main className="flex min-h-[100dvh] items-center justify-center bg-[radial-gradient(circle_at_top,_#ffedd5,_transparent_40%),#fffdfa]"><PageLoader label="Verifying certificate…" /></main>;
+  if (state.loading) return <main className="flex min-h-[100dvh] items-center justify-center bg-white"><PageLoader label="Verifying certificate…" /></main>;
 
   const result = state.result;
   const valid = Boolean(result?.valid);
@@ -37,20 +37,20 @@ export default function CertificateVerifyPage() {
     } catch (error) { if (error.name !== 'AbortError') toast.error('Could not share the verification link.'); }
   };
 
-  return <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top_left,_rgba(255,237,213,0.9),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(254,215,170,0.55),_transparent_35%),linear-gradient(180deg,#fffdfa,#f8fafc)] px-4 py-10 sm:py-16">
+  return <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-white px-4 py-10 sm:py-16">
     <div className="pointer-events-none absolute -left-24 top-16 h-72 w-72 rounded-full bg-orange-200/40 blur-3xl" />
     <div className="pointer-events-none absolute -right-24 bottom-10 h-80 w-80 rounded-full bg-amber-200/40 blur-3xl" />
     <section className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-orange-100 bg-white shadow-2xl shadow-orange-950/[0.08]">
-      <div className={`h-1.5 bg-gradient-to-r ${valid ? 'from-brand-500 via-orange-500 to-amber-400' : revoked ? 'from-red-500 to-rose-500' : 'from-slate-300 to-slate-400'}`} />
+      <div className={`h-1.5 ${valid ? 'bg-brand-600' : revoked ? 'bg-red-600' : 'bg-slate-300'}`} />
       <div className="p-6 sm:p-9">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-orange-600 to-amber-600 text-xs font-black text-white shadow-lg shadow-orange-900/20 ring-1 ring-white/25">IC</div><div><p className="text-sm font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brand-700/80">QuickLink Learning Portal</p></div></div>
+          <div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-green-50 text-xs font-black text-white shadow-lg shadow-orange-900/20 ring-1 ring-white/25">IC</div><div><p className="text-sm font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-brand-700/80">QuickLink Learning Portal</p></div></div>
           <Badge color={valid ? 'green' : revoked ? 'red' : 'slate'}>{valid ? 'Authentic certificate' : revoked ? 'Revoked certificate' : 'Not found'}</Badge>
         </div>
 
         {valid ? <>
           <div className="mt-8 text-center">
-            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-orange-50 to-amber-50 text-brand-700 ring-1 ring-orange-100"><Award size={30} /></span>
+            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-green-50 text-brand-700 ring-1 ring-orange-100"><Award size={30} /></span>
             <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.22em] text-slate-400">Certificate of completion</p>
             <h1 className="mt-2 break-words text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{result.courseTitle}</h1>
             <p className="mt-4 text-sm text-slate-500">This certifies that</p>

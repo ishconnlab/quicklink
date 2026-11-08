@@ -1,7 +1,7 @@
 import { BrainCircuit, Code2, GraduationCap, Sparkles } from 'lucide-react';
 
 export default function AuthLearningVisual() {
-  return <div className="relative my-7 h-56 overflow-hidden rounded-3xl border border-green-100 bg-gradient-to-br from-green-50 via-white to-emerald-50 p-5" aria-label="Student learning programming and AI">
+  return <div className="relative my-7 h-56 overflow-hidden rounded-3xl border border-green-100 bg-green-50 p-5" aria-label="Student learning programming and AI">
     <div className="absolute right-5 top-5 animate-bounce rounded-xl border border-green-100 bg-white p-2 text-green-700 shadow-sm [animation-duration:3.5s]"><BrainCircuit size={22} /><span className="mt-1 block text-[9px] font-bold">AI / ML</span></div>
     <div className="absolute bottom-5 left-5 flex h-40 w-[68%] flex-col rounded-xl border border-slate-700 bg-slate-900 p-3 text-green-300 shadow-xl">
       <div className="mb-2 flex gap-1"><i className="h-1.5 w-1.5 rounded-full bg-red-400"/><i className="h-1.5 w-1.5 rounded-full bg-amber-300"/><i className="h-1.5 w-1.5 rounded-full bg-green-400"/></div>

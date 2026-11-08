@@ -51,7 +51,7 @@ export default function AdminDashboard() {
       </div>
     </section>
 
-    <section className="mb-6 rounded-2xl border border-emerald-200/70 bg-gradient-to-r from-emerald-50 via-white to-green-50 p-4 sm:p-5">
+    <section className="mb-6 rounded-2xl border border-emerald-200/70 bg-green-50 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="eyebrow text-emerald-700">Verified revenue</p><p className="mt-1 text-2xl font-black tracking-tight text-slate-950">{revenue}</p><p className="mt-0.5 text-xs text-slate-500">Confirmed and waived enrollments are not included in revenue.</p></div>
         <Link to="/enrollments" className="btn-secondary">Open enrollment ledger <ArrowRight size={15} /></Link>

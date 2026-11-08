@@ -12,6 +12,13 @@ import { isAdmin } from '../lib/roles.js';
 
 const csvCell = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
 const duration = (seconds) => `${Math.floor(seconds / 60)} min`;
+const reportWindow = (period) => {
+  const end = new Date(); const start = new Date(end);
+  if (period === 'daily') start.setHours(0, 0, 0, 0);
+  if (period === 'weekly') { start.setHours(0, 0, 0, 0); start.setDate(start.getDate() - ((start.getDay() + 6) % 7)); }
+  if (period === 'monthly') { start.setHours(0, 0, 0, 0); start.setDate(1); }
+  return { from: start.toISOString(), to: end.toISOString() };
+};
 
 export default function ClassReportPage() {
   const { sessionId } = useParams();
@@ -90,6 +97,14 @@ export default function ClassReportPage() {
     } catch (error) { toast.error(apiError(error).message); }
   };
 
+  const downloadPeriodPdf = async (period) => {
+    try {
+      const response = await api.get(`/classes/${data.class.id}/report.pdf`, { params: reportWindow(period), responseType: 'blob' });
+      const url = URL.createObjectURL(response.data); const anchor = document.createElement('a');
+      anchor.href = url; anchor.download = `quicklink-attendance-${period}-${data.class.id}.pdf`; anchor.click(); URL.revokeObjectURL(url);
+    } catch (error) { toast.error(apiError(error).message); }
+  };
+
   if (loading) return <PageLoader label="Loading attendance report…" />;
   if (!data) return <EmptyState title="Report unavailable" description="The session may still be live or you may not have access." />;
   const { session, class: classInfo } = data;
@@ -97,7 +112,7 @@ export default function ClassReportPage() {
   const canManage = isAdmin(user);
   return <div>
     <Link to={`/classes/${classInfo.id}`} className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-800"><ArrowLeft size={16} />Back to class</Link>
-    <PageHeader title="Class attendance report" subtitle={`${classInfo.title} · ${classInfo.subject} · ${classInfo.level}`} actions={<div className="flex gap-2"><button className="btn-secondary" onClick={downloadCsv}><Download size={17} />CSV</button><button className="btn-primary" onClick={downloadPdf}><FileText size={17} />Download PDF</button></div>} />
+    <PageHeader title="Class attendance report" subtitle={`${classInfo.title} · ${classInfo.subject} · ${classInfo.level}`} actions={<div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={downloadCsv}><Download size={17} />CSV</button><button className="btn-primary" onClick={downloadPdf}><FileText size={17} />This session</button>{canManage && ['daily', 'weekly', 'monthly'].map((period) => <button key={period} className="btn-secondary capitalize" onClick={() => downloadPeriodPdf(period)}>{period} PDF</button>)}</div>} />
     <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
       <StatCard label="Students present" value={`${report.attendedCount}/${report.enrolledCount}`} icon={Users} accent="green" />
       <StatCard label="Late" value={report.lateCount || 0} icon={Users} accent="amber" />

@@ -71,7 +71,7 @@ export default function StudentDashboard() {
       actions={<><Link to="/courses" className="btn-secondary">Explore trainings</Link><Link to="/classes" className="btn-primary"><Video size={16} />My live classes</Link></>}
     />
 
-    {paymentDue > 0 && <Link to="/courses" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 to-white p-4 transition hover:border-amber-300">
+    {paymentDue > 0 && <Link to="/courses" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-green-50 p-4 transition hover:border-amber-300">
       <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><CreditCard size={19} /></span><div><p className="text-sm font-bold text-amber-950">{paymentDue} training{paymentDue === 1 ? '' : 's'} need payment attention</p><p className="text-xs text-amber-700">Submit your payment reference to keep accessing live classes.</p></div></div>
       <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-800">Review <ArrowRight size={15} /></span>
     </Link>}
@@ -93,7 +93,7 @@ export default function StudentDashboard() {
           const progress = progressFor(course);
           const payment = course.enrollment?.payment;
           return <article key={course.id} className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03] transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-brand-500 to-amber-400" />
+            <div className="absolute inset-x-0 top-0 h-1 bg-green-50" />
             <div className="p-5">
               <div className="flex flex-wrap items-center gap-2"><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{liveClasses.some((item) => item.id === course.id) && <Badge color="red">Live now</Badge>}</div>
               <h3 className="mt-3 break-words text-base font-bold leading-6 text-slate-950">{course.title}</h3>
@@ -115,7 +115,7 @@ export default function StudentDashboard() {
       <section>
         <SectionHeader title="Live and upcoming" description="Sessions from your trainings." icon={Radio} action={<Link to="/classes" className="text-sm font-semibold text-brand-700">View classes</Link>} />
         {liveClasses.length || upcoming.length ? <div className="space-y-2">
-          {liveClasses.slice(0, 3).map((item) => <Link key={item.id} to={`/classes/sessions/${item.liveSession.id}/live`} className="flex items-center gap-3 rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-white p-4 transition hover:border-red-300"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700"><Radio size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{item.liveSession.title || item.title}</span><span className="block text-xs text-red-700">Live now · join your class</span></span><ArrowRight size={16} className="text-red-500" /></Link>)}
+          {liveClasses.slice(0, 3).map((item) => <Link key={item.id} to={`/classes/sessions/${item.liveSession.id}/live`} className="flex items-center gap-3 rounded-2xl border border-red-200 bg-green-50 p-4 transition hover:border-red-300"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700"><Radio size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{item.liveSession.title || item.title}</span><span className="block text-xs text-red-700">Live now · join your class</span></span><ArrowRight size={16} className="text-red-500" /></Link>)}
           {upcoming.map((item) => <Link key={item.id} to={`/classes/${item.id}`} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-green-200"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-brand-700"><CalendarClock size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{item.title}</span><span className="block text-xs text-slate-500">{formatDateTime(item.startsAt)}{item.schedule ? ` · ${item.schedule}` : ''}</span></span><ArrowRight size={16} className="text-slate-300" /></Link>)}
         </div> : <EmptyState icon={CalendarClock} title="No sessions scheduled" description="Your trainer will announce live classes here." />}
       </section>
@@ -126,7 +126,7 @@ export default function StudentDashboard() {
       </section>
     </div>
 
-    <section className="rounded-2xl border border-green-100 bg-gradient-to-r from-green-50 via-white to-amber-50 p-5">
+    <section className="rounded-2xl border border-green-100 bg-green-50 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-brand-700 shadow-sm ring-1 ring-green-100"><Clock3 size={20} /></span><div><p className="font-bold text-slate-900">Keep your streak going</p><p className="text-sm text-slate-500">Check your requirements before each session so nothing blocks your certificate.</p></div></div><Link to="/courses" className="btn-secondary">Review requirements <ArrowRight size={15} /></Link></div>
     </section>
   </div>;

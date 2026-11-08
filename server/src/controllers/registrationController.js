@@ -294,6 +294,21 @@ export const updateFormStatus = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { form: safeForm(form) } });
 });
 
+export const updateForm = asyncHandler(async (req, res) => {
+  const form = await formWithClass(req.params.formId, req.user);
+  for (const key of ['title', 'description', 'fields']) if (req.body[key] !== undefined) form[key] = req.body[key];
+  if (req.body.placeholders) form.placeholders = assertPlaceholders(req.body.placeholders);
+  await form.save();
+  res.json({ success: true, data: { form: safeForm(form) } });
+});
+
+export const deleteForm = asyncHandler(async (req, res) => {
+  const form = await formWithClass(req.params.formId, req.user);
+  await TrainingRegistration.deleteMany({ form: form._id });
+  await form.deleteOne();
+  res.json({ success: true, data: { deleted: true, id: req.params.formId } });
+});
+
 export const uploadFormImage = asyncHandler(async (req, res) => {
   if (!req.file?.buffer) throw ApiError.badRequest('Choose a PNG, JPEG, or WebP image.');
   const type = imageTypes.find((image) => image.mime === req.file.mimetype && image.matches(req.file.buffer));
@@ -723,6 +738,8 @@ export default {
   listForms,
   createForm,
   updateFormStatus,
+  updateForm,
+  deleteForm,
   uploadFormImage,
   getPublicImage,
   getPublicForm,

@@ -135,7 +135,7 @@ export default function TeacherDashboard() {
         <SectionHeader title="My followers" description="Students who follow your teaching updates." icon={UsersRound} />
         {followers.length ? <div className="grid gap-2">
           {followers.map((follower) => <article key={follower.id} className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03]">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-600 to-emerald-800 text-sm font-bold text-white">{follower.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50 text-sm font-bold text-white">{follower.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
             <div className="min-w-0 flex-1"><p className="truncate font-semibold text-slate-900">{follower.name}</p><p className="truncate text-sm text-slate-500">{follower.email}</p></div>
             <p className="shrink-0 text-right text-xs text-slate-400">Following since<br />{new Date(follower.followedAt).toLocaleDateString()}</p>
           </article>)}

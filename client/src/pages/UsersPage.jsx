@@ -193,7 +193,7 @@ export default function UsersPage() {
         return <article key={person.id} className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03]">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-100 to-amber-100 text-sm font-black text-brand-800">{person.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-50 text-sm font-black text-brand-800">{person.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5"><p className="break-words font-bold text-slate-900">{person.name}</p>{self && <Badge color="brand">You</Badge>}<Badge color={person.role === 'student' ? 'green' : 'purple'}>{roleLabel(person.role)}</Badge>{person.registrationStatus === 'pending' && <Badge color="amber">Pending approval</Badge>}{person.registrationStatus === 'rejected' && <Badge color="red">Rejected</Badge>}{!person.isActive && person.registrationStatus !== 'pending' && <Badge color="slate">Disabled</Badge>}</div>
                 <div className="mt-1 flex flex-col gap-0.5 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:gap-x-3">

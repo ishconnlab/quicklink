@@ -146,7 +146,7 @@ export default function ClassDetailPage() {
 
     <section className="relative mb-5 overflow-hidden rounded-3xl border border-orange-100 bg-white shadow-sm shadow-orange-950/[0.04]">
       <CourseThumbnail imageUrl={item.thumbnailUrl} title={item.title} loading="eager" className="absolute inset-0 opacity-25" />
-      <div className="absolute inset-0 bg-gradient-to-r from-white via-white/95 to-white/70" />
+      <div className="absolute inset-0 bg-green-50" />
       <div className="relative p-5 sm:p-7">
         <div className="flex flex-wrap gap-1.5"><Badge color="brand">{item.level}</Badge><Badge>{item.subject}</Badge>{item.course && <Badge color="slate">{item.course}</Badge>}{item.liveSession && <Badge color="red"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />Live now</Badge>}{!item.active && <Badge color="slate">Archived</Badge>}</div>
         <h1 className="mt-3 break-words text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{item.title}</h1>
@@ -177,7 +177,7 @@ export default function ClassDetailPage() {
       {paymentBlocked && <Link to={`/courses/${id}`} className="btn-primary shrink-0"><Wallet size={16} />Submit payment reference</Link>}
     </section>}
 
-    {item.liveSession ? <section className="mb-4 rounded-2xl border border-red-200 bg-gradient-to-r from-red-50 to-orange-50 p-4 shadow-sm sm:p-5">
+    {item.liveSession ? <section className="mb-4 rounded-2xl border border-red-200 bg-green-50 p-4 shadow-sm sm:p-5">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><Badge color="red"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />Live now</Badge><span className="text-xs text-slate-500">Started {formatDateTime(item.liveSession.startedAt)}</span></div><h2 className="mt-2 break-words text-lg font-bold text-slate-950">{item.liveSession.title || item.title}</h2><p className="mt-1 break-all text-xs text-slate-500">{sessionLink || 'Share this class from the live room.'}</p></div>
         <div className="flex shrink-0 flex-wrap gap-2">{admin && sessionLink && <button className="btn-secondary" onClick={copyLink}>{copied ? <CheckCircle2 size={16} /> : <Copy size={16} />}{copied ? 'Copied' : 'Copy join link'}</button>}<Link to={`/classes/sessions/${item.liveSession.id}/live`} className="btn-primary"><Video size={17} />Enter classroom</Link>{admin && <Link to={`/classes/sessions/${item.liveSession.id}/report`} className="btn-secondary"><FileText size={16} />Report</Link>}</div>

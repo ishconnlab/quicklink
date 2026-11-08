@@ -49,8 +49,11 @@ export const downloadAttendancePdf = asyncHandler(async (req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="quicklink-attendance-${classItem._id.toString()}.pdf"`);
   const doc = new PDFDocument({ size: 'A4', margins: { top: 42, right: margin, bottom: 42, left: margin }, bufferPages: true, info: { Title: `Attendance report - ${classItem.title}`, Author: 'QuickLink' } });
   doc.pipe(res);
-  doc.font('Helvetica-Bold').fontSize(18).fillColor('#0f172a').text('QuickLink attendance report');
-  doc.moveDown(0.35).font('Helvetica').fontSize(10).fillColor('#334155');
+  doc.font('Helvetica-Bold').fontSize(18).fillColor('#166534').text('ATTENDANCE REPORT');
+  doc.moveDown(0.25).font('Helvetica').fontSize(9).fillColor('#475569').text('IshConnect · QuickLink Learning | Official training record');
+  doc.moveDown(0.6).moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).lineWidth(1.5).strokeColor('#15803d').stroke();
+  doc.moveDown(0.6).font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text('TRAINING DETAILS');
+  doc.moveDown(0.3).font('Helvetica').fontSize(9).fillColor('#334155');
   doc.text(`Training: ${classItem.course || classItem.title}`);
   doc.text(`Class: ${classItem.title} - ${classItem.subject} - ${classItem.level}`);
   doc.text('Managed by: IshConnect administrators');
@@ -58,11 +61,12 @@ export const downloadAttendancePdf = asyncHandler(async (req, res) => {
   doc.text(`Planned class start: ${classItem.startsAt ? new Date(classItem.startsAt).toLocaleString('en', { timeZone: classItem.timezone || 'UTC' }) : 'Not set'} - Planned duration: ${classItem.durationMinutes || 60} minutes`);
   doc.text(`Report ID: ${classItem._id.toString()} - Generated: ${new Date().toISOString()}`);
   if (req.query.from || req.query.to) doc.text(`Date range: ${req.query.from || 'Beginning'} to ${req.query.to || 'Present'}`);
-  doc.moveDown(0.8);
+  doc.moveDown(0.8).font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text('ATTENDANCE SUMMARY');
+  doc.moveDown(0.3);
   const attendedRows = rows.filter(({ entry }) => entry.attended).length;
   const totalRows = rows.length;
   const percent = totalRows ? Math.round((attendedRows / totalRows) * 100) : 0;
-  doc.font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text(`Sessions: ${sessions.length}   Student records: ${totalRows}   Attendance: ${percent}%`);
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#166534').text(`Sessions: ${sessions.length}     Student records: ${totalRows}     Attendance rate: ${percent}%`);
   doc.moveDown(1);
   writeTableHeader(doc);
   let activeSession = null;
@@ -70,7 +74,7 @@ export const downloadAttendancePdf = asyncHandler(async (req, res) => {
     if (activeSession !== session._id.toString()) {
       activeSession = session._id.toString();
       if (doc.y > 730) { doc.addPage(); writeTableHeader(doc); }
-      doc.font('Helvetica-Bold').fontSize(8).fillColor('#1d4ed8').text(`Session: ${new Date(session.startedAt).toLocaleString('en', { timeZone: classItem.timezone || 'UTC' })} - Ended ${session.endedAt ? new Date(session.endedAt).toLocaleString('en', { timeZone: classItem.timezone || 'UTC' }) : '-'} - Duration ${Math.round((session.report?.durationSeconds || 0) / 60)} min - Present ${session.report?.attendedCount || 0}/${session.report?.enrolledCount || 0}`);
+      doc.font('Helvetica-Bold').fontSize(8).fillColor('#166534').text(`SESSION ${sessions.findIndex((item) => item._id.toString() === activeSession) + 1} | ${new Date(session.startedAt).toLocaleString('en', { timeZone: classItem.timezone || 'UTC' })} | Ended ${session.endedAt ? new Date(session.endedAt).toLocaleString('en', { timeZone: classItem.timezone || 'UTC' }) : '-'} | ${Math.round((session.report?.durationSeconds || 0) / 60)} minutes | Present ${session.report?.attendedCount || 0}/${session.report?.enrolledCount || 0}`);
       doc.moveDown(0.6);
       writeTableHeader(doc);
       if (session.report?.teacherNotes) {

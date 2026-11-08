@@ -80,6 +80,8 @@ router.post('/public/:slug/claim-account', requireAuth, validate(slugParams, 'pa
 router.use(requireAuth, requireAdmin);
 router.get('/', registrations.listForms);
 router.post('/', validate(formBody), registrations.createForm);
+router.put('/:formId', validate(idParams, 'params'), validate(formBody.omit({ classId: true }).partial()), registrations.updateForm);
+router.delete('/:formId', validate(idParams, 'params'), registrations.deleteForm);
 router.patch('/:formId', validate(idParams, 'params'), validate(z.object({ active: z.boolean() })), registrations.updateFormStatus);
 router.post('/:formId/image', validate(idParams, 'params'), uploadImage.single('image'), registrations.uploadFormImage);
 router.get('/:formId/entries', validate(idParams, 'params'), registrations.listRegistrations);

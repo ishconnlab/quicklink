@@ -136,13 +136,13 @@ export default function PublicTrainingRegistrationPage() {
   if (!form) return <main className="flex min-h-[100dvh] items-center justify-center bg-[#fffaf5] px-4"><div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-7 text-center shadow-sm"><h1 className="text-lg font-bold text-slate-900">Registration unavailable</h1><p className="mt-2 text-sm leading-6 text-slate-500">{error || 'This registration link may have expired or the training may be closed.'}</p></div></main>;
   if (verifying) return <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-[#fffaf5] text-sm text-slate-600"><Spinner size={28} />Verifying your email…</main>;
 
-  return <main className="min-h-[100dvh] bg-[radial-gradient(circle_at_top_left,_rgba(255,237,213,0.9),_transparent_35%),radial-gradient(circle_at_bottom_right,_rgba(254,215,170,0.5),_transparent_35%),linear-gradient(180deg,#fffdfa,#f8fafc)] px-4 py-8 sm:py-12">
+  return <main className="min-h-[100dvh] bg-white px-4 py-8 sm:py-12">
     <section className="mx-auto w-full max-w-xl overflow-hidden rounded-3xl border border-orange-100 bg-white shadow-2xl shadow-orange-950/[0.07]">
-      <div className="h-1.5 bg-gradient-to-r from-brand-500 via-orange-500 to-amber-400" />
+      <div className="h-1.5 bg-green-50" />
       {form.imageUrl && <img src={assetUrl(form.imageUrl)} alt="" className="h-44 w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
       <div className="p-6 sm:p-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 via-orange-600 to-amber-600 text-[10px] font-black text-white shadow-md shadow-orange-900/20">IC</div><div><p className="text-sm font-black text-slate-950">IshConnect</p><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-700/80">QuickLink training registration</p></div></div>
+          <div className="flex items-center gap-2.5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-[10px] font-black text-white shadow-md shadow-orange-900/20">IC</div><div><p className="text-sm font-black text-slate-950">IshConnect</p><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-700/80">QuickLink training registration</p></div></div>
           <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-brand-800 ring-1 ring-orange-100"><GraduationCap size={13} />Enrollment open</span>
         </div>
         <h1 className="break-words text-2xl font-black tracking-tight text-slate-950">{form.title}</h1>

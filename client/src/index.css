@@ -76,7 +76,7 @@
       hover:bg-slate-50 hover:ring-slate-300;
   }
   .btn-danger {
-    @apply btn bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-sm shadow-red-900/20 hover:from-red-700 hover:to-rose-700;
+    @apply btn bg-red-700 text-white shadow-sm shadow-red-900/20 hover:bg-red-800;
   }
   .btn-ghost {
     @apply btn bg-transparent text-slate-600 hover:bg-slate-100;

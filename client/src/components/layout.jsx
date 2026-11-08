@@ -4,10 +4,10 @@ import { useEffect, useId } from 'react';
 
 export function PageHeader({ title, subtitle, actions, eyebrow }) {
   return (
-    <div className="relative mb-6 overflow-hidden rounded-3xl border border-orange-100 bg-gradient-to-br from-white via-orange-50/70 to-amber-50/60 p-5 shadow-sm shadow-orange-900/[0.04] sm:p-7">
+    <div className="relative mb-6 overflow-hidden rounded-3xl border border-orange-100 bg-green-50 p-5 shadow-sm shadow-orange-900/[0.04] sm:p-7">
       <div className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-orange-200/50 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 left-1/3 h-44 w-44 rounded-full bg-amber-200/40 blur-3xl" />
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-brand-500 via-orange-500 to-amber-400" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-green-50" />
       <div className="relative flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           {eyebrow && <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-700">{eyebrow}</p>}
@@ -24,7 +24,7 @@ export function SectionHeader({ title, description, action, icon: Icon }) {
   return (
     <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
-        {Icon && <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-50 to-amber-50 text-brand-700 ring-1 ring-orange-100"><Icon size={18} /></span>}
+        {Icon && <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-brand-700 ring-1 ring-orange-100"><Icon size={18} /></span>}
         <div className="min-w-0">
           <h2 className="break-words text-base font-bold tracking-tight text-slate-900">{title}</h2>
           {description && <p className="mt-0.5 break-words text-sm text-slate-500">{description}</p>}
@@ -37,18 +37,18 @@ export function SectionHeader({ title, description, action, icon: Icon }) {
 
 export function StatCard({ label, value, icon: Icon, hint, accent = 'brand' }) {
   const accents = {
-    brand: { icon: 'bg-gradient-to-br from-brand-500 to-amber-600 text-white shadow-orange-900/20', bar: 'from-brand-500 to-amber-500' },
-    orange: { icon: 'bg-gradient-to-br from-brand-500 to-amber-600 text-white shadow-orange-900/20', bar: 'from-brand-500 to-amber-500' },
-    green: { icon: 'bg-gradient-to-br from-emerald-500 to-teal-700 text-white shadow-emerald-900/20', bar: 'from-emerald-500 to-teal-600' },
-    amber: { icon: 'bg-gradient-to-br from-amber-400 to-orange-600 text-white shadow-amber-900/20', bar: 'from-amber-400 to-orange-500' },
-    slate: { icon: 'bg-gradient-to-br from-slate-500 to-slate-700 text-white shadow-slate-900/20', bar: 'from-slate-400 to-slate-600' },
-    purple: { icon: 'bg-gradient-to-br from-violet-500 to-purple-700 text-white shadow-purple-900/20', bar: 'from-violet-500 to-purple-600' },
-    red: { icon: 'bg-gradient-to-br from-rose-500 to-red-700 text-white shadow-red-900/20', bar: 'from-rose-500 to-red-600' },
+    brand: { icon: 'bg-brand-700 text-white', bar: 'bg-brand-600' },
+    orange: { icon: 'bg-brand-700 text-white', bar: 'bg-brand-600' },
+    green: { icon: 'bg-emerald-700 text-white', bar: 'bg-emerald-600' },
+    amber: { icon: 'bg-amber-600 text-white', bar: 'bg-amber-600' },
+    slate: { icon: 'bg-slate-600 text-white', bar: 'bg-slate-500' },
+    purple: { icon: 'bg-violet-700 text-white', bar: 'bg-violet-600' },
+    red: { icon: 'bg-red-700 text-white', bar: 'bg-red-600' },
   };
   const theme = accents[accent] || accents.brand;
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] transition duration-200 hover:-translate-y-0.5 hover:shadow-md">
-      <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${theme.bar}`} />
+      <div className={`absolute inset-x-0 top-0 h-1 ${theme.bar}`} />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="break-words text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</p>
@@ -121,11 +121,11 @@ export function Badge({ children, color = 'slate' }) {
 
 export function ProgressBar({ value = 0, tone = 'brand' }) {
   const tones = {
-    brand: 'from-brand-500 to-amber-500',
-    green: 'from-emerald-500 to-teal-500',
-    amber: 'from-amber-400 to-orange-500',
+    brand: 'bg-brand-600',
+    green: 'bg-emerald-600',
+    amber: 'bg-amber-600',
   };
-  return <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full bg-gradient-to-r ${tones[tone] || tones.brand} transition-all`} style={{ width: `${Math.min(100, Math.max(0, Number(value) || 0))}%` }} /></div>;
+  return <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${tones[tone] || tones.brand} transition-all`} style={{ width: `${Math.min(100, Math.max(0, Number(value) || 0))}%` }} /></div>;
 }
 
 export default { PageHeader, SectionHeader, StatCard, Modal, Badge, ProgressBar };

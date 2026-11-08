@@ -109,7 +109,7 @@ export default function SettingsPage() {
         </form>
       </section>
 
-      <section className="rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50/80 via-white to-amber-50/60 p-4 shadow-sm shadow-orange-950/[0.03] sm:p-5">
+      <section className="rounded-2xl border border-orange-100 bg-green-50 p-4 shadow-sm shadow-orange-950/[0.03] sm:p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-brand-700 ring-1 ring-orange-100"><Smartphone size={19} /></span><div><h2 className="text-base font-bold text-slate-950">Install the QuickLink app</h2><p className="mt-1 max-w-lg text-sm leading-6 text-slate-600">Add IshConnect QuickLink to your home screen for faster access to trainings, live classes, and certificates.</p><p className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><CheckCircle2 size={13} />{installed ? 'Installed on this device' : 'Works offline for the app shell'}</p></div></div>
           <button onClick={install} className="btn-secondary shrink-0" disabled={installed}>{installed ? <ShieldCheck size={16} /> : <Download size={16} />}{installed ? 'App installed' : 'Install app'}</button>

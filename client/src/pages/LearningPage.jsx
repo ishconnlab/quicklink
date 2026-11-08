@@ -47,7 +47,7 @@ function BookCover({ src, alt, className = '' }) {
     }).catch(() => {});
     return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [src]);
-  return imageUrl ? <img src={imageUrl} alt={alt} className={className} /> : <div aria-label="No book cover uploaded" className={`${className} flex items-center justify-center bg-gradient-to-br from-brand-50 to-sky-100 text-brand-700`}><BookOpen size={24} /></div>;
+  return imageUrl ? <img src={imageUrl} alt={alt} className={className} /> : <div aria-label="No book cover uploaded" className={`${className} flex items-center justify-center bg-green-50 text-brand-700`}><BookOpen size={24} /></div>;
 }
 
 export default function LearningPage({ learner = false }) {

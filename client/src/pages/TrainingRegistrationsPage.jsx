@@ -36,6 +36,7 @@ export default function TrainingRegistrationsPage() {
   const [enrolling, setEnrolling] = useState('');
   const [copied, setCopied] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingFormId, setEditingFormId] = useState('');
   const [formData, setFormData] = useState(blankForm);
   const [image, setImage] = useState(null);
   const [nextFieldId, setNextFieldId] = useState(1);
@@ -81,12 +82,14 @@ export default function TrainingRegistrationsPage() {
 
   const createForm = async (event) => {
     event.preventDefault();
-    if (!formData.classId) { toast.error('Choose a training class.'); return; }
+    if (!editingFormId && !formData.classId) { toast.error('Choose a training class.'); return; }
     setSaving(true);
     try {
-      const response = await api.post('/registrations', formData);
+      const response = editingFormId
+        ? await api.put(`/registrations/${editingFormId}`, (({ classId, ...editable }) => editable)(formData))
+        : await api.post('/registrations', formData);
       const created = response.data.data.form;
-      if (image) {
+      if (image && !editingFormId) {
         const body = new FormData();
         body.append('image', image);
         await api.post(`/registrations/${created.id}/image`, body);
@@ -94,7 +97,8 @@ export default function TrainingRegistrationsPage() {
       setCreateOpen(false);
       setFormData(blankForm());
       setImage(null);
-      toast.success('Shareable training registration form created.');
+      toast.success(editingFormId ? 'Registration form updated.' : 'Shareable training registration form created.');
+      setEditingFormId('');
       await loadForms();
       setSelectedId(created.id);
     } catch (error) { toast.error(apiError(error).message); }
@@ -159,6 +163,23 @@ export default function TrainingRegistrationsPage() {
     } catch (error) { toast.error(apiError(error).message); }
   };
 
+  const editForm = () => {
+    setEditingFormId(selectedForm.id);
+    setImage(null);
+    setFormData({ classId: selectedForm.classId, title: selectedForm.title, description: selectedForm.description || '', placeholders: selectedForm.placeholders, fields: selectedForm.fields || [] });
+    setCreateOpen(true);
+  };
+
+  const deleteForm = async () => {
+    if (!selectedForm || !window.confirm(`Delete "${selectedForm.title}" and its registration entries?`)) return;
+    try {
+      await api.delete(`/registrations/${selectedForm.id}`);
+      toast.success('Registration form and entries deleted.');
+      setSelectedId('');
+      await loadForms();
+    } catch (error) { toast.error(apiError(error).message); }
+  };
+
   const addField = () => {
     const key = `custom_${nextFieldId}`;
     setNextFieldId((id) => id + 1);
@@ -186,6 +207,8 @@ export default function TrainingRegistrationsPage() {
                 <button className="btn-secondary" onClick={copyFormLink}>{copied ? <Check size={16} /> : <Copy size={16} />}{copied ? 'Copied' : 'Copy link'}</button>
                 <a className="btn-secondary" href={`${window.location.origin}${selectedForm.publicUrl}`} target="_blank" rel="noreferrer"><ExternalLink size={16} />Preview</a>
                 <button className="btn-secondary" onClick={toggleActive}>{selectedForm.active ? 'Pause form' : 'Activate form'}</button>
+                <button className="btn-secondary" onClick={editForm}>Edit form</button>
+                <button className="btn-ghost text-red-700" onClick={deleteForm}>Delete form</button>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
@@ -226,9 +249,9 @@ export default function TrainingRegistrationsPage() {
         </section>}
       </div>}
 
-    <Modal open={createOpen} onClose={() => !saving && setCreateOpen(false)} title="Create training registration form" size="manage" footer={<><button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>Cancel</button><button form="training-registration-form" type="submit" className="btn-primary" disabled={saving}>{saving ? <Spinner size={16} /> : <Plus size={16} />}Create and share</button></>}>
+    <Modal open={createOpen} onClose={() => !saving && setCreateOpen(false)} title={editingFormId ? 'Edit registration form' : 'Create training registration form'} size="manage" footer={<><button className="btn-secondary" onClick={() => { setCreateOpen(false); setEditingFormId(''); }} disabled={saving}>Cancel</button><button form="training-registration-form" type="submit" className="btn-primary" disabled={saving}>{saving ? <Spinner size={16} /> : <Plus size={16} />}{editingFormId ? 'Save changes' : 'Create and share'}</button></>}>
       <form id="training-registration-form" onSubmit={createForm} className="space-y-4">
-        <div><label className="label" htmlFor="registration-class">Training class</label><select id="registration-class" className="input" required value={formData.classId} onChange={(event) => setFormData({ ...formData, classId: event.target.value })}><option value="">Select a class</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.course || item.title} — {item.title}</option>)}</select>{classes.length === 0 && <p className="mt-1 text-xs text-amber-700">Create an active class before making a registration form.</p>}</div>
+        {!editingFormId && <div><label className="label" htmlFor="registration-class">Training class</label><select id="registration-class" className="input" required value={formData.classId} onChange={(event) => setFormData({ ...formData, classId: event.target.value })}><option value="">Select a class</option>{classes.map((item) => <option key={item.id} value={item.id}>{item.course || item.title} — {item.title}</option>)}</select>{classes.length === 0 && <p className="mt-1 text-xs text-amber-700">Create an active class before making a registration form.</p>}</div>}
         <div><label className="label" htmlFor="registration-title">Form title</label><input id="registration-title" className="input" minLength={2} maxLength={160} placeholder="Defaults to the selected training title" value={formData.title} onChange={(event) => setFormData({ ...formData, title: event.target.value })} /></div>
         <div><label className="label" htmlFor="registration-description">Description</label><textarea id="registration-description" className="input min-h-24" maxLength={4000} placeholder="Describe the training and what registrants should expect." value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} /></div>
         <div><p className="label">Field placeholders</p><div className="grid gap-3 sm:grid-cols-3">{[['name', 'Name'], ['email', 'Email'], ['whatsapp', 'WhatsApp number']].map(([key, label]) => <div key={key}><label className="sr-only" htmlFor={`placeholder-${key}`}>{label} placeholder</label><input id={`placeholder-${key}`} className="input" maxLength={120} aria-label={`${label} placeholder`} placeholder={label} value={formData.placeholders[key]} onChange={(event) => setFormData({ ...formData, placeholders: { ...formData.placeholders, [key]: event.target.value } })} /></div>)}</div></div>

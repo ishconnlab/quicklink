@@ -182,7 +182,7 @@ export default function CertificatesPage() {
     {loading && !certificates.length ? <PageLoader label="Loading certificates…" /> : visible.length === 0 ? <EmptyState icon={Award} title={certificates.length ? 'No matching certificates' : admin ? 'No certificates issued' : 'No certificates yet'} description={certificates.length ? 'Try changing the search or filters.' : admin ? 'Open a training, verify completion, then issue individual or bulk certificates.' : 'Complete all training requirements, including the assessment and project when required, to unlock your certificate.'} action={!certificates.length && (admin ? <Link to="/courses" className="btn-primary">Open trainings</Link> : <Link to="/courses" className="btn-primary">Browse trainings</Link>)} /> : <>
       <div className="space-y-3">
         {visible.map((certificate) => <article key={certificate.id} className={`overflow-hidden rounded-2xl border bg-white shadow-sm shadow-slate-900/[0.03] ${certificate.revoked ? 'border-red-200' : 'border-slate-200/80'}`}>
-          <div className={`h-1 bg-gradient-to-r ${certificate.revoked ? 'from-red-400 to-rose-500' : 'from-brand-500 via-orange-500 to-amber-400'}`} />
+          <div className={`h-1 ${certificate.revoked ? 'bg-red-500' : 'bg-brand-600'}`} />
           <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-3">
               <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${certificate.revoked ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-brand-700'}`}>{certificate.revoked ? <ShieldX size={21} /> : <Award size={21} />}</span>

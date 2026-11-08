@@ -231,7 +231,7 @@ export default function CourseDetailPage() {
 
     <section className="mb-5 overflow-hidden rounded-3xl border border-orange-100 bg-white shadow-sm shadow-orange-950/[0.04]">
       <div className="flex flex-col sm:flex-row">
-        <div className="relative h-44 w-full shrink-0 sm:h-auto sm:w-72 lg:w-80"><CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="absolute inset-0" /><div className="absolute inset-0 bg-gradient-to-t from-slate-950/30 to-transparent sm:bg-gradient-to-r" /></div>
+        <div className="relative h-44 w-full shrink-0 sm:h-auto sm:w-72 lg:w-80"><CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="absolute inset-0" /><div className="absolute inset-0 bg-green-50 sm:bg-green-50" /></div>
         <div className="min-w-0 flex-1 p-5 sm:p-6">
           <div className="flex flex-wrap gap-1.5"><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{course.trade && <Badge color="slate">{course.trade}</Badge>}{course.enrolled && <Badge color="green">Enrolled</Badge>}{!course.active && <Badge color="red">Archived</Badge>}{!course.published && <Badge color="amber">Draft</Badge>}</div>
           <h1 className="mt-3 break-words text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">{course.title}</h1>
@@ -330,7 +330,7 @@ export default function CourseDetailPage() {
           </div>
         </section>
         {course.description && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5"><h2 className="text-sm font-bold text-slate-900">About this training</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{course.description}</p></section>}
-        <section className="rounded-2xl border border-orange-100 bg-gradient-to-br from-orange-50 via-white to-amber-50 p-4 shadow-sm shadow-orange-950/[0.03] sm:p-5">
+        <section className="rounded-2xl border border-orange-100 bg-green-50 p-4 shadow-sm shadow-orange-950/[0.03] sm:p-5">
           <h2 className="flex items-center gap-2 text-sm font-bold text-slate-900"><FileCheck2 size={16} className="text-brand-700" />What you earn</h2>
           <ul className="mt-3 space-y-2 text-sm text-slate-600"><li className="flex items-start gap-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />Live trainer-led classes and attendance tracking</li><li className="flex items-start gap-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />Project review and structured feedback</li><li className="flex items-start gap-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />Certification assessment with up to {course.assessment?.attempts || 3} attempts</li><li className="flex items-start gap-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-emerald-600" />A verifiable IshConnect certificate you can share</li></ul>
         </section>
