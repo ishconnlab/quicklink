@@ -25,6 +25,13 @@ export default function AdminDashboard() {
     }
   }, [toast]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (state.loading || window.location.hash !== '#submission-inbox') return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('submission-inbox')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [state.loading, state.data]);
 
   if (state.loading && !state.data) return <PageLoader label="Loading your command center…" />;
   if (!state.data) return <EmptyState title="Dashboard could not load" description="Check the server connection and try again." action={<button className="btn-primary" onClick={load}>Try again</button>} />;
@@ -61,7 +68,7 @@ export default function AdminDashboard() {
       </div>
     </section>
 
-    <section className="mb-6 rounded-2xl border border-green-200 bg-white p-4 sm:p-5">
+    <section id="submission-inbox" className="mb-6 scroll-mt-5 rounded-2xl border border-green-200 bg-white p-4 sm:p-5">
       <SectionHeader title="Submission inbox" description="New student work sent to the admin team." icon={ReceiptText} action={<Link to="/courses" className="text-sm font-semibold text-brand-700">Open training manager</Link>} />
       {recentProjectSubmissions.length > 0 && <div className="mb-4 space-y-2">
         <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Recent project submissions</h3>

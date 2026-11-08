@@ -79,7 +79,7 @@ const lesson = z.object({
   resources: z.array(z.object({ title: z.string().trim().max(180), url: z.string().url().max(2000) })).max(30).optional().default([]),
   code: z.object({ language: z.string().max(40).optional().default(''), source: z.string().max(20000).optional().default('') }).optional().default({}),
   codeBlocks: z.array(z.object({ language: z.string().max(40).optional().default(''), source: z.string().max(20000), explanation: z.string().max(2000).optional().default('') })).max(20).optional().default([]),
-  knowledgeCheck: z.array(lessonQuestion).length(10).or(z.array(lessonQuestion).length(0)).optional().default([]),
+  knowledgeCheck: z.array(lessonQuestion).refine((questions) => [0, 5, 10].includes(questions.length), { message: 'An intermediate assessment must contain 5 or 10 questions.' }).optional().default([]),
   passMark: z.number().int().min(1).max(100).optional().default(70),
   assessmentAttempts: z.number().int().min(1).max(10).optional().default(3),
 });
@@ -152,7 +152,7 @@ router.get('/:id/report.pdf', requireAdmin, validate(idParams, 'params'), valida
 router.get('/:id/learning', validate(idParams, 'params'), classes.getLearningCourse);
 router.get('/:id/learning/analytics', requireAdmin, validate(idParams, 'params'), classes.getLearningAnalytics);
 router.put('/:id/learning/lessons/:lessonId/complete', validate(z.object({ id: objectId, lessonId: objectId }), 'params'), classes.completeLesson);
-router.post('/:id/learning/lessons/:lessonId/assessment', validate(z.object({ id: objectId, lessonId: objectId }), 'params'), validate(z.object({ answers: z.array(z.object({ optionIndex: z.number().int().min(0).max(3) })).length(10) })), classes.submitLessonAssessment);
+router.post('/:id/learning/lessons/:lessonId/assessment', validate(z.object({ id: objectId, lessonId: objectId }), 'params'), validate(z.object({ answers: z.array(z.object({ optionIndex: z.number().int().min(0).max(3) })).refine((answers) => [5, 10].includes(answers.length), { message: 'Submit answers for all 5 or 10 questions.' }) })), classes.submitLessonAssessment);
 router.post('/:id/learning/lessons/:lessonId/events', validate(z.object({ id: objectId, lessonId: objectId }), 'params'), validate(z.object({ type: z.enum(['tab-hidden', 'window-blur', 'fullscreen-exit', 'copy', 'context-menu']) })), classes.logAssessmentEvent);
 router.get('/:id/invitations', requireAdmin, validate(idParams, 'params'), invitations.listInvitations);
 router.post('/:id/invitations', requireAdmin, validate(idParams, 'params'), validate(z.object({ studentIds: z.array(objectId).min(1).max(100) })), invitations.sendInvitations);

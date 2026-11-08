@@ -111,6 +111,7 @@ export const submitLessonAssessment = asyncHandler(async (req, res) => {
   assertLessonAccessible(course, existing, index, lessons);
   const lesson = lessons[index].lesson;
   if (!(lesson.knowledgeCheck || []).length) throw ApiError.conflict('This lesson has no assessment.');
+  if (req.body.answers.length !== lesson.knowledgeCheck.length) throw ApiError.badRequest('Submit one answer for every question.');
   const progress = existing || new CourseLearningProgress({ student: req.user._id, course: course._id });
   const attemptCount = (progress.assessmentAttempts || []).filter((attempt) => idString(attempt.lessonId) === req.params.lessonId).length;
   const attemptLimit = lesson.assessmentAttempts || 3;

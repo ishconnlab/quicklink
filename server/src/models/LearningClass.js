@@ -46,7 +46,7 @@ const lessonSchema = new mongoose.Schema({
   resources: [{ title: { type: String, trim: true, maxlength: 180 }, url: { type: String, trim: true, maxlength: 2000 } }],
   code: { language: { type: String, default: '', trim: true, maxlength: 40 }, source: { type: String, default: '', maxlength: 20000 } },
   codeBlocks: [{ language: { type: String, default: '', trim: true, maxlength: 40 }, source: { type: String, default: '', maxlength: 20000 }, explanation: { type: String, default: '', trim: true, maxlength: 2000 } }],
-  knowledgeCheck: { type: [lessonQuestionSchema], default: [], validate: { validator: (questions) => questions.length === 0 || questions.length === 10, message: 'An intermediate assessment must contain exactly 10 questions.' } },
+  knowledgeCheck: { type: [lessonQuestionSchema], default: [], validate: { validator: (questions) => [0, 5, 10].includes(questions.length), message: 'An intermediate assessment must contain 5 or 10 questions.' } },
   passMark: { type: Number, default: 70, min: 1, max: 100 },
   assessmentAttempts: { type: Number, default: 3, min: 1, max: 10 },
 }, { _id: true });

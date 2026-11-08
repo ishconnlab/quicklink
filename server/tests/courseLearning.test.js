@@ -12,14 +12,17 @@ const questions = Array.from({ length: 10 }, (_, index) => ({
   explanation: 'Review the lesson concept.',
 }));
 
-test('course lessons validate complete four-option, ten-question knowledge checks', () => {
+test('course lessons accept five- and ten-question knowledge checks with four options', () => {
   const course = new LearningClass({
     title: 'Python basics', subject: 'Programming', level: 'Training',
-    modules: [{ title: 'Foundations', lessons: [{ title: 'Variables', knowledgeCheck: questions }] }],
+    modules: [{ title: 'Foundations', lessons: [{ title: 'Variables', knowledgeCheck: questions.slice(0, 5) }] }],
   });
   assert.equal(course.validateSync(), undefined);
+  course.modules[0].lessons[0].knowledgeCheck = questions;
+  assert.equal(course.validateSync(), undefined);
   course.modules[0].lessons[0].knowledgeCheck.pop();
-  assert.match(course.validateSync().message, /exactly 10 questions/);
+  course.modules[0].lessons[0].knowledgeCheck.pop();
+  assert.match(course.validateSync().message, /5 or 10 questions/);
 });
 
 test('course learning progress is unique per student and course', () => {

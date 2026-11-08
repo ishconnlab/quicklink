@@ -86,6 +86,7 @@ export default function AppLayout() {
       { label: 'Training operations', links: [
         { to: '/courses', label: 'Trainings', icon: GraduationCap },
         { to: '/admin/courses', label: 'Courses', icon: BookOpen },
+        { to: '/dashboard#submission-inbox', label: 'Project submissions', icon: ReceiptText },
         { to: '/classes', label: 'Live classes', icon: Video },
         { to: '/enrollments', label: 'Enrollments & payments', icon: ReceiptText },
         { to: '/certificates', label: 'Certificates', icon: Award },
