@@ -623,6 +623,14 @@ export const reviewRegistration = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { registration: safeRegistration(registration) } });
 });
 
+export const deleteRegistration = asyncHandler(async (req, res) => {
+  const form = await formWithClass(req.params.formId, req.user);
+  const registration = await registrationFor(form, req.params.registrationId);
+  await registration.deleteOne();
+  await recordActivity(req, { action: 'registration.deleted', resourceType: 'registration', resourceId: registration._id, message: `Deleted registration entry for ${registration.email}.` });
+  res.json({ success: true, data: { deleted: true, id: req.params.registrationId } });
+});
+
 export const enrollRegistrationStudent = asyncHandler(async (req, res) => {
   const form = await formWithClass(req.params.formId, req.user);
   const registration = await registrationFor(form, req.params.registrationId);
@@ -746,6 +754,7 @@ export default {
   submitRegistration,
   listRegistrations,
   reviewRegistration,
+  deleteRegistration,
   enrollRegistrationStudent,
   enrollSelectedRegistrations,
   sendLiveClassEmail,

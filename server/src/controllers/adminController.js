@@ -347,6 +347,58 @@ export const verifyPayment = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { enrollment: enrollmentJson(await enrollment.populate([{ path: 'student', select: 'name email whatsapp country province' }, { path: 'learningClass', select: 'title subject level startsAt endsAt payment' }])) } });
 });
 
+export const createEnrollment = asyncHandler(async (req, res) => {
+  const [student, learningClass] = await Promise.all([
+    User.findOne({ _id: req.body.studentId, role: 'student', isActive: true }).select('_id name email'),
+    LearningClass.findById(req.body.classId).select('_id title payment students'),
+  ]);
+  if (!student) throw ApiError.notFound('Active student not found.');
+  if (!learningClass) throw ApiError.notFound('Training not found.');
+  let enrollment = await Enrollment.findOne({ student: student._id, learningClass: learningClass._id });
+  if (enrollment?.status === 'enrolled') throw ApiError.conflict('This student is already enrolled in this training.');
+  const paymentRequired = learningClass.payment?.enabled === true;
+  const paymentStatus = paymentRequired ? 'unpaid' : 'not_required';
+  if (enrollment) {
+    enrollment.status = 'enrolled';
+    enrollment.enrolledAt = new Date();
+    enrollment.cancelledAt = null;
+    enrollment.paymentStatus = paymentStatus;
+    enrollment.paymentAmount = paymentRequired ? Number(learningClass.payment.amount || 0) : 0;
+    enrollment.paymentCurrency = learningClass.payment.currency || 'RWF';
+    enrollment.paymentReference = '';
+    enrollment.paymentNote = '';
+    enrollment.paymentSubmittedAt = null;
+    enrollment.paymentVerifiedAt = null;
+    enrollment.paymentVerifiedBy = null;
+    await enrollment.save();
+  } else {
+    [enrollment] = await Enrollment.create([{
+      student: student._id,
+      learningClass: learningClass._id,
+      paymentStatus,
+      paymentAmount: paymentRequired ? Number(learningClass.payment.amount || 0) : 0,
+      paymentCurrency: learningClass.payment.currency || 'RWF',
+    }]);
+  }
+  await LearningClass.updateOne({ _id: learningClass._id }, { $addToSet: { students: student._id } });
+  await recordActivity(req, { action: 'enrollment.created', resourceType: 'enrollment', resourceId: enrollment._id, message: `Enrolled ${student.name} in ${learningClass.title}.` });
+  const populated = await Enrollment.findById(enrollment._id).populate('student', 'name email whatsapp country province').populate('learningClass', 'title subject level startsAt endsAt payment').lean();
+  res.status(201).json({ success: true, data: { enrollment: enrollmentJson(populated) } });
+});
+
+export const deleteEnrollment = asyncHandler(async (req, res) => {
+  const enrollment = await Enrollment.findById(req.params.id).populate('student', 'name').populate('learningClass', 'title');
+  if (!enrollment) throw ApiError.notFound('Enrollment not found.');
+  await Promise.all([
+    Enrollment.deleteOne({ _id: enrollment._id }),
+    enrollment.learningClass && enrollment.student
+      ? LearningClass.updateOne({ _id: enrollment.learningClass._id }, { $pull: { students: enrollment.student._id } })
+      : Promise.resolve(),
+  ]);
+  await recordActivity(req, { action: 'enrollment.deleted', resourceType: 'enrollment', resourceId: enrollment._id, message: `Removed ${enrollment.student?.name || 'a student'} from ${enrollment.learningClass?.title || 'a training'}.` });
+  res.json({ success: true, data: { deleted: true, id: req.params.id } });
+});
+
 export const getSettings = asyncHandler(async (_req, res) => {
   res.json({ success: true, data: { settings: await getPlatformSettings({ fresh: true }) } });
 });
@@ -369,6 +421,8 @@ export default {
   getStudentDetail,
   listEnrollments,
   verifyPayment,
+  createEnrollment,
+  deleteEnrollment,
   getSettings,
   saveSettings,
 };

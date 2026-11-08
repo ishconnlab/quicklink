@@ -59,6 +59,8 @@ router.get('/activity', validate(activityQuery, 'query'), admin.listActivity);
 router.get('/students', validate(studentQuery, 'query'), admin.listStudents);
 router.get('/students/:id', validate(z.object({ id: objectId }), 'params'), admin.getStudentDetail);
 router.get('/enrollments', validate(enrollmentQuery, 'query'), admin.listEnrollments);
+router.post('/enrollments', validate(z.object({ studentId: objectId, classId: objectId })), admin.createEnrollment);
+router.delete('/enrollments/:id', validate(z.object({ id: objectId }), 'params'), admin.deleteEnrollment);
 router.patch('/enrollments/:id/payment', validate(z.object({ id: objectId }), 'params'), validate(paymentBody), admin.verifyPayment);
 router.get('/settings', admin.getSettings);
 router.patch('/settings', validate(settingsBody), admin.saveSettings);

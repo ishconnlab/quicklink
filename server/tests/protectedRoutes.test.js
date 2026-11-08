@@ -58,6 +58,10 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     const permanentUserDelete = await fetch(`${root}/api/users/0123456789abcdef01234567`, { method: 'DELETE' });
     const assignmentDelete = await fetch(`${root}/api/assignments/0123456789abcdef01234567`, { method: 'DELETE' });
     const linkRegistrationAccount = await fetch(`${root}/api/registrations/public/${'a'.repeat(32)}/claim-account`, { method: 'POST' });
+    const createEnrollment = await fetch(`${root}/api/admin/enrollments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const deleteEnrollment = await fetch(`${root}/api/admin/enrollments/0123456789abcdef01234567`, { method: 'DELETE' });
+    const deleteCertificate = await fetch(`${root}/api/certificates/0123456789abcdef01234567`, { method: 'DELETE' });
+    const deleteRegistration = await fetch(`${root}/api/registrations/0123456789abcdef01234567/entries/0123456789abcdef01234567`, { method: 'DELETE' });
     assert.equal(completion.status, 401);
     assert.equal(issue.status, 401);
     assert.equal(download.status, 400);
@@ -81,6 +85,10 @@ test('certificate completion and issuance endpoints reject unauthenticated reque
     assert.equal(permanentUserDelete.status, 401);
     assert.equal(assignmentDelete.status, 401);
     assert.equal(linkRegistrationAccount.status, 401);
+    assert.equal(createEnrollment.status, 401);
+    assert.equal(deleteEnrollment.status, 401);
+    assert.equal(deleteCertificate.status, 401);
+    assert.equal(deleteRegistration.status, 401);
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }

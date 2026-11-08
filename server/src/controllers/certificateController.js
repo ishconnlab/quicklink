@@ -16,6 +16,7 @@ import { assertCanAttend } from '../services/classAccess.js';
 import config from '../config/env.js';
 import { isAdmin } from '../security/roles.js';
 import { notifyUsers } from '../services/notifications.js';
+import { recordActivity } from '../services/activityLog.js';
 
 const COURSE_FIELDS = [
   'title', 'level', 'active', 'published', 'students', 'learningMaterials', 'completionRequirements',
@@ -262,6 +263,14 @@ export const updateCertificateDescription = asyncHandler(async (req, res) => {
   certificate.description = req.body.description.trim();
   await certificate.save();
   res.json({ success: true, data: { certificate: certificateJson(certificate) } });
+});
+
+export const deleteCertificate = asyncHandler(async (req, res) => {
+  const certificate = await CourseCertificate.findById(req.params.id);
+  if (!certificate) throw ApiError.notFound('Certificate not found.');
+  await certificate.deleteOne();
+  await recordActivity(req, { action: 'certificate.deleted', resourceType: 'certificate', resourceId: certificate._id, message: `Deleted certificate ${certificate.code} for ${certificate.studentName}.` });
+  res.json({ success: true, data: { deleted: true, id: req.params.id } });
 });
 
 export const reissueCertificate = asyncHandler(async (req, res) => {

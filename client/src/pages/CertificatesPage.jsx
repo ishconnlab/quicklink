@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Award, BadgeCheck, ChevronLeft, ChevronRight, Download, ExternalLink, FilePenLine, RefreshCcw,
-  Search, Share2, ShieldCheck, ShieldX, SlidersHorizontal, Sparkles,
+  Search, Share2, ShieldCheck, ShieldX, SlidersHorizontal, Sparkles, Trash2,
 } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, Modal, PageHeader, StatCard } from '../components/layout.jsx';
@@ -153,6 +153,19 @@ export default function CertificatesPage() {
     finally { setBusyId(''); }
   };
 
+  const deleteCertificate = async (certificate) => {
+    const approved = await dialog.confirm({ title: 'Delete certificate record?', message: `Permanently remove ${certificate.studentName}'s certificate for ${certificate.courseTitle}. This also removes its public verification record.`, confirmLabel: 'Delete certificate' });
+    if (!approved) return;
+    setBusyId(certificate.id);
+    try {
+      await api.delete(`/certificates/${certificate.id}`);
+      setCertificates((current) => current.filter((item) => item.id !== certificate.id));
+      setTotal((value) => Math.max(0, value - 1));
+      toast.success('Certificate record deleted.');
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setBusyId(''); }
+  };
+
   const validCount = certificates.filter((certificate) => !certificate.revoked).length;
   const revokedCount = certificates.filter((certificate) => certificate.revoked).length;
 
@@ -203,6 +216,7 @@ export default function CertificatesPage() {
                 {!certificate.revoked && <button className="btn-secondary" onClick={() => { setDescriptionTarget(certificate); setDescriptionValue(certificate.description || ''); }}>Description</button>}
                 {!certificate.revoked && <button className="btn-ghost text-red-600" onClick={() => { setRevokeTarget(certificate); setRevokeReason(''); }}>Revoke</button>}
                 {certificate.revoked && <button className="btn-secondary" onClick={() => reissue(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <RefreshCcw size={15} />}Reissue</button>}
+                <button className="btn-ghost text-red-700" onClick={() => deleteCertificate(certificate)} disabled={busyId === certificate.id} aria-label="Delete certificate record">{busyId === certificate.id ? <Spinner size={15} /> : <Trash2 size={15} />}Delete</button>
               </>}
             </div>
           </div>

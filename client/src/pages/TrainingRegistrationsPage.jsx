@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ClipboardList, Copy, ExternalLink, Mail, MessageCircle, Plus, Radio, UserPlus } from 'lucide-react';
+import { Check, ClipboardList, Copy, ExternalLink, Mail, MessageCircle, Plus, Radio, Trash2, UserPlus } from 'lucide-react';
 import api, { apiError, assetUrl } from '../api/client.js';
 import { Badge, Modal, PageHeader } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
@@ -130,6 +130,23 @@ export default function TrainingRegistrationsPage() {
     finally { setEmailing(''); }
   };
 
+  const updateEntryStatus = async (entry, status) => {
+    try {
+      const response = await api.patch(`/registrations/${selectedForm.id}/entries/${entry.id}/status`, { status, note: 'Updated by administrator.' });
+      setEntries((current) => current.map((item) => item.id === entry.id ? response.data.data.registration : item));
+      toast.success('Registration status updated.');
+    } catch (error) { toast.error(apiError(error).message); }
+  };
+
+  const deleteEntry = async (entry) => {
+    if (!window.confirm(`Delete the registration entry for ${entry.name}? Their student account and any enrollment will remain.`)) return;
+    try {
+      await api.delete(`/registrations/${selectedForm.id}/entries/${entry.id}`);
+      setEntries((current) => current.filter((item) => item.id !== entry.id));
+      toast.success('Registration entry deleted.');
+    } catch (error) { toast.error(apiError(error).message); }
+  };
+
   const enrollRegistrant = async (entry) => {
     if (!selectedForm) return;
     setEnrolling(entry.id);
@@ -232,6 +249,7 @@ export default function TrainingRegistrationsPage() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <h3 className="font-semibold text-slate-900">{entry.name}</h3>
+                      <div className="mt-1 flex flex-wrap items-center gap-2"><Badge color={entry.status === 'REJECTED' ? 'red' : entry.status === 'PENDING' ? 'amber' : 'green'}>{entry.status}</Badge><select className="input min-h-9 w-auto py-1 text-xs" value={entry.status} onChange={(event) => updateEntryStatus(entry, event.target.value)} aria-label={`Update ${entry.name} registration status`}>{['PENDING', 'APPROVED', 'REJECTED', 'ENROLLED', 'INVITED', 'ATTENDED', 'COMPLETED'].map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
                       <a className="mt-1 block break-all text-sm text-brand-700 hover:underline" href={`mailto:${entry.email}`}>{entry.email}</a>
                       <a className="mt-1 block text-sm text-slate-500 hover:underline" href={`tel:${entry.whatsapp}`}>{entry.whatsapp}</a>
                       <p className="mt-2 text-xs text-slate-400">Registered {formatDateTime(entry.createdAt)}</p>
@@ -240,6 +258,7 @@ export default function TrainingRegistrationsPage() {
                     <div className="flex shrink-0 flex-wrap gap-2">
                       {entry.studentId ? <button className="btn-secondary" disabled={emailing === entry.id || enrolling === entry.id} onClick={() => sendEmail(entry)}>{emailing === entry.id ? <Spinner size={15} /> : <Mail size={15} />}Email invite</button> : <button className="btn-secondary" disabled={entry.status === 'REJECTED' || enrolling === entry.id || emailing === entry.id} title={entry.status === 'REJECTED' ? 'A rejected registration cannot be enrolled.' : 'Create a student account, enroll them in the class, and email their access details.'} onClick={() => enrollRegistrant(entry)}>{enrolling === entry.id ? <Spinner size={15} /> : <Mail size={15} />}{entry.status === 'REJECTED' ? 'Rejected' : 'Enroll & email access'}</button>}
                       {waUrl ? <a className="btn-secondary" href={waUrl} target="_blank" rel="noreferrer"><MessageCircle size={15} />WhatsApp</a> : <button className="btn-secondary" disabled title="This registration has no usable WhatsApp number."><MessageCircle size={15} />WhatsApp</button>}
+                      <button className="btn-ghost text-red-700" onClick={() => deleteEntry(entry)} aria-label={`Delete registration entry for ${entry.name}`}><Trash2 size={15} />Delete entry</button>
                     </div>
                   </div>
                 </article>;

@@ -88,6 +88,7 @@ router.get('/:formId/entries', validate(idParams, 'params'), registrations.listR
 router.post('/:formId/entries/enroll', validate(idParams, 'params'), validate(z.object({ registrationIds: z.array(id).min(1).max(200) })), registrations.enrollSelectedRegistrations);
 router.post('/:formId/entries/invite', validate(idParams, 'params'), validate(z.object({ registrationIds: z.array(id).max(500).optional().default([]) })), registrations.sendClassInvitations);
 router.patch('/:formId/entries/:registrationId/status', validate(registrationParams, 'params'), validate(z.object({ status: registrationStatus, note: z.string().trim().max(1000).optional().default('') })), registrations.reviewRegistration);
+router.delete('/:formId/entries/:registrationId', validate(registrationParams, 'params'), registrations.deleteRegistration);
 router.post('/:formId/entries/:registrationId/enroll', validate(registrationParams, 'params'), registrations.enrollRegistrationStudent);
 router.post('/:formId/entries/:registrationId/email', validate(registrationParams, 'params'), registrations.sendLiveClassEmail);
 

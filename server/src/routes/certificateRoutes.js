@@ -23,6 +23,7 @@ router.get('/all', requireAdmin, validate(listQuery, 'query'), certificates.list
 router.get('/:id.pdf', validate(z.object({ id: certificateIdentifier }), 'params'), certificates.downloadCertificate);
 router.patch('/:id/name', requireAdmin, validate(z.object({ id: objectId }), 'params'), validate(z.object({ studentName: z.string().trim().min(2).max(120) })), certificates.updateCertificateName);
 router.patch('/:id/description', requireAdmin, validate(z.object({ id: objectId }), 'params'), validate(z.object({ description: z.string().trim().max(500) })), certificates.updateCertificateDescription);
+router.delete('/:id', requireAdmin, validate(z.object({ id: objectId }), 'params'), certificates.deleteCertificate);
 router.patch('/:id/revoke', requireAdmin, validate(z.object({ id: objectId }), 'params'), validate(z.object({ reason: z.string().trim().min(3).max(1000) })), certificates.revokeCertificate);
 router.post('/:id/reissue', requireAdmin, validate(z.object({ id: objectId }), 'params'), validate(z.object({ reason: z.string().trim().max(1000).optional().default('') })), certificates.reissueCertificate);
 export default router;

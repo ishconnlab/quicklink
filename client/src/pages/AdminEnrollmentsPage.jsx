@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Badge, Modal, PageHeader } from '../components/layout.jsx';
-import { CheckCircle2, Download, Filter, MessageCircle, ReceiptText, Search, ShieldCheck, UserRound, Wallet } from 'lucide-react';
+import { CheckCircle2, Download, Filter, MessageCircle, Plus, ReceiptText, Search, ShieldCheck, Trash2, UserRound, Wallet } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -20,6 +20,11 @@ export default function AdminEnrollmentsPage() {
   const [editing, setEditing] = useState(null);
   const [paymentForm, setPaymentForm] = useState({ status: 'pending', note: '' });
   const [saving, setSaving] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createForm, setCreateForm] = useState({ studentId: '', classId: '' });
+  const [students, setStudents] = useState([]);
+  const [trainings, setTrainings] = useState([]);
+  const [deletingId, setDeletingId] = useState('');
 
   const load = useCallback(async (page = 1) => {
     setState((current) => ({ ...current, loading: true }));
@@ -59,6 +64,43 @@ export default function AdminEnrollmentsPage() {
     finally { setSaving(false); }
   };
 
+  const openCreate = async () => {
+    try {
+      const [studentResponse, trainingResponse] = await Promise.all([
+        api.get('/admin/students', { params: { limit: 100, active: 'true' } }),
+        api.get('/courses', { params: { manage: 'true', limit: 100 } }),
+      ]);
+      setStudents(studentResponse.data.data.students || []);
+      setTrainings(trainingResponse.data.data.courses || []);
+      setCreateForm({ studentId: '', classId: '' });
+      setCreateOpen(true);
+    } catch (error) { toast.error(apiError(error).message); }
+  };
+
+  const createEnrollment = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await api.post('/admin/enrollments', createForm);
+      toast.success('Student enrolled in the training.');
+      setCreateOpen(false);
+      await load(1);
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setSaving(false); }
+  };
+
+  const deleteEnrollment = async (enrollment) => {
+    const approved = window.confirm(`Remove ${enrollment.student?.name || 'this student'} from ${enrollment.class?.title || 'this training'}?`);
+    if (!approved) return;
+    setDeletingId(enrollment.id);
+    try {
+      await api.delete(`/admin/enrollments/${enrollment.id}`);
+      toast.success('Enrollment removed.');
+      await load(state.enrollments.length === 1 && state.page > 1 ? state.page - 1 : state.page);
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setDeletingId(''); }
+  };
+
   const exportCsv = (rows) => {
     const headers = ['Student', 'Email', 'WhatsApp', 'Country', 'Province', 'Training', 'Enrolled', 'Payment status', 'Amount', 'Currency', 'Reference', 'Attendance', 'Certificate'];
     const lines = rows.map((item) => [item.student?.name, item.student?.email, item.student?.whatsapp, item.student?.country, item.student?.province, item.class?.title, item.enrolledAt, paymentLabel[item.paymentStatus] || item.paymentStatus, item.paymentAmount, item.paymentCurrency, item.paymentReference, `${item.attendance?.attended || 0}/${item.attendance?.sessions || 0}`, item.certificate ? (item.certificate.revoked ? 'Revoked' : 'Issued') : 'Not issued'].map(csvValue).join(','));
@@ -76,7 +118,7 @@ export default function AdminEnrollmentsPage() {
       eyebrow="Operations"
       title="Enrollments and payments"
       subtitle="Review every enrollment, follow attendance progress, verify mobile money references, and monitor certificate issuance."
-      actions={<><button className="btn-secondary" onClick={() => exportCsv(selected.length ? state.enrollments.filter((item) => selected.includes(item.id)) : state.enrollments)}><Download size={16} />Export {selected.length ? 'selected' : 'page'}</button><Link to="/students" className="btn-primary"><UserRound size={16} />Students</Link></>}
+      actions={<><button className="btn-secondary" onClick={() => exportCsv(selected.length ? state.enrollments.filter((item) => selected.includes(item.id)) : state.enrollments)}><Download size={16} />Export {selected.length ? 'selected' : 'page'}</button><button className="btn-primary" onClick={openCreate}><Plus size={16} />Add enrollment</button><Link to="/students" className="btn-secondary"><UserRound size={16} />Students</Link></>}
     />
 
     <div className="mb-4 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm shadow-slate-900/[0.03] sm:p-4">
@@ -105,7 +147,7 @@ export default function AdminEnrollmentsPage() {
               <td className="px-3 py-3"><Badge color={paymentTone[enrollment.paymentStatus] || 'slate'}>{paymentLabel[enrollment.paymentStatus] || enrollment.paymentStatus}</Badge>{enrollment.paymentReference && <p className="mt-1 max-w-36 truncate text-[11px] text-slate-400" title={enrollment.paymentReference}>Ref: {enrollment.paymentReference}</p>}{enrollment.paymentAmount > 0 && <p className="text-[11px] font-semibold text-slate-600">{formatMoney(enrollment.paymentAmount, enrollment.paymentCurrency)}</p>}</td>
               <td className="px-3 py-3"><span className="font-semibold text-slate-700">{enrollment.attendance?.attended || 0}</span><span className="text-slate-400"> / {enrollment.attendance?.sessions || 0}</span><p className="text-[11px] text-slate-400">sessions</p></td>
               <td className="px-3 py-3">{enrollment.certificate ? <Badge color={enrollment.certificate.revoked ? 'red' : 'green'}>{enrollment.certificate.revoked ? 'Revoked' : 'Issued'}</Badge> : <span className="text-xs text-slate-400">Not issued</span>}</td>
-              <td className="px-3 py-3 text-right"><div className="flex justify-end gap-1.5"><button className="btn-secondary min-h-0 px-2.5 py-1.5 text-xs" onClick={() => openPayment(enrollment)} disabled={enrollment.paymentStatus === 'not_required'}><ShieldCheck size={14} />Payment</button>{enrollment.student?.whatsapp && <a className="btn-ghost min-h-0 px-2 py-1.5" href={`https://wa.me/${enrollment.student.whatsapp.replace(/[^\d]/g, '')}`} target="_blank" rel="noreferrer" aria-label={`Message ${enrollment.student.name} on WhatsApp`}><MessageCircle size={15} /></a>}</div></td>
+              <td className="px-3 py-3 text-right"><div className="flex justify-end gap-1.5"><button className="btn-secondary min-h-0 px-2.5 py-1.5 text-xs" onClick={() => openPayment(enrollment)} disabled={enrollment.paymentStatus === 'not_required'}><ShieldCheck size={14} />Payment</button><button className="btn-ghost min-h-0 px-2 py-1.5 text-red-700" onClick={() => deleteEnrollment(enrollment)} disabled={deletingId === enrollment.id} aria-label={`Remove ${enrollment.student?.name} enrollment`}>{deletingId === enrollment.id ? <Spinner size={14} /> : <Trash2 size={15} />}</button>{enrollment.student?.whatsapp && <a className="btn-ghost min-h-0 px-2 py-1.5" href={`https://wa.me/${enrollment.student.whatsapp.replace(/[^\d]/g, '')}`} target="_blank" rel="noreferrer" aria-label={`Message ${enrollment.student.name} on WhatsApp`}><MessageCircle size={15} /></a>}</div></td>
             </tr>)}
           </tbody>
         </table>
@@ -117,7 +159,7 @@ export default function AdminEnrollmentsPage() {
           <Link to={`/courses/${enrollment.class?.id}`} className="mt-3 block text-sm font-semibold text-brand-800">{enrollment.class?.title}</Link>
           <div className="mt-2 flex flex-wrap gap-1.5"><Badge color={paymentTone[enrollment.paymentStatus] || 'slate'}>{paymentLabel[enrollment.paymentStatus] || enrollment.paymentStatus}</Badge><Badge>{enrollment.attendance?.attended || 0}/{enrollment.attendance?.sessions || 0} attended</Badge>{enrollment.certificate && <Badge color={enrollment.certificate.revoked ? 'red' : 'green'}>{enrollment.certificate.revoked ? 'Certificate revoked' : 'Certificate issued'}</Badge>}</div>
           {enrollment.paymentReference && <p className="mt-2 break-all rounded-lg bg-slate-50 px-2.5 py-2 text-xs text-slate-600">Reference: {enrollment.paymentReference}</p>}
-          <div className="mt-3 flex flex-wrap gap-2"><button className="btn-secondary flex-1" onClick={() => openPayment(enrollment)} disabled={enrollment.paymentStatus === 'not_required'}><Wallet size={15} />Payment</button>{enrollment.student?.whatsapp && <a className="btn-secondary" href={`https://wa.me/${enrollment.student.whatsapp.replace(/[^\d]/g, '')}`} target="_blank" rel="noreferrer"><MessageCircle size={15} />WhatsApp</a>}</div>
+          <div className="mt-3 flex flex-wrap gap-2"><button className="btn-secondary flex-1" onClick={() => openPayment(enrollment)} disabled={enrollment.paymentStatus === 'not_required'}><Wallet size={15} />Payment</button><button className="btn-ghost text-red-700" onClick={() => deleteEnrollment(enrollment)} disabled={deletingId === enrollment.id}><Trash2 size={15} />Remove</button>{enrollment.student?.whatsapp && <a className="btn-secondary" href={`https://wa.me/${enrollment.student.whatsapp.replace(/[^\d]/g, '')}`} target="_blank" rel="noreferrer"><MessageCircle size={15} />WhatsApp</a>}</div>
         </article>)}
       </div>
 
@@ -131,6 +173,13 @@ export default function AdminEnrollmentsPage() {
         <label className="block"><span className="label">Note to student</span><textarea className="input min-h-24" maxLength={1000} value={paymentForm.note} onChange={(event) => setPaymentForm({ ...paymentForm, note: event.target.value })} placeholder="Explain any issue or confirmation details." /></label>
         <p className="text-xs text-slate-400">The student receives an in-app notification for paid, waived, rejected, and pending statuses.</p>
       </div>}
+    </Modal>
+    <Modal open={createOpen} onClose={() => !saving && setCreateOpen(false)} title="Add student enrollment" footer={<><button className="btn-secondary" onClick={() => setCreateOpen(false)} disabled={saving}>Cancel</button><button form="create-enrollment" className="btn-primary" disabled={saving || !createForm.studentId || !createForm.classId}>{saving ? <Spinner size={16} /> : <Plus size={16} />}Add enrollment</button></>}>
+      <form id="create-enrollment" onSubmit={createEnrollment} className="space-y-3">
+        <label className="block"><span className="label">Student</span><select className="input" required value={createForm.studentId} onChange={(event) => setCreateForm({ ...createForm, studentId: event.target.value })}><option value="">Select a student</option>{students.map((student) => <option key={student.id} value={student.id}>{student.name} — {student.email}</option>)}</select></label>
+        <label className="block"><span className="label">Training</span><select className="input" required value={createForm.classId} onChange={(event) => setCreateForm({ ...createForm, classId: event.target.value })}><option value="">Select a training</option>{trainings.map((training) => <option key={training.id} value={training.id}>{training.title}</option>)}</select></label>
+        <p className="text-xs text-slate-500">Payment starts at unpaid when the training requires payment. You can update payment status from the ledger.</p>
+      </form>
     </Modal>
   </div>;
 }
