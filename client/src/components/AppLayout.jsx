@@ -132,7 +132,6 @@ export default function AppLayout() {
       <div className="flex h-14 items-center justify-between gap-3 px-3 sm:h-16 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">{!standalone && <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-600 hover:bg-green-50" aria-label="Open navigation"><Menu size={20} /></button>}<NavLink to="/dashboard"><Brand short={standalone} /></NavLink></div>
         {standalone && <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto px-2 md:flex" aria-label="QuickLink navigation">{allLinks.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} aria-label={label} title={label} className={({ isActive }) => classNames('flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition', isActive ? 'bg-green-50 text-brand-800' : 'text-slate-600 hover:bg-slate-50')}><Icon size={15} /><span className="hidden xl:inline">{label}</span></NavLink>)}</nav>}
-        <AccountMenu />
       </div>
     </header>
 
@@ -141,7 +140,7 @@ export default function AppLayout() {
     </div>
 
     <nav className={classNames('fixed inset-x-0 bottom-0 z-30 border-t border-green-100/80 bg-white/95 shadow-[0_-8px_24px_rgba(124,45,18,0.06)] backdrop-blur', standalone ? 'md:hidden' : 'lg:hidden')} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
-      <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${mobileLinks.length}, minmax(0, 1fr))` }}>{mobileLinks.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} aria-label={label} title={label} className="group flex min-w-0 items-center justify-center px-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500">{({ isActive }) => <span className={classNames('flex h-10 w-12 items-center justify-center rounded-xl transition', isActive ? 'bg-green-50 text-brand-700 ring-1 ring-green-100' : 'text-slate-400 group-hover:bg-slate-50 group-hover:text-slate-600')}><Icon size={21} strokeWidth={isActive ? 2.4 : 2} /></span>}</NavLink>)}</div>
+      <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${mobileLinks.length}, minmax(0, 1fr))` }}>{mobileLinks.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} aria-label={label} title={label} className="group flex min-w-0 items-center justify-center px-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500">{({ isActive }) => <span className={classNames('flex h-10 w-10 items-center justify-center rounded-xl transition', isActive ? 'bg-green-50 text-brand-700 ring-1 ring-green-100' : 'text-slate-400 group-hover:bg-slate-50 group-hover:text-slate-600')}><Icon size={19} strokeWidth={isActive ? 2.4 : 2} /></span>}</NavLink>)}</div>
     </nav>
   </div>;
 }

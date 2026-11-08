@@ -93,12 +93,12 @@ export default function StudentDashboard() {
         {state.courses.map((course) => {
           const progress = progressFor(course);
           const payment = course.enrollment?.payment;
-          return <article key={course.id} className="rounded-2xl border border-slate-200 bg-white">
+          return <article key={course.id} className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             <div className="absolute inset-x-0 top-0 h-1 bg-green-50" />
             <div className="p-5">
               <div className="flex flex-wrap items-center gap-2"><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{liveClasses.some((item) => item.id === course.id) && <Badge color="red">Live now</Badge>}</div>
               <h3 className="mt-3 break-words text-base font-bold leading-6 text-slate-950">{course.title}</h3>
-              <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-slate-500">{course.introduction || course.description || 'Open the training to see your requirements and next step.'}</p>
+              <p className="mt-1.5 line-clamp-2 break-words text-sm leading-6 text-slate-500">{course.introduction || course.description || 'Open the training to see your requirements and next step.'}</p>
               <div className="mt-4"><div className="mb-1.5 flex items-center justify-between text-xs text-slate-500"><span>Requirements completed</span><span className="font-semibold text-slate-700">{progress}%</span></div><ProgressBar value={progress} /></div>
               <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
                 <Badge color={paymentTone[payment?.status] || 'slate'}>{payment ? paymentLabel[payment.status] || payment.status : 'No payment'}</Badge>
@@ -117,7 +117,7 @@ export default function StudentDashboard() {
         <SectionHeader title="Live and upcoming" description="Sessions from your trainings." icon={Radio} action={<Link to="/classes" className="text-sm font-semibold text-brand-700">View classes</Link>} />
         {liveClasses.length || upcoming.length ? <div className="space-y-2">
           {liveClasses.slice(0, 3).map((item) => <Link key={item.id} to={`/classes/sessions/${item.liveSession.id}/live`} className="flex items-center gap-3 rounded-2xl border border-red-200 bg-green-50 p-4 transition hover:border-red-300"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-100 text-red-700"><Radio size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{item.liveSession.title || item.title}</span><span className="block text-xs text-red-700">Live now · join your class</span></span><ArrowRight size={16} className="text-red-500" /></Link>)}
-          {upcoming.map((item) => <Link key={item.id} to={`/classes/${item.id}`} className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 transition hover:border-green-200"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-brand-700"><CalendarClock size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{item.title}</span><span className="block text-xs text-slate-500">{formatDateTime(item.startsAt)}{item.schedule ? ` · ${item.schedule}` : ''}</span></span><ArrowRight size={16} className="text-slate-300" /></Link>)}
+          {upcoming.map((item) => <Link key={item.id} to={`/classes/${item.id}`} className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-green-200 sm:p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-green-50 text-brand-700"><CalendarClock size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{item.title}</span><span className="block break-words text-xs leading-4 text-slate-500">{formatDateTime(item.startsAt)}{item.schedule ? ` · ${item.schedule}` : ''}</span></span><ArrowRight size={16} className="shrink-0 text-slate-300" /></Link>)}
         </div> : <EmptyState icon={CalendarClock} title="No sessions scheduled" description="Your trainer will announce live classes here." />}
       </section>
 

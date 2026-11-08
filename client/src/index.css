@@ -137,6 +137,15 @@
   line-height: 1.5rem;
 }
 
+.quicklink-app-main :where(.card, .surface, article, section) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.quicklink-app-main :where(.card, .surface, article, section) :where(h1, h2, h3, p) {
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 639px) {
   .quicklink-app-main[data-standalone='true'] .quicklink-dashboard-stats > div > div > div {
     width: 2rem;

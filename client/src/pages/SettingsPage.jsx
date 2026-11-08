@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CheckCircle2, Download, KeyRound, LockKeyhole, Mail, MapPin, Phone, Save, ShieldCheck, Smartphone, User } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { CheckCircle2, Download, KeyRound, LockKeyhole, LogOut, Mail, MapPin, Phone, Save, ShieldCheck, Smartphone, User } from 'lucide-react';
 import { PageHeader } from '../components/layout.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
@@ -10,7 +10,8 @@ import { roleLabel } from '../lib/roles.js';
 import { Spinner } from '../components/ui.jsx';
 
 export default function SettingsPage() {
-  const { user, updateProfile, changePassword } = useAuth();
+  const { user, updateProfile, changePassword, logout } = useAuth();
+  const navigate = useNavigate();
   const toast = useToast();
   const [profile, setProfile] = useState({ name: '', whatsapp: '', country: '', province: '' });
   const [profileErrors, setProfileErrors] = useState({});
@@ -77,6 +78,11 @@ export default function SettingsPage() {
     setInstallEvent(null);
   };
 
+  const signOut = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
+
   return <div className="mx-auto max-w-3xl">
     <PageHeader eyebrow="Your account" title="Settings" subtitle="Keep your contact details current, manage security, and install the QuickLink QuickLink app on your device." />
 
@@ -84,7 +90,7 @@ export default function SettingsPage() {
       <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div><h2 className="flex items-center gap-2 text-base font-bold text-slate-950"><User size={18} className="text-brand-700" />Profile</h2><p className="mt-1 text-sm text-slate-500">Used on class rosters, invitations, and your certificate.</p></div>
-          <Badge>{roleLabel(user?.role)}</Badge>
+          <div className="flex shrink-0 items-center gap-2"><Badge>{roleLabel(user?.role)}</Badge><button type="button" onClick={signOut} className="btn-ghost min-h-9 px-2.5 text-xs text-slate-600"><LogOut size={14} />Sign out</button></div>
         </div>
         <form onSubmit={saveProfile} className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="sm:col-span-2"><span className="label">Full name</span><input className={`input ${profileErrors.name ? 'ring-2 ring-red-400' : ''}`} autoComplete="name" required minLength={2} maxLength={120} value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} />{profileErrors.name && <span className="mt-1 block text-xs text-red-600">{profileErrors.name}</span>}</label>
