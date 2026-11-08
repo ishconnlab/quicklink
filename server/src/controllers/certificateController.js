@@ -32,6 +32,7 @@ function certificateJson(certificate) {
     code: certificate.code,
     studentName: certificate.studentName,
     courseTitle: certificate.courseTitle,
+    description: certificate.description || '',
     level: certificate.level,
     completionDate: certificate.completionDate || certificate.issuedAt,
     issuedAt: certificate.issuedAt,
@@ -249,6 +250,15 @@ export const updateCertificateName = asyncHandler(async (req, res) => {
   if (!certificate) throw ApiError.notFound('Certificate not found.');
   if (certificate.revokedAt) throw ApiError.conflict('A revoked certificate cannot be edited.');
   certificate.studentName = req.body.studentName.trim();
+  await certificate.save();
+  res.json({ success: true, data: { certificate: certificateJson(certificate) } });
+});
+
+export const updateCertificateDescription = asyncHandler(async (req, res) => {
+  const certificate = await CourseCertificate.findById(req.params.id);
+  if (!certificate) throw ApiError.notFound('Certificate not found.');
+  if (certificate.revokedAt) throw ApiError.conflict('A revoked certificate cannot be edited.');
+  certificate.description = req.body.description.trim();
   await certificate.save();
   res.json({ success: true, data: { certificate: certificateJson(certificate) } });
 });
@@ -625,6 +635,7 @@ export default {
   listCertificateCandidates,
   issueCertificates,
   updateCertificateName,
+  updateCertificateDescription,
   reissueCertificate,
   getCertificationAssessmentSettings,
   saveCertificationAssessmentSettings,

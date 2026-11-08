@@ -4,6 +4,7 @@ import { AlertCircle, ArrowRight, Award, CalendarCheck2, Eye, EyeOff, Lock, LogI
 import { useAuth } from '../context/AuthContext.jsx';
 import api, { apiError } from '../api/client.js';
 import { Spinner } from '../components/ui.jsx';
+import AuthLearningVisual from '../components/AuthLearningVisual.jsx';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -63,12 +64,13 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#fffaf5]">
-      <div className="pointer-events-none absolute -left-24 top-10 h-80 w-80 rounded-full bg-orange-200/50 blur-3xl" />
+      <div className="pointer-events-none absolute -left-24 top-10 h-80 w-80 rounded-full bg-green-200/50 blur-3xl" />
       <div className="pointer-events-none absolute -right-20 bottom-0 h-96 w-96 rounded-full bg-amber-200/40 blur-3xl" />
-      <div className="relative mx-auto grid min-h-screen w-full max-w-6xl items-center gap-8 px-4 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:px-8">
-        <section className="hidden lg:block">
+      <div className="relative mx-auto grid min-h-screen w-full max-w-6xl items-center gap-8 px-4 py-10 lg:grid-cols-[0.95fr_1.05fr] lg:px-8">
+        <section className="order-2 hidden lg:block">
+          <AuthLearningVisual />
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-orange-600 to-amber-600 text-sm font-black text-white shadow-xl shadow-orange-900/20">IC</span>
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-green-600 to-amber-600 text-sm font-black text-white shadow-xl shadow-green-900/20">IC</span>
             <div><p className="text-lg font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-700">QuickLink Learning Portal</p></div>
           </div>
           <h1 className="mt-12 max-w-xl text-4xl font-black leading-[1.08] tracking-tight text-slate-950 xl:text-5xl">Learn deeply.<br /><span className="bg-gradient-to-r from-brand-600 to-amber-500 bg-clip-text text-transparent">Get certified.</span></h1>
@@ -79,16 +81,16 @@ export default function LoginPage() {
               { icon: ShieldCheck, title: 'Structured projects', text: 'Submit work and receive trainer feedback' },
               { icon: Award, title: 'Certificates', text: 'Shareable, verifiable achievement records' },
               { icon: ArrowRight, title: 'One workspace', text: 'Every training and result in one place' },
-            ].map(({ icon: Icon, title, text }) => <div key={title} className="rounded-2xl border border-orange-100 bg-white/70 p-4 backdrop-blur"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-brand-700 ring-1 ring-orange-100"><Icon size={17} /></span><p className="mt-3 text-sm font-bold text-slate-900">{title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{text}</p></div>)}
+            ].map(({ icon: Icon, title, text }) => <div key={title} className="rounded-2xl border border-green-100 bg-white/70 p-4 backdrop-blur"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-green-50 text-brand-700 ring-1 ring-green-100"><Icon size={17} /></span><p className="mt-3 text-sm font-bold text-slate-900">{title}</p><p className="mt-1 text-xs leading-5 text-slate-500">{text}</p></div>)}
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-md">
+        <section className="order-1 mx-auto w-full max-w-md">
           <div className="mb-6 flex items-center gap-3 lg:hidden">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-orange-600 to-amber-600 text-xs font-black text-white shadow-lg shadow-orange-900/20">IC</span>
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-brand-500 via-green-600 to-amber-600 text-xs font-black text-white shadow-lg shadow-green-900/20">IC</span>
             <div><p className="font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">QuickLink Learning</p></div>
           </div>
-          <div className="rounded-3xl border border-orange-100 bg-white/95 p-6 shadow-2xl shadow-orange-950/[0.07] backdrop-blur sm:p-8">
+          <div className="rounded-3xl border border-green-100 bg-white/95 p-6 shadow-2xl shadow-green-950/[0.07] backdrop-blur sm:p-8">
             <p className="eyebrow">Welcome back</p>
             <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Sign in to your portal</h1>
             <p className="mt-1.5 text-sm text-slate-500">Use the email and password linked to your student account.</p>

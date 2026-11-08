@@ -51,7 +51,7 @@ export default function AdminDashboard() {
       </div>
     </section>
 
-    <section className="mb-6 rounded-2xl border border-emerald-200/70 bg-gradient-to-r from-emerald-50 via-white to-orange-50 p-4 sm:p-5">
+    <section className="mb-6 rounded-2xl border border-emerald-200/70 bg-gradient-to-r from-emerald-50 via-white to-green-50 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="eyebrow text-emerald-700">Verified revenue</p><p className="mt-1 text-2xl font-black tracking-tight text-slate-950">{revenue}</p><p className="mt-0.5 text-xs text-slate-500">Confirmed and waived enrollments are not included in revenue.</p></div>
         <Link to="/enrollments" className="btn-secondary">Open enrollment ledger <ArrowRight size={15} /></Link>
@@ -61,8 +61,8 @@ export default function AdminDashboard() {
     <div className="mb-7 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
       <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03]">
         <div className="border-b border-slate-100 p-4 sm:p-5"><SectionHeader title="Recent enrollments" description="The latest students who joined a training." action={<Link to="/enrollments" className="text-sm font-semibold text-brand-700">View all</Link>} icon={Users} /></div>
-        {recentEnrollments.length ? <div className="divide-y divide-slate-100">{recentEnrollments.map((enrollment) => <div key={enrollment.id} className="flex flex-wrap items-center gap-3 p-4 transition hover:bg-orange-50/30">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orange-50 text-xs font-bold text-brand-800 ring-1 ring-orange-100">{enrollment.student?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
+        {recentEnrollments.length ? <div className="divide-y divide-slate-100">{recentEnrollments.map((enrollment) => <div key={enrollment.id} className="flex flex-wrap items-center gap-3 p-4 transition hover:bg-green-50/30">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-brand-800 ring-1 ring-green-100">{enrollment.student?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">{enrollment.student?.name || 'Student'}</p><p className="truncate text-xs text-slate-500">{enrollment.class?.title || 'Training'} · {formatDateTime(enrollment.enrolledAt)}</p></div>
           <Badge color={paymentTone[enrollment.paymentStatus] || 'slate'}>{paymentLabel[enrollment.paymentStatus] || enrollment.paymentStatus}</Badge>
           {enrollment.paymentReference && <Link to={`/enrollments?search=${encodeURIComponent(enrollment.student?.email || '')}`} className="text-xs font-semibold text-brand-700 hover:underline">Review</Link>}
@@ -72,8 +72,8 @@ export default function AdminDashboard() {
       <section className="space-y-4">
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
           <SectionHeader title="Upcoming trainings" description="Scheduled to start soon." icon={Video} />
-          {upcomingTrainings.length ? <div className="space-y-2">{upcomingTrainings.map((training) => <Link key={training.id} to={`/courses/${training.id}`} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-orange-200 hover:bg-orange-50/40"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-brand-700"><Video size={15} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-800">{training.title}</span><span className="block text-xs text-slate-500">{formatDateTime(training.startsAt)} · {training.enrolledCount} enrolled</span></span><ArrowRight size={14} className="text-slate-300" /></Link>)}</div> : <p className="text-sm text-slate-500">No upcoming start dates.</p>}
-          <Link to="/courses/new" className="mt-3 flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-orange-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-orange-50"><PlusCircle size={14} /> Create a training</Link>
+          {upcomingTrainings.length ? <div className="space-y-2">{upcomingTrainings.map((training) => <Link key={training.id} to={`/courses/${training.id}`} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-green-200 hover:bg-green-50/40"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-50 text-brand-700"><Video size={15} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-800">{training.title}</span><span className="block text-xs text-slate-500">{formatDateTime(training.startsAt)} · {training.enrolledCount} enrolled</span></span><ArrowRight size={14} className="text-slate-300" /></Link>)}</div> : <p className="text-sm text-slate-500">No upcoming start dates.</p>}
+          <Link to="/courses/new" className="mt-3 flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-green-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-green-50"><PlusCircle size={14} /> Create a training</Link>
         </div>
         <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
           <SectionHeader title="Quick actions" icon={Sparkles} />
@@ -83,7 +83,7 @@ export default function AdminDashboard() {
               { to: '/students', label: 'Manage students', icon: Users },
               { to: '/registrations', label: 'Registration queue', icon: UserCheck },
               { to: '/certificates', label: 'Certificates', icon: Award },
-            ].map(({ to, label, icon: Icon }) => <Link key={to} to={to} className="flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-orange-200 hover:bg-orange-50/40"><Icon size={16} className="text-brand-700" />{label}</Link>)}
+            ].map(({ to, label, icon: Icon }) => <Link key={to} to={to} className="flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-green-200 hover:bg-green-50/40"><Icon size={16} className="text-brand-700" />{label}</Link>)}
           </div>
         </div>
       </section>
@@ -91,7 +91,7 @@ export default function AdminDashboard() {
 
     <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
       <SectionHeader title="Recent activity" description="The latest actions across the platform." icon={Activity} action={<Link to="/enrollments" className="text-sm font-semibold text-brand-700">Open operations</Link>} />
-      {recentActivity.length ? <ol className="relative space-y-3 border-l border-orange-100 pl-4">{recentActivity.map((entry) => <li key={entry.id} className="relative"><span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-brand-500 ring-4 ring-white" /><p className="text-sm text-slate-700"><span className="font-semibold text-slate-900">{entry.actorName || 'System'}</span> {entry.message}</p><p className="mt-0.5 text-xs text-slate-400">{formatDateTime(entry.createdAt)}</p></li>)}</ol> : <EmptyState title="No activity yet" description="Actions will appear here as your team manages the platform." />}
+      {recentActivity.length ? <ol className="relative space-y-3 border-l border-green-100 pl-4">{recentActivity.map((entry) => <li key={entry.id} className="relative"><span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-brand-500 ring-4 ring-white" /><p className="text-sm text-slate-700"><span className="font-semibold text-slate-900">{entry.actorName || 'System'}</span> {entry.message}</p><p className="mt-0.5 text-xs text-slate-400">{formatDateTime(entry.createdAt)}</p></li>)}</ol> : <EmptyState title="No activity yet" description="Actions will appear here as your team manages the platform." />}
     </section>
   </div>;
 }

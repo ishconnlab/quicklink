@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, FileText, Users } from 'lucide-react';
+import { ArrowLeft, Download, FileText, Trash2, Users } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader, StatCard } from '../components/layout.jsx';
 import { EmptyState, PageLoader } from '../components/ui.jsx';
@@ -69,6 +69,15 @@ export default function ClassReportPage() {
     } catch (error) { toast.error(apiError(error).message); }
   };
 
+  const removeAttendance = async (person) => {
+    if (!window.confirm(`Remove ${person.name} from this attendance report?`)) return;
+    try {
+      await api.delete(`/classes/sessions/${sessionId}/attendance/${person.user}`);
+      const response = await api.get(`/classes/sessions/${sessionId}/report`);
+      setData(response.data.data);
+      toast.success('Attendance record removed.');
+    } catch (error) { toast.error(apiError(error).message); }
+  };
   const downloadPdf = async () => {
     try {
       const response = await api.get(`/classes/${data.class.id}/report.pdf`, { params: { sessionId }, responseType: 'blob' });
@@ -100,7 +109,7 @@ export default function ClassReportPage() {
     </div>
     <section className="card mb-4">
       <div className="mb-3 flex items-center justify-between gap-3"><h2 className="font-semibold text-slate-800">Attendance</h2><Badge color="brand">{report.attendance.length} people</Badge></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead><tr className="border-b border-slate-100 text-xs uppercase text-slate-400"><th className="py-2 pr-3">Name</th><th className="py-2 pr-3">Role</th><th className="py-2 pr-3">Status</th><th className="py-2 pr-3">First joined</th><th className="py-2 pr-3">Time present</th><th className="py-2">Joins</th></tr></thead><tbody>{report.attendance.map((person) => <tr key={`${person.user}-${person.role}`} className="border-b border-slate-50"><td className="py-3 pr-3"><span className="block font-medium text-slate-800">{person.name}</span><span className="text-xs text-slate-400">{person.email}</span>{person.correctionHistory?.map((correction, index) => <span key={index} className="block text-[10px] text-slate-400">Correction: {correction.fromStatus} → {correction.toStatus} · {correction.reason}</span>)}</td><td className="py-3 pr-3 capitalize text-slate-600">{person.role}</td><td className="py-3 pr-3"><Badge color={person.status === 'present' ? 'green' : person.status === 'late' ? 'amber' : person.status === 'early' || person.status === 'excused' ? 'brand' : 'slate'}>{person.status || (person.attended ? 'present' : 'absent')}</Badge>{canManage && person.role === 'student' && <button onClick={() => correctAttendance(person)} className="ml-2 text-xs text-brand-700">Correct</button>}</td><td className="py-3 pr-3 text-slate-600">{person.firstJoinedAt ? formatDateTime(person.firstJoinedAt) : '—'}</td><td className="py-3 pr-3 text-slate-600">{person.attended ? duration(person.totalSeconds) : '—'}</td><td className="py-3 text-slate-600">{person.joinCount || '—'}</td></tr>)}</tbody></table></div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left text-sm"><thead><tr className="border-b border-slate-100 text-xs uppercase text-slate-400"><th className="py-2 pr-3">Name</th><th className="py-2 pr-3">Role</th><th className="py-2 pr-3">Status</th><th className="py-2 pr-3">First joined</th><th className="py-2 pr-3">Time present</th><th className="py-2">Joins</th></tr></thead><tbody>{report.attendance.map((person) => <tr key={`${person.user}-${person.role}`} className="border-b border-slate-50"><td className="py-3 pr-3"><span className="block font-medium text-slate-800">{person.name}</span><span className="text-xs text-slate-400">{person.email}</span>{person.correctionHistory?.map((correction, index) => <span key={index} className="block text-[10px] text-slate-400">Correction: {correction.fromStatus} → {correction.toStatus} · {correction.reason}</span>)}</td><td className="py-3 pr-3 capitalize text-slate-600">{person.role}</td><td className="py-3 pr-3"><Badge color={person.status === 'present' ? 'green' : person.status === 'late' ? 'amber' : person.status === 'early' || person.status === 'excused' ? 'brand' : 'slate'}>{person.status || (person.attended ? 'present' : 'absent')}</Badge>{canManage && person.role === 'student' && <><button onClick={() => correctAttendance(person)} className="ml-2 text-xs text-brand-700">Correct</button><button title="Remove attendance record" aria-label={`Remove ${person.name} attendance`} onClick={() => removeAttendance(person)} className="ml-2 text-red-600"><Trash2 size={14} /></button></>}</td><td className="py-3 pr-3 text-slate-600">{person.firstJoinedAt ? formatDateTime(person.firstJoinedAt) : '—'}</td><td className="py-3 pr-3 text-slate-600">{person.attended ? duration(person.totalSeconds) : '—'}</td><td className="py-3 text-slate-600">{person.joinCount || '—'}</td></tr>)}</tbody></table></div>
     </section>
     {report.teacherNotes && <section className="card"><h2 className="mb-2 font-semibold text-slate-800">Session notes</h2><p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{report.teacherNotes}</p></section>}
   </div>;

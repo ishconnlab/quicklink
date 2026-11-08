@@ -15,6 +15,7 @@ const certificateSchema = new mongoose.Schema({
   book: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningBook', default: null, index: true },
   studentName: { type: String, required: true, trim: true, maxlength: 120 },
   courseTitle: { type: String, required: true, trim: true, maxlength: 160 },
+  description: { type: String, default: '', trim: true, maxlength: 500 },
   level: { type: String, default: 'Training', enum: ['L3', 'L4', 'L5', 'Bootcamp', 'Training'] },
   completionDate: { type: Date, default: null },
   issuedAt: { type: Date, required: true, default: Date.now, index: true },

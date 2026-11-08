@@ -819,6 +819,23 @@ export const correctAttendance = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { session: sessionJson(session, { report: true }) } });
 });
 
+export const removeAttendance = asyncHandler(async (req, res) => {
+  const session = await getSessionContext(req);
+  if (!isAdmin(req.user)) throw ApiError.forbidden('Only an administrator can remove attendance records.');
+  if (session.status !== 'ended') throw ApiError.conflict('Attendance records can be removed after the session ends.');
+  const personId = req.params.studentId;
+  const before = session.report.attendance.length;
+  session.report.attendance = session.report.attendance.filter((entry) => entry.user?.toString() !== personId);
+  session.attendance = session.attendance.filter((entry) => entry.user?.toString() !== personId);
+  if (session.report.attendance.length === before) throw ApiError.notFound('Attendance record not found.');
+  session.report.attendedCount = session.report.attendance.filter((person) => person.attended && person.role === 'student').length;
+  session.report.lateCount = session.report.attendance.filter((person) => person.status === 'late' && person.role === 'student').length;
+  session.report.earlyCount = session.report.attendance.filter((person) => person.status === 'early' && person.role === 'student').length;
+  session.report.excusedCount = session.report.attendance.filter((person) => person.status === 'excused' && person.role === 'student').length;
+  await session.save();
+  res.json({ success: true, data: { session: sessionJson(session, { report: true }) } });
+});
+
 export const archiveClass = asyncHandler(async (req, res) => {
   const item = await LearningClass.findById(req.params.id);
   if (!item) throw ApiError.notFound('Training not found.');
@@ -860,4 +877,5 @@ export default {
   endSession,
   getSessionReport,
   correctAttendance,
+  removeAttendance,
 };

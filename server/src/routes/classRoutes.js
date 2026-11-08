@@ -111,6 +111,7 @@ router.put('/sessions/:sessionId/notes', requireAdmin, validate(sessionParams, '
 router.post('/sessions/:sessionId/livekit-token', validate(sessionParams, 'params'), classes.createLiveKitToken);
 router.post('/sessions/:sessionId/end', requireAdmin, validate(sessionParams, 'params'), validate(z.object({ teacherNotes: z.string().trim().max(4000).optional().default('') })), classes.endSession);
 router.patch('/sessions/:sessionId/attendance/:studentId', requireAdmin, validate(attendanceParams, 'params'), validate(z.object({ status: z.enum(['present', 'absent', 'late', 'early', 'excused']), reason: z.string().trim().min(3).max(1000) })), classes.correctAttendance);
+router.delete('/sessions/:sessionId/attendance/:studentId', requireAdmin, validate(attendanceParams, 'params'), classes.removeAttendance);
 router.get('/sessions/:sessionId', validate(sessionParams, 'params'), classes.getSession);
 router.get('/', classes.listClasses);
 router.get('/:id/report.pdf', requireAdmin, validate(idParams, 'params'), validate(pdfQuery, 'query'), attendanceReports.downloadAttendancePdf);

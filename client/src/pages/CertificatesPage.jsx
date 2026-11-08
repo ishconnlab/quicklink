@@ -31,6 +31,8 @@ export default function CertificatesPage() {
   const [busyId, setBusyId] = useState('');
   const [renameTarget, setRenameTarget] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const [descriptionTarget, setDescriptionTarget] = useState(null);
+  const [descriptionValue, setDescriptionValue] = useState('');
   const [revokeTarget, setRevokeTarget] = useState(null);
   const [revokeReason, setRevokeReason] = useState('');
   const [saving, setSaving] = useState(false);
@@ -114,6 +116,18 @@ export default function CertificatesPage() {
     finally { setSaving(false); }
   };
 
+  const saveDescription = async () => {
+    if (!descriptionTarget) return;
+    setSaving(true);
+    try {
+      const response = await api.patch(`/certificates/${descriptionTarget.id}/description`, { description: descriptionValue.trim() });
+      setCertificates((current) => current.map((item) => item.id === descriptionTarget.id ? response.data.data.certificate : item));
+      setDescriptionTarget(null);
+      toast.success('Certificate description updated.');
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setSaving(false); }
+  };
+
   const revoke = async () => {
     if (!revokeTarget || revokeReason.trim().length < 3) return;
     setSaving(true);
@@ -186,6 +200,7 @@ export default function CertificatesPage() {
               {admin && <>
                 <Link to={`/courses/${certificate.courseId}`} className="btn-secondary"><Award size={15} />Training</Link>
                 {!certificate.revoked && <button className="btn-secondary" onClick={() => openRename(certificate)}><FilePenLine size={15} />Name</button>}
+                {!certificate.revoked && <button className="btn-secondary" onClick={() => { setDescriptionTarget(certificate); setDescriptionValue(certificate.description || ''); }}>Description</button>}
                 {!certificate.revoked && <button className="btn-ghost text-red-600" onClick={() => { setRevokeTarget(certificate); setRevokeReason(''); }}>Revoke</button>}
                 {certificate.revoked && <button className="btn-secondary" onClick={() => reissue(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <RefreshCcw size={15} />}Reissue</button>}
               </>}
@@ -198,6 +213,10 @@ export default function CertificatesPage() {
 
     {admin && <Modal open={Boolean(renameTarget)} onClose={() => !saving && setRenameTarget(null)} title="Correct certificate name" footer={<><button className="btn-secondary" onClick={() => setRenameTarget(null)} disabled={saving}>Cancel</button><button className="btn-primary" onClick={saveRename} disabled={saving || renameValue.trim().length < 2}>{saving ? <Spinner size={16} /> : <FilePenLine size={16} />}Save name</button></>}>
       <div className="space-y-3"><p className="text-sm leading-6 text-slate-600">Use the student’s full legal name as it should appear on the printed certificate. The verification page and PDF update immediately.</p><label className="block"><span className="label">Printed student name</span><input className="input" minLength={2} maxLength={120} value={renameValue} onChange={(event) => setRenameValue(event.target.value)} autoFocus /></label></div>
+    </Modal>}
+
+    {admin && <Modal open={Boolean(descriptionTarget)} onClose={() => !saving && setDescriptionTarget(null)} title="Edit certificate description" footer={<><button className="btn-secondary" onClick={() => setDescriptionTarget(null)} disabled={saving}>Cancel</button><button className="btn-primary" onClick={saveDescription} disabled={saving}>{saving ? <Spinner size={16} /> : <FilePenLine size={16} />}Save description</button></>}>
+      <label className="block"><span className="label">Printed description (up to 500 characters)</span><textarea className="input min-h-24" maxLength={500} value={descriptionValue} onChange={(event) => setDescriptionValue(event.target.value)} placeholder="Recognizing the learner's achievement and demonstrated skills." /></label>
     </Modal>}
 
     {admin && <Modal open={Boolean(revokeTarget)} onClose={() => !saving && setRevokeTarget(null)} title="Revoke certificate" footer={<><button className="btn-secondary" onClick={() => setRevokeTarget(null)} disabled={saving}>Cancel</button><button className="btn-danger" onClick={revoke} disabled={saving || revokeReason.trim().length < 3}>{saving ? <Spinner size={16} /> : <ShieldX size={16} />}Revoke certificate</button></>}>

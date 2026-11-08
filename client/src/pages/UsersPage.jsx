@@ -154,7 +154,6 @@ export default function UsersPage() {
       title: `Permanently delete ${person.name}?`,
       message: 'This removes the account, enrollments, assessment drafts, project submissions, certificates, registrations, and attendance personal records. Class sessions and training records remain. This cannot be undone.',
       confirmLabel: 'Delete account permanently',
-      confirmationText: 'DELETE',
       tone: 'danger',
     });
     if (!confirmed) return;

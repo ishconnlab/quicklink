@@ -39,6 +39,7 @@ export async function createCertificatePdf(certificate, verificationUrl) {
   drawCentered(certificate.courseTitle, height - 383, bold, 20, ACCENT_COLOR, width - 200);
   drawCentered(`${certificate.level}  ·  Issued ${new Date(certificate.issuedAt).toLocaleDateString('en-GB')}`, height - 407, regular, 11, BRAND_COLOR);
   drawCentered('IshConnect · QuickLink Learning Portal', height - 427, regular, 10, BRAND_COLOR);
+  if (certificate.description) drawCentered(certificate.description, height - 450, regular, 9, BRAND_COLOR, width - 180);
 
   const stampWidth = 76;
   const stampHeight = stamp.height * stampWidth / stamp.width;

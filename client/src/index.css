@@ -68,8 +68,8 @@
       disabled:cursor-not-allowed disabled:opacity-60 min-h-[44px];
   }
   .btn-primary {
-    @apply btn bg-gradient-to-r from-brand-600 via-orange-600 to-amber-500 text-white shadow-sm shadow-brand-900/20
-      hover:from-brand-700 hover:via-orange-700 hover:to-amber-600 active:from-brand-800 active:via-orange-800 active:to-amber-700;
+    @apply btn bg-brand-700 text-white shadow-sm shadow-brand-900/20
+      hover:bg-brand-800 active:bg-brand-900;
   }
   .btn-secondary {
     @apply btn bg-white text-slate-700 shadow-sm shadow-slate-900/[0.03] ring-1 ring-slate-200
