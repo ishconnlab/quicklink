@@ -53,6 +53,7 @@ export default function CoursesPage() {
   const [result, setResult] = useState({ courses: [], subjects: [], trades: [], page: 1, pages: 1, total: 0 });
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState('');
+  const hasFilters = Boolean(filters.search || filters.level || filters.subject || filters.sort !== 'newest');
 
   const load = useCallback(async (page = 1) => {
     setLoading(true);
@@ -94,17 +95,19 @@ export default function CoursesPage() {
       actions={admin ? <Link to="/courses/new" className="btn-primary"><PlusCircle size={17} />New training</Link> : <Link to="/classes" className="btn-secondary">My live classes</Link>}
     />
 
-    <div className="mb-5 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm shadow-slate-900/[0.03] sm:p-4">
-      <div className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-slate-400"><SlidersHorizontal size={14} className="text-brand-700" />Refine results</div>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="relative sm:col-span-2 lg:col-span-1"><Search size={16} className="absolute left-3 top-3.5 text-slate-400" /><input className="input pl-9" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Search trainings" aria-label="Search trainings" /></label>
-        <select className="input" value={filters.level} onChange={(event) => setFilters({ ...filters, level: event.target.value })} aria-label="Filter by level"><option value="">All levels</option>{['Bootcamp', 'Training'].map((level) => <option key={level}>{level}</option>)}</select>
-        <select className="input" value={filters.subject} onChange={(event) => setFilters({ ...filters, subject: event.target.value })} aria-label="Filter by subject"><option value="">All subjects</option>{result.subjects.map((subject) => <option key={subject}>{subject}</option>)}</select>
-        <select className="input" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })} aria-label="Sort trainings"><option value="newest">Recently updated</option><option value="title">Title A–Z</option><option value="popular">Most enrolled</option><option value="level">Level</option></select>
+    <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-50 text-brand-700"><SlidersHorizontal size={15} /></span><div className="min-w-0"><h2 className="text-sm font-semibold text-slate-900">Find a training</h2><p className="hidden text-xs text-slate-500 sm:block">Search by name, subject or level</p></div></div>
+        {hasFilters && <button type="button" className="btn-ghost min-h-9 px-2 text-xs text-brand-700" onClick={() => setFilters({ search: '', level: '', subject: '', sort: 'newest' })}>Clear filters</button>}
       </div>
-      <p className="mt-2 text-xs text-slate-400">{result.total} training{result.total === 1 ? '' : 's'} found{admin ? ' · archived and draft trainings included' : ' · enrolled only'}</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <label className="relative col-span-2 sm:col-span-1"><span className="sr-only">Search trainings</span><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="input pl-9 text-sm" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} placeholder="Search trainings" aria-label="Search trainings" /></label>
+        <select className="input min-w-0 text-sm" value={filters.level} onChange={(event) => setFilters({ ...filters, level: event.target.value })} aria-label="Filter by level"><option value="">Any level</option>{['Bootcamp', 'Training'].map((level) => <option key={level}>{level}</option>)}</select>
+        <select className="input min-w-0 text-sm" value={filters.subject} onChange={(event) => setFilters({ ...filters, subject: event.target.value })} aria-label="Filter by subject"><option value="">Any subject</option>{result.subjects.map((subject) => <option key={subject}>{subject}</option>)}</select>
+        <select className="input col-span-2 min-w-0 text-sm sm:col-span-1" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })} aria-label="Sort trainings"><option value="newest">Recently updated</option><option value="title">Name A-Z</option><option value="popular">Most enrolled</option><option value="level">Level</option></select>
+      </div>
+      <p className="mt-2 text-xs text-slate-500">{result.total} training{result.total === 1 ? '' : 's'}{admin ? ' · includes drafts' : ' · your enrolled trainings'}</p>
     </div>
-
     {loading ? <PageLoader label="Loading trainings…" /> : !result.courses.length ? <EmptyState icon={GraduationCap} title={admin ? 'No trainings found' : 'No enrolled trainings'} description={admin ? 'Create the first training or adjust your filters.' : 'Your trainings will appear here after enrollment.'} action={admin ? <Link to="/courses/new" className="btn-primary">Create training</Link> : null} /> : <>
       <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">{result.courses.map((course) => <CourseCard key={course.id} course={course} admin={admin} onDelete={deleteTraining} deleting={deletingId === course.id} />)}</div>
       {result.pages > 1 && <div className="mt-5 flex items-center justify-center gap-3"><button className="btn-secondary" disabled={result.page <= 1} onClick={() => load(result.page - 1)}>Previous</button><span className="text-sm text-slate-500">Page {result.page} of {result.pages}</span><button className="btn-secondary" disabled={result.page >= result.pages} onClick={() => load(result.page + 1)}>Next</button></div>}

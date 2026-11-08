@@ -63,8 +63,9 @@ export default function StudentDashboard() {
     return Math.round(completion.checks.filter((check) => check.complete).length / completion.checks.length * 100);
   };
 
-  return <div>
+  return <div className="quicklink-dashboard">
     <PageHeader
+      className="quicklink-dashboard-header"
       eyebrow="Student workspace"
       title={`Welcome back, ${firstName}`}
       subtitle="Your trainings, live sessions, projects, assessments, and certificates are all in one place."
@@ -78,7 +79,7 @@ export default function StudentDashboard() {
 
     <section className="mb-7">
       <SectionHeader title="Your snapshot" description="A quick view of your current learning." icon={Sparkles} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="quicklink-dashboard-stats grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Active trainings" value={state.courses.length} icon={GraduationCap} hint="Enrolled and in progress" />
         <StatCard label="Live now" value={liveClasses.length} icon={Radio} accent="red" hint={liveClasses.length ? 'Join from My live classes' : 'No sessions live'} />
         <StatCard label="Completed" value={completedTrainings} icon={CheckCircle2} accent="green" hint="Requirements fully met" />

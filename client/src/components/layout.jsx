@@ -2,9 +2,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useEffect, useId } from 'react';
 
-export function PageHeader({ title, subtitle, actions, eyebrow }) {
+export function PageHeader({ title, subtitle, actions, eyebrow, className = '' }) {
   return (
-    <div className="relative mb-6 overflow-hidden rounded-2xl border border-green-200 bg-white p-5 sm:p-7">
+    <div className={`quicklink-page-header relative mb-6 overflow-hidden rounded-2xl border border-green-200 bg-white p-5 sm:p-7 ${className}`}>
       <div className="relative flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           {eyebrow && <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-brand-700">{eyebrow}</p>}

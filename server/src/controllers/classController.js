@@ -166,7 +166,9 @@ function learnerSessionJson(session, user) {
 }
 
 function courseJson(item, user, enrollment = null) {
-  const enrolled = Boolean(enrollment && enrollment.status === 'enrolled');
+  const userId = String(user?._id || '');
+  const enrolled = Boolean(enrollment && enrollment.status === 'enrolled')
+    || Boolean(userId && (item.students || []).some((student) => String(student?._id ?? student) === userId));
   const enrolledCount = (item.students || []).length;
   const enrollmentStatus = enrolled ? 'enrolled'
     : !item.active ? 'archived'

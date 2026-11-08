@@ -39,8 +39,9 @@ export default function AdminDashboard() {
     } catch (error) { toast.error(apiError(error).message); }
   };
 
-  return <div>
+  return <div className="quicklink-dashboard">
     <PageHeader
+      className="quicklink-dashboard-header"
       eyebrow="Administration"
       title="Training command center"
       subtitle="Monitor enrollments, payments, live sessions, assessments, and certificates across the platform."
@@ -49,7 +50,7 @@ export default function AdminDashboard() {
 
     <section className="mb-7">
       <SectionHeader title="Platform pulse" description="Live totals across every training." icon={Sparkles} />
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="quicklink-dashboard-stats grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Active students" value={stats.activeStudents} icon={GraduationCap} hint={`${stats.students} total student accounts`} />
         <StatCard label="Active trainings" value={stats.trainings} icon={Video} hint={`${stats.enrollments} current enrollments`} />
         <StatCard label="Pending payments" value={stats.pendingPayments} icon={CreditCard} accent="amber" hint="Waiting for verification" />
