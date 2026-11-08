@@ -12,12 +12,12 @@ const paymentLabel = { not_required: 'Not required', unpaid: 'Unpaid', pending: 
 
 export default function AdminDashboard() {
   const toast = useToast();
-  const [state, setState] = useState({ loading: true, data: null });
+  const [state, setState] = useState({ loading: true, data: null, notifications: [] });
   const load = useCallback(async () => {
     setState((current) => ({ ...current, loading: true }));
     try {
-      const response = await api.get('/admin/dashboard');
-      setState({ loading: false, data: response.data.data });
+      const [response, notificationResponse] = await Promise.all([api.get('/admin/dashboard'), api.get('/users/notifications')]);
+      setState({ loading: false, data: response.data.data, notifications: notificationResponse.data.data.notifications });
     } catch (error) {
       toast.error(apiError(error).message);
       setState((current) => ({ ...current, loading: false }));
@@ -30,6 +30,14 @@ export default function AdminDashboard() {
 
   const { stats, recentEnrollments, upcomingTrainings, recentActivity } = state.data;
   const revenue = stats.revenueByCurrency?.length ? stats.revenueByCurrency.map((item) => formatMoney(item.total, item.currency)).join(' · ') : 'No payments recorded';
+  const submissionNotifications = state.notifications.filter((item) => ['assignment', 'project'].includes(item.type));
+
+  const markRead = async (item) => {
+    try {
+      await api.patch(`/users/notifications/${item.id}/read`);
+      setState((current) => ({ ...current, notifications: current.notifications.map((notification) => notification.id === item.id ? { ...notification, read: true } : notification) }));
+    } catch (error) { toast.error(apiError(error).message); }
+  };
 
   return <div>
     <PageHeader
@@ -51,6 +59,11 @@ export default function AdminDashboard() {
       </div>
     </section>
 
+    <section className="mb-6 rounded-2xl border border-green-200 bg-white p-4 sm:p-5">
+      <SectionHeader title="Submission inbox" description="New student work sent to the admin team." icon={ReceiptText} action={<Link to="/courses" className="text-sm font-semibold text-brand-700">Open training manager</Link>} />
+      {submissionNotifications.length ? <div className="divide-y divide-slate-100">{submissionNotifications.slice(0, 8).map((item) => <div key={item.id} className={`flex items-center gap-3 py-3 ${item.read ? '' : 'bg-green-50/60'}`}><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-slate-800">{item.title}</span><span className="block text-xs text-slate-500">{item.message} · {formatDateTime(item.createdAt)}</span></span><Link to={item.href || '/courses'} onClick={() => markRead(item)} className="btn-secondary min-h-9">Review</Link></div>)}</div> : <p className="text-sm text-slate-500">New assignment and project submissions will appear here.</p>}
+    </section>
+
     <section className="mb-6 rounded-2xl border border-emerald-200/70 bg-green-50 p-4 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><p className="eyebrow text-emerald-700">Verified revenue</p><p className="mt-1 text-2xl font-black tracking-tight text-slate-950">{revenue}</p><p className="mt-0.5 text-xs text-slate-500">Confirmed and waived enrollments are not included in revenue.</p></div>
@@ -59,7 +72,7 @@ export default function AdminDashboard() {
     </section>
 
     <div className="mb-7 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
-      <section className="rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03]">
+      <section className="rounded-2xl border border-slate-200/80 bg-white">
         <div className="border-b border-slate-100 p-4 sm:p-5"><SectionHeader title="Recent enrollments" description="The latest students who joined a training." action={<Link to="/enrollments" className="text-sm font-semibold text-brand-700">View all</Link>} icon={Users} /></div>
         {recentEnrollments.length ? <div className="divide-y divide-slate-100">{recentEnrollments.map((enrollment) => <div key={enrollment.id} className="flex flex-wrap items-center gap-3 p-4 transition hover:bg-green-50/30">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-brand-800 ring-1 ring-green-100">{enrollment.student?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
@@ -70,12 +83,12 @@ export default function AdminDashboard() {
       </section>
 
       <section className="space-y-4">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5">
           <SectionHeader title="Upcoming trainings" description="Scheduled to start soon." icon={Video} />
           {upcomingTrainings.length ? <div className="space-y-2">{upcomingTrainings.map((training) => <Link key={training.id} to={`/courses/${training.id}`} className="flex items-center gap-3 rounded-xl border border-slate-100 p-3 transition hover:border-green-200 hover:bg-green-50/40"><span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-green-50 text-brand-700"><Video size={15} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-800">{training.title}</span><span className="block text-xs text-slate-500">{formatDateTime(training.startsAt)} · {training.enrolledCount} enrolled</span></span><ArrowRight size={14} className="text-slate-300" /></Link>)}</div> : <p className="text-sm text-slate-500">No upcoming start dates.</p>}
           <Link to="/courses/new" className="mt-3 flex items-center justify-center gap-1.5 rounded-xl border border-dashed border-green-200 px-3 py-2 text-xs font-semibold text-brand-700 hover:bg-green-50"><PlusCircle size={14} /> Create a training</Link>
         </div>
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5">
           <SectionHeader title="Quick actions" icon={Sparkles} />
           <div className="grid gap-2 sm:grid-cols-2">
             {[
@@ -83,13 +96,16 @@ export default function AdminDashboard() {
               { to: '/students', label: 'Manage students', icon: Users },
               { to: '/registrations', label: 'Registration queue', icon: UserCheck },
               { to: '/certificates', label: 'Certificates', icon: Award },
+              { to: '/courses', label: 'Manage trainings', icon: GraduationCap },
+              { to: '/classes', label: 'Live classes', icon: Radio },
+              { to: '/settings', label: 'Platform settings', icon: Activity },
             ].map(({ to, label, icon: Icon }) => <Link key={to} to={to} className="flex items-center gap-2 rounded-xl border border-slate-100 px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-green-200 hover:bg-green-50/40"><Icon size={16} className="text-brand-700" />{label}</Link>)}
           </div>
         </div>
       </section>
     </div>
 
-    <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+    <section className="rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5">
       <SectionHeader title="Recent activity" description="The latest actions across the platform." icon={Activity} action={<Link to="/enrollments" className="text-sm font-semibold text-brand-700">Open operations</Link>} />
       {recentActivity.length ? <ol className="relative space-y-3 border-l border-green-100 pl-4">{recentActivity.map((entry) => <li key={entry.id} className="relative"><span className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-brand-500 ring-4 ring-white" /><p className="text-sm text-slate-700"><span className="font-semibold text-slate-900">{entry.actorName || 'System'}</span> {entry.message}</p><p className="mt-0.5 text-xs text-slate-400">{formatDateTime(entry.createdAt)}</p></li>)}</ol> : <EmptyState title="No activity yet" description="Actions will appear here as your team manages the platform." />}
     </section>

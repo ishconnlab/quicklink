@@ -153,14 +153,14 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
       </div>
       <p className="mt-3 text-sm text-slate-600">{status.text}</p>
       {payload?.latestAttempt && <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-xs text-slate-600">Latest attempt: <span className="font-bold text-slate-900">{payload.latestAttempt.score}%</span> · {payload.latestAttempt.passed ? 'Passed' : 'Not passed'} · {new Date(payload.latestAttempt.submittedAt).toLocaleString()}</div>}
-      {payload?.lockdown && <p className="mt-3 flex items-start gap-2 rounded-xl bg-orange-50 px-3 py-2.5 text-xs leading-5 text-brand-900"><LockKeyhole size={14} className="mt-0.5 shrink-0" />Lockdown mode: fullscreen is requested, leaving fullscreen is recorded, and copying question text is disabled.</p>}
+      {payload?.lockdown && <p className="mt-3 flex items-start gap-2 rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900"><LockKeyhole size={14} className="mt-0.5 shrink-0" />Lockdown mode: fullscreen is requested, leaving fullscreen is recorded, and copying question text is disabled.</p>}
       <div className="mt-4 flex flex-wrap gap-2"><button className="btn-primary" onClick={begin} disabled={starting || !payload?.canStart}>{starting ? <Spinner size={16} /> : payload?.draft ? <RefreshCw size={16} /> : <Play size={16} />}{payload?.draft ? 'Resume assessment' : 'Start assessment'}</button>{payload?.passed && <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700"><CheckCircle2 size={16} />Assessment complete</span>}</div>
       {!payload?.canStart && !payload?.passed && <p className="mt-2 text-xs text-slate-400">{!payload?.enabled ? 'Administrator setup required.' : !payload?.configured ? 'All 10 questions must be configured.' : payload?.projectSubmissionRequired && !payload?.projectSubmitted ? 'Submit the project above to unlock this assessment.' : payload?.attemptsRemaining <= 0 ? 'No attempts remain.' : 'You cannot start this assessment right now.'}</p>}
     </section>
 
     {taking && <div className="fixed inset-0 z-[100] overflow-y-auto bg-[#fffaf5]" onCopy={(event) => event.preventDefault()} onContextMenu={(event) => event.preventDefault()}>
       <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-4 sm:px-6 sm:py-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-white/95 p-3 shadow-sm backdrop-blur sm:p-4">
+        <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-100 bg-white/95 p-3 shadow-sm backdrop-blur sm:p-4">
           <div><p className="eyebrow">Certification assessment</p><p className="mt-0.5 text-sm font-bold text-slate-900">{payload?.title}</p></div>
           <div className="flex items-center gap-2">
             <span className="hidden items-center gap-1 text-xs text-slate-500 sm:inline-flex">{payload?.lockdown ? <LockKeyhole size={13} /> : <ShieldCheck size={13} />}{payload?.lockdown ? 'Lockdown active' : 'Standard mode'}</span>
@@ -177,7 +177,7 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
             <ProgressBar value={progress} />
             <h1 className="mt-6 select-none text-lg font-bold leading-8 text-slate-950 sm:text-xl">{questions[current]?.prompt}</h1>
             <div className="mt-5 space-y-2.5 select-none">
-              {(questions[current]?.options || []).map((option, index) => <button key={index} type="button" onClick={() => setAnswers((value) => ({ ...value, [current]: index }))} className={`flex w-full items-start gap-3 rounded-xl border p-3.5 text-left text-sm transition ${answers[current] === index ? 'border-brand-400 bg-orange-50 text-brand-950 ring-2 ring-brand-200' : 'border-slate-200 bg-white text-slate-700 hover:border-orange-200 hover:bg-orange-50/40'}`}><span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${answers[current] === index ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{String.fromCharCode(65 + index)}</span><span className="pt-0.5 leading-6">{option}</span></button>)}
+              {(questions[current]?.options || []).map((option, index) => <button key={index} type="button" onClick={() => setAnswers((value) => ({ ...value, [current]: index }))} className={`flex w-full items-start gap-3 rounded-xl border p-3.5 text-left text-sm transition ${answers[current] === index ? 'border-brand-400 bg-green-50 text-brand-950 ring-2 ring-brand-200' : 'border-slate-200 bg-white text-slate-700 hover:border-green-200 hover:bg-green-50/40'}`}><span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${answers[current] === index ? 'bg-brand-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{String.fromCharCode(65 + index)}</span><span className="pt-0.5 leading-6">{option}</span></button>)}
             </div>
             <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
               <button className="btn-secondary" disabled={current === 0} onClick={() => setCurrent((value) => Math.max(0, value - 1))}><ChevronLeft size={16} />Previous</button>
@@ -186,9 +186,9 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
           </main>
           <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">Questions</p>
-            <div className="mt-3 grid grid-cols-5 gap-1.5 lg:grid-cols-4">{questions.map((_, index) => <button key={index} type="button" onClick={() => setCurrent(index)} className={`flex h-9 items-center justify-center rounded-lg text-xs font-bold transition ${index === current ? 'bg-slate-900 text-white' : answers[index] !== undefined ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500 hover:bg-orange-100'}`}>{index + 1}</button>)}</div>
+            <div className="mt-3 grid grid-cols-5 gap-1.5 lg:grid-cols-4">{questions.map((_, index) => <button key={index} type="button" onClick={() => setCurrent(index)} className={`flex h-9 items-center justify-center rounded-lg text-xs font-bold transition ${index === current ? 'bg-slate-900 text-white' : answers[index] !== undefined ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500 hover:bg-green-100'}`}>{index + 1}</button>)}</div>
             <div className="mt-4 space-y-1.5 text-xs text-slate-500"><p className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded bg-emerald-300" />Answered</p><p className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded bg-slate-200" />Unanswered</p><p className="flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded bg-slate-900" />Current</p></div>
-            <div className="mt-4 rounded-xl bg-orange-50 p-3 text-xs leading-5 text-brand-900"><p className="font-semibold">Attempts</p><p>{payload?.attemptsRemaining} remaining after this attempt.</p></div>
+            <div className="mt-4 rounded-xl bg-green-50 p-3 text-xs leading-5 text-brand-900"><p className="font-semibold">Attempts</p><p>{payload?.attemptsRemaining} remaining after this attempt.</p></div>
           </aside>
         </div>
       </div>

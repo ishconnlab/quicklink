@@ -15,6 +15,7 @@ import { gradeAssessment, sanitizeAssessmentQuestions } from '../services/finalA
 import { assertCanAttend } from '../services/classAccess.js';
 import config from '../config/env.js';
 import { isAdmin } from '../security/roles.js';
+import { notifyUsers } from '../services/notifications.js';
 
 const COURSE_FIELDS = [
   'title', 'level', 'active', 'published', 'students', 'learningMaterials', 'completionRequirements',
@@ -476,7 +477,7 @@ export const getMyProjectSubmission = asyncHandler(async (req, res) => {
 });
 
 export const submitProject = asyncHandler(async (req, res) => {
-  const course = await LearningClass.findById(req.params.id).select('students projectSubmission payment startsAt createdAt');
+  const course = await LearningClass.findById(req.params.id).select('title students projectSubmission payment startsAt createdAt');
   if (!course) throw ApiError.notFound('Training not found.');
   if (req.user.role !== 'student' || !course.students.some((student) => student.toString() === req.user._id.toString())) {
     throw ApiError.forbidden('Enroll in this training to submit its project.');
@@ -505,6 +506,8 @@ export const submitProject = asyncHandler(async (req, res) => {
     },
     { upsert: true, new: true, runValidators: true },
   );
+  const admins = await User.find({ role: 'admin', isActive: true }).distinct('_id');
+  await notifyUsers(admins, { type: 'assignment', title: 'Project submitted', message: `${req.user.name} submitted a project for ${course.title || 'a training'}.`, href: `/courses/${course._id}` });
   res.status(201).json({ success: true, data: { submission: { ...submission.toObject(), id: submission._id.toString() } } });
 });
 
@@ -569,7 +572,7 @@ export const verifyCertificate = asyncHandler(async (req, res) => {
       completionDate: certificate.completionDate || certificate.issuedAt,
       issuedAt: certificate.issuedAt,
       certificateId: certificate.code,
-      issuer: 'IshConnect',
+      issuer: 'QuickLink',
       learningPortal: 'QuickLink Learning Portal',
       verificationPath: `/verify/${certificate.code}`,
       sharePath: `/api/certificates/share/${certificate.code}`,
@@ -589,12 +592,12 @@ export const shareCertificate = asyncHandler(async (req, res) => {
   const status = certificate.revokedAt ? 'Revoked certificate' : 'Verified certificate';
   const title = `${status}: ${certificate.studentName} - ${certificate.courseTitle}`;
   const description = certificate.revokedAt
-    ? 'This IshConnect certificate has been revoked. View its current verification status in the QuickLink Learning Portal.'
-    : `${certificate.studentName} completed ${certificate.courseTitle} (${certificate.level}) through the QuickLink Learning Portal. Verify this IshConnect certificate online.`;
+    ? 'This QuickLink certificate has been revoked. View its current verification status in the QuickLink Learning Portal.'
+    : `${certificate.studentName} completed ${certificate.courseTitle} (${certificate.level}) through the QuickLink Learning Portal. Verify this QuickLink certificate online.`;
   const escapeHtml = (value) => String(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=300');
-  res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}"><meta property="og:type" content="website"><meta property="og:site_name" content="IshConnect - QuickLink Learning Portal"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(shareUrl)}"><meta property="og:image" content="${escapeHtml(imageUrl)}"><meta property="og:image:alt" content="IshConnect corporate seal"><meta name="twitter:card" content="summary"><meta http-equiv="refresh" content="0;url=${escapeHtml(verificationUrl)}"></head><body><p>Opening the <a href="${escapeHtml(verificationUrl)}">certificate verification page</a>...</p><script>window.location.replace(${JSON.stringify(verificationUrl)})</script></body></html>`);
+  res.send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><meta name="description" content="${escapeHtml(description)}"><meta property="og:type" content="website"><meta property="og:site_name" content="QuickLink - QuickLink Learning Portal"><meta property="og:title" content="${escapeHtml(title)}"><meta property="og:description" content="${escapeHtml(description)}"><meta property="og:url" content="${escapeHtml(shareUrl)}"><meta property="og:image" content="${escapeHtml(imageUrl)}"><meta property="og:image:alt" content="QuickLink corporate seal"><meta name="twitter:card" content="summary"><meta http-equiv="refresh" content="0;url=${escapeHtml(verificationUrl)}"></head><body><p>Opening the <a href="${escapeHtml(verificationUrl)}">certificate verification page</a>...</p><script>window.location.replace(${JSON.stringify(verificationUrl)})</script></body></html>`);
 });
 
 export const revokeCertificate = asyncHandler(async (req, res) => {

@@ -16,7 +16,7 @@ const paymentLabel = { not_required: 'No payment', unpaid: 'Payment due', pendin
 function CourseCard({ course, admin }) {
   const action = admin ? 'Manage training' : course.enrolled ? 'Open training' : course.enrollmentStatus === 'open' ? 'View and enroll' : 'View details';
   const payment = course.enrollment?.payment;
-  return <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03] transition duration-200 hover:-translate-y-0.5 hover:border-orange-200 hover:shadow-md">
+  return <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03] transition duration-200 hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
     <div className="relative aspect-[16/9] overflow-hidden">
       <CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="absolute inset-0 transition duration-300 group-hover:scale-[1.02]" />
       <div className="absolute inset-x-0 bottom-0 h-16 bg-green-50" />
@@ -69,8 +69,8 @@ export default function CoursesPage() {
   return <div>
     <PageHeader
       eyebrow={admin ? 'Training operations' : 'Training catalog'}
-      title={admin ? 'Trainings' : 'Explore trainings'}
-      subtitle={admin ? 'Create, publish, schedule, and manage every IshConnect training.' : 'Choose a program, enroll, and follow your path to a verified certificate.'}
+      title={admin ? 'Trainings' : 'My trainings'}
+      subtitle={admin ? 'Create, publish, schedule, and manage every QuickLink training.' : 'Your enrolled trainings and learning progress.'}
       actions={admin ? <Link to="/courses/new" className="btn-primary"><PlusCircle size={17} />New training</Link> : <Link to="/classes" className="btn-secondary">My live classes</Link>}
     />
 
@@ -82,10 +82,10 @@ export default function CoursesPage() {
         <select className="input" value={filters.subject} onChange={(event) => setFilters({ ...filters, subject: event.target.value })} aria-label="Filter by subject"><option value="">All subjects</option>{result.subjects.map((subject) => <option key={subject}>{subject}</option>)}</select>
         <select className="input" value={filters.sort} onChange={(event) => setFilters({ ...filters, sort: event.target.value })} aria-label="Sort trainings"><option value="newest">Recently updated</option><option value="title">Title A–Z</option><option value="popular">Most enrolled</option><option value="level">Level</option></select>
       </div>
-      <p className="mt-2 text-xs text-slate-400">{result.total} training{result.total === 1 ? '' : 's'} found{admin ? ' · archived and draft trainings included' : ''}</p>
+      <p className="mt-2 text-xs text-slate-400">{result.total} training{result.total === 1 ? '' : 's'} found{admin ? ' · archived and draft trainings included' : ' · enrolled only'}</p>
     </div>
 
-    {loading ? <PageLoader label="Loading trainings…" /> : !result.courses.length ? <EmptyState icon={GraduationCap} title="No trainings found" description={admin ? 'Create the first training or adjust your filters.' : 'Try changing your search or filters.'} action={admin ? <Link to="/courses/new" className="btn-primary">Create training</Link> : null} /> : <>
+    {loading ? <PageLoader label="Loading trainings…" /> : !result.courses.length ? <EmptyState icon={GraduationCap} title={admin ? 'No trainings found' : 'No enrolled trainings'} description={admin ? 'Create the first training or adjust your filters.' : 'Your trainings will appear here after enrollment.'} action={admin ? <Link to="/courses/new" className="btn-primary">Create training</Link> : null} /> : <>
       <div className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-3">{result.courses.map((course) => <CourseCard key={course.id} course={course} admin={admin} />)}</div>
       {result.pages > 1 && <div className="mt-5 flex items-center justify-center gap-3"><button className="btn-secondary" disabled={result.page <= 1} onClick={() => load(result.page - 1)}>Previous</button><span className="text-sm text-slate-500">Page {result.page} of {result.pages}</span><button className="btn-secondary" disabled={result.page >= result.pages} onClick={() => load(result.page + 1)}>Next</button></div>}
     </>}

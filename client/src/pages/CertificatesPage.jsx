@@ -94,7 +94,7 @@ export default function CertificatesPage() {
   const share = async (certificate) => {
     const url = verifyUrl(certificate);
     try {
-      if (navigator.share) await navigator.share({ title: `${certificate.courseTitle} certificate`, text: `Verified IshConnect certificate for ${certificate.studentName}`, url });
+      if (navigator.share) await navigator.share({ title: `${certificate.courseTitle} certificate`, text: `Verified QuickLink certificate for ${certificate.studentName}`, url });
       else { await navigator.clipboard.writeText(url); toast.success('Verification link copied.'); }
     } catch (error) { if (error.name !== 'AbortError') toast.error('Could not share the certificate link.'); }
   };
@@ -160,7 +160,7 @@ export default function CertificatesPage() {
     <PageHeader
       eyebrow={admin ? 'Credential registry' : 'Your achievements'}
       title={admin ? 'Certificates' : 'My certificates'}
-      subtitle={admin ? 'Search the registry, correct printed names, revoke credentials, and reissue with a fresh verification code. Issue new certificates from a training page.' : 'Download, share, and verify the certificates you earned through IshConnect trainings. Every certificate has a public verification page.'}
+      subtitle={admin ? 'Search the registry, correct printed names, revoke credentials, and reissue with a fresh verification code. Issue new certificates from a training page.' : 'Download, share, and verify the certificates you earned through QuickLink trainings. Every certificate has a public verification page.'}
       actions={admin ? <Link to="/courses" className="btn-primary"><Award size={17} />Issue from trainings</Link> : <Link to="/courses" className="btn-secondary"><Sparkles size={17} />Find another training</Link>}
     />
 
@@ -185,7 +185,7 @@ export default function CertificatesPage() {
           <div className={`h-1 ${certificate.revoked ? 'bg-red-500' : 'bg-brand-600'}`} />
           <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-start gap-3">
-              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${certificate.revoked ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-brand-700'}`}>{certificate.revoked ? <ShieldX size={21} /> : <Award size={21} />}</span>
+              <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${certificate.revoked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-brand-700'}`}>{certificate.revoked ? <ShieldX size={21} /> : <Award size={21} />}</span>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-1.5"><h2 className="break-words font-bold text-slate-900">{certificate.courseTitle}</h2><Badge color={certificate.revoked ? 'red' : 'green'}>{certificate.revoked ? 'Revoked' : 'Valid'}</Badge><Badge color="slate">{certificate.level}</Badge>{certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}</div>
                 <p className="mt-1 text-sm text-slate-600">Awarded to <strong className="text-slate-800">{certificate.studentName}</strong></p>

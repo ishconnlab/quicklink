@@ -20,7 +20,7 @@ export const DEFAULT_PLATFORM_SETTINGS = Object.freeze({
     instructions: 'Pay using the provided mobile money code, then submit the transaction reference for verification.',
   },
   certificates: {
-    issuer: 'IshConnect',
+    issuer: 'QuickLink',
     portalName: 'QuickLink Learning Portal',
     batchLimit: 20,
   },

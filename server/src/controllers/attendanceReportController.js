@@ -50,13 +50,13 @@ export const downloadAttendancePdf = asyncHandler(async (req, res) => {
   const doc = new PDFDocument({ size: 'A4', margins: { top: 42, right: margin, bottom: 42, left: margin }, bufferPages: true, info: { Title: `Attendance report - ${classItem.title}`, Author: 'QuickLink' } });
   doc.pipe(res);
   doc.font('Helvetica-Bold').fontSize(18).fillColor('#166534').text('ATTENDANCE REPORT');
-  doc.moveDown(0.25).font('Helvetica').fontSize(9).fillColor('#475569').text('IshConnect · QuickLink Learning | Official training record');
+  doc.moveDown(0.25).font('Helvetica').fontSize(9).fillColor('#475569').text('QuickLink · QuickLink Learning | Official training record');
   doc.moveDown(0.6).moveTo(margin, doc.y).lineTo(pageWidth - margin, doc.y).lineWidth(1.5).strokeColor('#15803d').stroke();
   doc.moveDown(0.6).font('Helvetica-Bold').fontSize(10).fillColor('#0f172a').text('TRAINING DETAILS');
   doc.moveDown(0.3).font('Helvetica').fontSize(9).fillColor('#334155');
   doc.text(`Training: ${classItem.course || classItem.title}`);
   doc.text(`Class: ${classItem.title} - ${classItem.subject} - ${classItem.level}`);
-  doc.text('Managed by: IshConnect administrators');
+  doc.text('Managed by: QuickLink administrators');
   doc.text(`Timezone: ${classItem.timezone || 'UTC'} - ${classItem.schedule || 'Scheduled time not set'}`);
   doc.text(`Planned class start: ${classItem.startsAt ? new Date(classItem.startsAt).toLocaleString('en', { timeZone: classItem.timezone || 'UTC' }) : 'Not set'} - Planned duration: ${classItem.durationMinutes || 60} minutes`);
   doc.text(`Report ID: ${classItem._id.toString()} - Generated: ${new Date().toISOString()}`);

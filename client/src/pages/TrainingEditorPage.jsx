@@ -30,7 +30,7 @@ const newRequestId = () => Array.from(crypto.getRandomValues(new Uint8Array(12))
 const num = (value, fallback = 0) => (value === '' || value === null || value === undefined ? fallback : Number(value));
 
 function Toggle({ checked, onChange, label, description }) {
-  return <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white p-3.5 transition hover:border-orange-200">
+  return <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white p-3.5 transition hover:border-green-200">
     <span className="min-w-0"><span className="block text-sm font-semibold text-slate-800">{label}</span>{description && <span className="mt-0.5 block text-xs leading-5 text-slate-500">{description}</span>}</span>
     <span className={`relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${checked ? 'bg-brand-600' : 'bg-slate-300'}`}><input type="checkbox" className="peer sr-only" checked={checked} onChange={(event) => onChange(event.target.checked)} /><span className={`absolute h-4 w-4 rounded-full bg-white shadow transition ${checked ? 'left-6' : 'left-1'}`} /></span>
   </label>;
@@ -220,10 +220,10 @@ export default function TrainingEditorPage() {
           <Toggle label="Require theory assessments" description="All published quizzes must pass." checked={form.completionRequirements.requireTheory} onChange={(value) => set('completionRequirements', { ...form.completionRequirements, requireTheory: value })} />
           <Field label="Minimum overall assignment score (%)"><input type="number" min="0" max="100" className="input" value={form.completionRequirements.minimumScore} onChange={(event) => set('completionRequirements', { ...form.completionRequirements, minimumScore: event.target.value })} /></Field>
         </div>
-        <p className="mt-3 rounded-xl bg-orange-50 px-3 py-2.5 text-xs leading-5 text-brand-900">The certification assessment and its 10 questions are configured from the training detail page after saving. Defaults come from platform settings.</p>
+        <p className="mt-3 rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900">The certification assessment and its 10 questions are configured from the training detail page after saving. Defaults come from platform settings.</p>
       </section>
 
-      <div className="sticky bottom-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-orange-100 bg-white/95 p-3 shadow-lg shadow-orange-950/5 backdrop-blur lg:bottom-4">
+      <div className="sticky bottom-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-100 bg-white/95 p-3 shadow-lg shadow-green-950/5 backdrop-blur lg:bottom-4">
         <p className="text-xs text-slate-500">Changes apply to enrolled students immediately. A live session blocks roster changes.</p>
         <div className="flex gap-2"><Link to={editing ? `/courses/${id}` : '/courses'} className="btn-secondary">Cancel</Link><button type="submit" disabled={saving} className="btn-primary">{saving ? <Spinner size={17} /> : <Save size={17} />}{saving ? 'Saving…' : editing ? 'Save changes' : 'Create training'}</button></div>
       </div>

@@ -47,8 +47,8 @@ export default function RegisterPage() {
       <section className="order-2 hidden lg:block">
         <AuthLearningVisual />
         <div className="flex items-center gap-3">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-sm font-black text-white shadow-xl shadow-green-900/20">IC</span>
-          <div><p className="text-lg font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-700">QuickLink Learning Portal</p></div>
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-700 text-sm font-black text-white">QL</span>
+          <div><p className="text-lg font-black tracking-tight text-slate-950">QuickLink</p><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-700">QuickLink Learning Portal</p></div>
         </div>
         <h1 className="mt-12 max-w-md text-4xl font-black leading-[1.08] tracking-tight text-slate-950">Start your next<br /><span className="bg-green-50 text-brand-800">professional chapter.</span></h1>
         <p className="mt-5 max-w-md text-base leading-7 text-slate-600">Create your student account to enroll in trainings, join live classes, complete projects, and earn certificates.</p>
@@ -59,8 +59,8 @@ export default function RegisterPage() {
 
       <section className="order-1 mx-auto w-full max-w-xl">
         <div className="mb-6 flex items-center gap-3 lg:hidden">
-          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-green-50 text-xs font-black text-white shadow-lg shadow-green-900/20">IC</span>
-          <div><p className="font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">QuickLink Learning</p></div>
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-700 text-xs font-black text-white">QL</span>
+          <div><p className="font-black tracking-tight text-slate-950">QuickLink</p><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">QuickLink Learning</p></div>
         </div>
         <div className="rounded-3xl border border-green-100 bg-white/95 p-6 shadow-2xl shadow-green-950/[0.07] backdrop-blur sm:p-8">
           <p className="eyebrow">Student registration</p>
@@ -79,7 +79,7 @@ export default function RegisterPage() {
               <div><label className="label" htmlFor="password">Password</label><div className="relative"><Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input id="password" type={showPassword ? 'text' : 'password'} className="input pl-9 pr-11" autoComplete="new-password" required minLength={10} maxLength={200} value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="At least 10 characters" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></div>
               <div><label className="label" htmlFor="confirmPassword">Confirm password</label><div className="relative"><Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input id="confirmPassword" type={showPassword ? 'text' : 'password'} className="input pl-9" autoComplete="new-password" required minLength={10} maxLength={200} value={form.confirmPassword} onChange={(event) => setForm({ ...form, confirmPassword: event.target.value })} placeholder="Enter it again" /></div></div>
             </div>
-            <p className="rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900">By creating an account you agree to follow IshConnect training rules, submit original project work, and keep your login details private.</p>
+            <p className="rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900">By creating an account you agree to follow QuickLink training rules, submit original project work, and keep your login details private.</p>
             <button disabled={loading} className="btn-primary w-full">{loading ? <Spinner size={18} /> : <UserRoundPlus size={18} />}{loading ? 'Creating your account…' : 'Create student account'}</button>
           </form>
           <p className="mt-5 text-center text-sm text-slate-500">Already have an account? <Link to="/login" className="font-bold text-brand-700 hover:underline">Sign in</Link></p>

@@ -137,13 +137,13 @@ export default function PublicTrainingRegistrationPage() {
   if (verifying) return <main className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-[#fffaf5] text-sm text-slate-600"><Spinner size={28} />Verifying your email…</main>;
 
   return <main className="min-h-[100dvh] bg-white px-4 py-8 sm:py-12">
-    <section className="mx-auto w-full max-w-xl overflow-hidden rounded-3xl border border-orange-100 bg-white shadow-2xl shadow-orange-950/[0.07]">
+    <section className="mx-auto w-full max-w-xl overflow-hidden rounded-3xl border border-green-100 bg-white shadow-2xl shadow-green-950/[0.07]">
       <div className="h-1.5 bg-green-50" />
       {form.imageUrl && <img src={assetUrl(form.imageUrl)} alt="" className="h-44 w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />}
       <div className="p-6 sm:p-8">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-50 text-[10px] font-black text-white shadow-md shadow-orange-900/20">IC</div><div><p className="text-sm font-black text-slate-950">IshConnect</p><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-700/80">QuickLink training registration</p></div></div>
-          <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-brand-800 ring-1 ring-orange-100"><GraduationCap size={13} />Enrollment open</span>
+          <div className="flex items-center gap-2.5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-700 text-[10px] font-black text-white shadow-md shadow-green-900/20">QL</div><div><p className="text-sm font-black text-slate-950">QuickLink</p><p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-700/80">QuickLink training registration</p></div></div>
+          <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-brand-800 ring-1 ring-green-100"><GraduationCap size={13} />Enrollment open</span>
         </div>
         <h1 className="break-words text-2xl font-black tracking-tight text-slate-950">{form.title}</h1>
         <p className="mt-1 text-sm font-medium text-slate-500">{form.training}{form.subject ? ` · ${form.subject}` : ''}{form.level ? ` · ${form.level}` : ''}</p>
@@ -161,10 +161,10 @@ export default function PublicTrainingRegistrationPage() {
             <h2 className="font-bold text-slate-900">Create your student account</h2>
             <p className="text-sm leading-6 text-slate-600">We will use <strong>{values.email}</strong> and email you a secure verification link. No education level or role selection is needed.</p>
             {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">{error}</div>}
-            <div className="rounded-xl bg-orange-50 px-3 py-2.5 text-xs leading-5 text-brand-900"><ShieldCheck size={14} className="mr-1 inline" />The verification link expires in one hour. Check your spam folder if it does not arrive.</div>
+            <div className="rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900"><ShieldCheck size={14} className="mr-1 inline" />The verification link expires in one hour. Check your spam folder if it does not arrive.</div>
             <button type="submit" className="btn-primary w-full" disabled={accountSaving}>{accountSaving ? <Spinner size={17} /> : <Mail size={17} />}{accountSaving ? 'Sending verification…' : 'Email me a verification link'}</button>
           </form>}
-          {claim && accountMode === 'verify' && <div role="status" className="mt-4 rounded-2xl border border-orange-200 bg-orange-50 p-4"><h2 className="font-bold text-brand-950">Check your email</h2><p className="mt-1 text-sm leading-6 text-brand-800">We sent a secure verification link to {values.email}. Open it within one hour, then set a password to finish enrolling in {form.classTitle}.</p></div>}
+          {claim && accountMode === 'verify' && <div role="status" className="mt-4 rounded-2xl border border-green-200 bg-green-50 p-4"><h2 className="font-bold text-brand-950">Check your email</h2><p className="mt-1 text-sm leading-6 text-brand-800">We sent a secure verification link to {values.email}. Open it within one hour, then set a password to finish enrolling in {form.classTitle}.</p></div>}
           {accountSetup && accountMode === 'setup' && <form onSubmit={completeAccount} className="mt-4 space-y-3 rounded-2xl border border-slate-200 p-4">
             <h2 className="font-bold text-slate-900">Set your student account password</h2>
             <p className="text-sm leading-6 text-slate-600">Email verified for <strong>{accountSetup.email}</strong>. Choose a password to create your account and enroll in {form.classTitle}.</p>

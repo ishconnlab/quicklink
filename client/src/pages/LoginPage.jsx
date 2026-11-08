@@ -70,10 +70,10 @@ export default function LoginPage() {
         <section className="order-2 hidden lg:block">
           <AuthLearningVisual />
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-green-50 text-sm font-black text-white shadow-xl shadow-green-900/20">IC</span>
-            <div><p className="text-lg font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-700">QuickLink Learning Portal</p></div>
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-700 text-sm font-black text-white">QL</span>
+            <div><p className="text-lg font-black tracking-tight text-slate-950">QuickLink</p><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-brand-700">QuickLink Learning Portal</p></div>
           </div>
-          <h1 className="mt-12 max-w-xl text-4xl font-black leading-[1.08] tracking-tight text-slate-950 xl:text-5xl">Learn deeply.<br /><span className="bg-green-50 text-brand-800">Get certified.</span></h1>
+          <h1 className="mt-12 max-w-xl text-4xl font-black leading-[1.08] tracking-tight text-slate-950 xl:text-5xl">Learn deeply.<br /><span className="text-brand-800">Get certified.</span></h1>
           <p className="mt-5 max-w-lg text-base leading-7 text-slate-600">Join structured trainings, attend live sessions with your trainers, submit real projects, and earn verifiable certificates.</p>
           <div className="mt-9 grid max-w-xl gap-3 sm:grid-cols-2">
             {[
@@ -87,8 +87,8 @@ export default function LoginPage() {
 
         <section className="order-1 mx-auto w-full max-w-md">
           <div className="mb-6 flex items-center gap-3 lg:hidden">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-green-50 text-xs font-black text-white shadow-lg shadow-green-900/20">IC</span>
-            <div><p className="font-black tracking-tight text-slate-950">IshConnect</p><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">QuickLink Learning</p></div>
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-700 text-xs font-black text-white">QL</span>
+            <div><p className="font-black tracking-tight text-slate-950">QuickLink</p><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">QuickLink Learning</p></div>
           </div>
           <div className="rounded-3xl border border-green-100 bg-white/95 p-6 shadow-2xl shadow-green-950/[0.07] backdrop-blur sm:p-8">
             <p className="eyebrow">Welcome back</p>
@@ -104,8 +104,8 @@ export default function LoginPage() {
                 : serverStatus === 'checking' || serverStatus === 'starting' ? <Spinner size={15} />
                   : <WifiOff size={15} />}
               <span className="flex-1">
-                {serverStatus === 'online' ? 'IshConnect server connected'
-                  : serverStatus === 'checking' ? 'Connecting to IshConnect…'
+                {serverStatus === 'online' ? 'QuickLink server connected'
+                  : serverStatus === 'checking' ? 'Connecting to QuickLink…'
                     : serverStatus === 'starting' ? 'Server is starting up; this may take a moment.'
                       : 'Cannot reach the server. Check your connection.'}
               </span>
@@ -126,9 +126,9 @@ export default function LoginPage() {
               <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? <Spinner size={18} /> : <LogIn size={18} />}{loading ? 'Signing in…' : 'Sign in'}</button>
             </form>
 
-            <p className="mt-5 text-center text-sm text-slate-500">New to IshConnect? <Link to="/register" className="font-bold text-brand-700 hover:underline">Create a student account</Link></p>
+            <p className="mt-5 text-center text-sm text-slate-500">New to QuickLink? <Link to="/register" className="font-bold text-brand-700 hover:underline">Create a student account</Link></p>
           </div>
-          <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400"><ShieldCheck size={12} /> Secure access · IshConnect training platform</p>
+          <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[11px] text-slate-400"><ShieldCheck size={12} /> Secure access · QuickLink training platform</p>
         </section>
       </div>
     </div>

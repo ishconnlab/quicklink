@@ -3,6 +3,18 @@ import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { permanentlyDeleteUser as deleteUserAccount } from '../services/permanentlyDeleteUser.js';
 import { recordActivity } from '../services/activityLog.js';
+import { Notification } from '../models/Notification.js';
+
+export const listNotifications = asyncHandler(async (req, res) => {
+  const notifications = await Notification.find({ recipient: req.user._id }).sort({ createdAt: -1 }).limit(50).lean();
+  res.json({ success: true, data: { notifications: notifications.map((item) => ({ id: item._id.toString(), title: item.title, message: item.message, href: item.href, type: item.type, read: Boolean(item.readAt), createdAt: item.createdAt })) } });
+});
+
+export const markNotificationRead = asyncHandler(async (req, res) => {
+  const result = await Notification.updateOne({ _id: req.params.id, recipient: req.user._id }, { $set: { readAt: new Date() } });
+  if (!result.matchedCount) throw ApiError.notFound('Notification not found.');
+  res.json({ success: true, data: { read: true } });
+});
 
 export const listUsers = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page || 1));

@@ -14,6 +14,8 @@ const listQuery = z.object({
 });
 
 router.use(requireAuth, requireAdmin);
+router.get('/notifications', users.listNotifications);
+router.patch('/notifications/:id/read', validate(idParamSchema), users.markNotificationRead);
 router.get('/', validate(listQuery, 'query'), users.listUsers);
 router.post('/', validate(createUserSchema), users.createUser);
 router.patch('/:id', validate(idParamSchema, 'params'), validate(updateUserSchema), users.updateUser);

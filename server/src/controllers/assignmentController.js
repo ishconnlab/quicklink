@@ -198,7 +198,10 @@ export const submitAssignment = asyncHandler(async (req, res) => {
       ? await AssignmentSubmission.findByIdAndUpdate(previous._id, { $set: values }, { new: true, runValidators: true })
       : await AssignmentSubmission.create({ assignment: assignment._id, learningClass: item._id, student: req.user._id, attempt: (previous?.attempt || 0) + 1, ...values });
     if (previous?.status === 'draft') await Promise.all((previous.files || []).filter((file) => !storedFiles.some((next) => next.storageKey === file.storageKey)).map((file) => fs.unlink(path.join(SUBMISSION_DIR, file.storageKey)).catch(() => {})));
-    if (!isDraft) await notifyUsers(teacherIdsFor(item), { type: 'assignment', title: 'Assignment submitted', message: `${req.user.name} submitted ${assignment.title}`, href: `/courses/${item._id}` });
+    if (!isDraft) {
+      const admins = await User.find({ role: 'admin', isActive: true }).distinct('_id');
+      await notifyUsers([...teacherIdsFor(item), ...admins], { type: 'assignment', title: 'Assignment submitted', message: `${req.user.name} submitted ${assignment.title}`, href: `/courses/${item._id}` });
+    }
     res.status(201).json({ success: true, data: { submission: { id: submission._id.toString(), attempt: submission.attempt, status: submission.status, score: submission.score, submittedAt: submission.submittedAt } } });
   } catch (error) {
     await Promise.all(storedFiles.map((file) => fs.unlink(path.join(SUBMISSION_DIR, file.storageKey)).catch(() => {})));

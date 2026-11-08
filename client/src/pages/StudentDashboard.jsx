@@ -92,7 +92,7 @@ export default function StudentDashboard() {
         {state.courses.map((course) => {
           const progress = progressFor(course);
           const payment = course.enrollment?.payment;
-          return <article key={course.id} className="group relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03] transition hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
+          return <article key={course.id} className="rounded-2xl border border-slate-200 bg-white">
             <div className="absolute inset-x-0 top-0 h-1 bg-green-50" />
             <div className="p-5">
               <div className="flex flex-wrap items-center gap-2"><Badge color="brand">{course.level}</Badge><Badge>{course.subject}</Badge>{liveClasses.some((item) => item.id === course.id) && <Badge color="red">Live now</Badge>}</div>
@@ -127,7 +127,7 @@ export default function StudentDashboard() {
     </div>
 
     <section className="rounded-2xl border border-green-100 bg-green-50 p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-brand-700 shadow-sm ring-1 ring-green-100"><Clock3 size={20} /></span><div><p className="font-bold text-slate-900">Keep your streak going</p><p className="text-sm text-slate-500">Check your requirements before each session so nothing blocks your certificate.</p></div></div><Link to="/courses" className="btn-secondary">Review requirements <ArrowRight size={15} /></Link></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-brand-700  ring-1 ring-green-100"><Clock3 size={20} /></span><div><p className="font-bold text-slate-900">Keep your streak going</p><p className="text-sm text-slate-500">Check your requirements before each session so nothing blocks your certificate.</p></div></div><Link to="/courses" className="btn-secondary">Review requirements <ArrowRight size={15} /></Link></div>
     </section>
   </div>;
 }

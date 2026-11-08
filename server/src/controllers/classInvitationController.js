@@ -63,7 +63,7 @@ function invitationDetails(classItem) {
     classItem.startsAt ? `Start: ${new Date(classItem.startsAt).toLocaleString('en', { timeZone: classItem.timezone || 'UTC', timeZoneName: 'short' })}` : '',
     classItem.schedule ? `Schedule: ${classItem.schedule}` : '',
     `Duration: ${classItem.durationMinutes || 60} minutes`,
-    'Managed by: IshConnect administrators',
+    'Managed by: QuickLink administrators',
   ].filter(Boolean);
 }
 

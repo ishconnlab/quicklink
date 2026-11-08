@@ -8,7 +8,7 @@
     min-height: 100%;
   }
   body {
-    @apply bg-slate-50 text-slate-800 antialiased;
+    @apply bg-white text-slate-800 antialiased;
     min-height: 100dvh;
     overflow-x: hidden;
     font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -60,6 +60,9 @@
 .manage-modal-scroll::-webkit-scrollbar {
   display: none;
 }
+
+.sidebar-nav { scrollbar-width: none; -ms-overflow-style: none; }
+.sidebar-nav::-webkit-scrollbar { display: none; }
 
 @layer components {
   .btn {

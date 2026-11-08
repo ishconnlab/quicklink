@@ -1,9 +1,4 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="192" y2="192" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#f97316"/><stop offset="1" stop-color="#b45309"/>
-    </linearGradient>
-  </defs>
-  <rect width="192" height="192" rx="44" fill="url(#g)"/>
-  <path d="M56 126V66h18v24h44V66h18v60h-18v-24H74v24H56z" fill="#fff"/>
+  <rect width="192" height="192" rx="44" fill="#15803d"/>
+  <text x="96" y="117" text-anchor="middle" font-family="Arial,sans-serif" font-size="58" font-weight="700" fill="#ffffff">QL</text>
 </svg>
