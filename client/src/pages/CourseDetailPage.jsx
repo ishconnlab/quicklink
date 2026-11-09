@@ -44,6 +44,8 @@ export default function CourseDetailPage() {
   const [completion, setCompletion] = useState(null);
   const [certificates, setCertificates] = useState([]);
   const [assessment, setAssessment] = useState(null);
+  const [assessmentLoading, setAssessmentLoading] = useState(true);
+  const [assessmentError, setAssessmentError] = useState('');
   const [project, setProject] = useState(null);
   const [adminData, setAdminData] = useState({ candidates: [], submissions: [], courseCertificates: [] });
   const [loading, setLoading] = useState(true);
@@ -62,6 +64,8 @@ export default function CourseDetailPage() {
       const courseResponse = await api.get(`/courses/${id}`);
       const nextCourse = courseResponse.data.data.course;
       setCourse(nextCourse);
+      setAssessmentLoading(!admin && nextCourse.enrolled);
+      setAssessmentError('');
       if (admin) {
         const [candidatesResult, submissionsResult] = await Promise.allSettled([
           api.get(`/courses/${id}/certificate-candidates`, { params: { limit: 100 } }),
@@ -91,17 +95,24 @@ export default function CourseDetailPage() {
         const settled = await Promise.allSettled(requests);
         if (settled[0].status === 'fulfilled') setCompletion(settled[0].value.data.data);
         if (settled[1].status === 'fulfilled') setCertificates(settled[1].value.data.data.certificates);
-        if (settled[2].status === 'fulfilled') setAssessment(settled[2].value.data.data);
+        if (settled[2].status === 'fulfilled') {
+          setAssessment(settled[2].value.data.data);
+          setAssessmentError('');
+        } else {
+          setAssessment(null);
+          setAssessmentError(`Could not load assessment status: ${apiError(settled[2].reason).message}`);
+        }
         if (settled[3].status === 'fulfilled') {
           setProject(settled[3].value.data.data);
           const submission = settled[3].value.data.data.submission;
           if (submission) setProjectForm({ linkUrl: submission.linkUrl || '', description: submission.description || '' });
         }
-      }
+      } else setAssessment(null);
     } catch (error) {
       toast.error(apiError(error).message);
     } finally {
       setLoading(false);
+      setAssessmentLoading(false);
     }
   }, [admin, id, toast]);
 
@@ -359,7 +370,7 @@ export default function CourseDetailPage() {
             {project?.submission?.status === 'approved' ? <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800"><CheckCircle2 size={17} />Your project is approved.<a href={project.submission.linkUrl} target="_blank" rel="noreferrer" className="font-semibold underline">Open submission</a></div> : project?.submission?.status === 'submitted' ? <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50 p-3.5 text-sm text-blue-950"><p className="flex items-center gap-2 font-semibold"><Clock3 size={16} />Project submitted · awaiting administrator review</p><p className="mt-1 text-xs text-blue-800">Submitted {formatDateTime(project.submission.submittedAt)}</p><a href={project.submission.linkUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 break-all font-semibold text-brand-700 underline">Open your submission <ExternalLink size={13} /></a>{project.submission.description && <p className="mt-3 whitespace-pre-wrap break-words text-sm text-slate-700">{project.submission.description}</p>}</div> : <>{project?.submission?.feedback && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p className="font-semibold">Changes requested by the administrator</p><p className="mt-1 whitespace-pre-wrap">{project.submission.feedback}</p></div>}<form onSubmit={submitProject} className="mt-3 space-y-2"><label className="block"><span className="label">Project link</span><input type="url" required minLength={5} maxLength={2000} className="input" value={projectForm.linkUrl} onChange={(event) => setProjectForm({ ...projectForm, linkUrl: event.target.value })} placeholder="https://github.com/your-project or another project URL" /></label><label className="block"><span className="label">Description</span><textarea className="input min-h-24" maxLength={4000} value={projectForm.description} onChange={(event) => setProjectForm({ ...projectForm, description: event.target.value })} placeholder="Explain what you built, the tools you used, and how to review it." /></label><div className="flex flex-wrap items-center gap-2"><button className="btn-primary" disabled={busy === 'project'}>{busy === 'project' ? <Spinner size={16} /> : <Send size={15} />}{project?.submission ? 'Resubmit project' : 'Submit project'}</button>{project?.submission && <span className="text-xs text-slate-400">Resubmitting replaces your previous project and resets review.</span>}</div></form></>}
           </section>}
 
-          {course.enrolled && <CertificationAssessment courseId={id} initial={assessment} onRefresh={load} />}
+          {course.enrolled && <CertificationAssessment courseId={id} initial={assessment} loading={assessmentLoading} loadError={assessmentError} onRefresh={load} />}
 
           {course.enrolled && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Certification</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><Award size={18} className="text-brand-700" />Your certificate</h2></div>{certificate && <Badge color={certificate.revoked ? 'red' : 'green'}>{certificate.revoked ? 'Revoked' : 'Valid'}</Badge>}</div>

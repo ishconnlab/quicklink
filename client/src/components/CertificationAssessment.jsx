@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext.jsx';
 
 const answerMap = (answers = []) => Object.fromEntries(answers.map((item) => [item.questionIndex, item.optionIndex]));
 
-export default function CertificationAssessment({ courseId, initial, onRefresh }) {
+export default function CertificationAssessment({ courseId, initial, loading = false, loadError = '', onRefresh }) {
   const toast = useToast();
   const dialog = useDialog();
   const { user } = useAuth();
@@ -184,6 +184,9 @@ export default function CertificationAssessment({ courseId, initial, onRefresh }
     if (payload?.draft) return { tone: 'brand', label: 'In progress', text: `Draft saved${payload.draft.lastSavedAt ? ` · ${new Date(payload.draft.lastSavedAt).toLocaleString()}` : ''}` };
     return { tone: 'brand', label: 'Ready', text: `${payload?.attemptsRemaining} of ${payload?.maxAttempts} attempts available.` };
   }, [payload]);
+
+  if (loading) return <section aria-busy="true" className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div className="flex items-center gap-2 text-sm text-slate-500"><Spinner size={16}/>Loading assessment status…</div></section>;
+  if (loadError) return <section role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-5 shadow-sm"><p className="text-sm font-semibold text-amber-950">Assessment status could not be loaded</p><p className="mt-1 text-sm text-amber-900">{loadError}</p><button className="btn-secondary mt-3" onClick={() => onRefresh?.()}>Retry</button></section>;
 
   return <>
     <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-900/[0.03]">

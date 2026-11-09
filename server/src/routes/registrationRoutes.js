@@ -85,7 +85,7 @@ router.delete('/:formId', validate(idParams, 'params'), registrations.deleteForm
 router.patch('/:formId', validate(idParams, 'params'), validate(z.object({ active: z.boolean() })), registrations.updateFormStatus);
 router.post('/:formId/image', validate(idParams, 'params'), uploadImage.single('image'), registrations.uploadFormImage);
 router.get('/:formId/entries', validate(idParams, 'params'), registrations.listRegistrations);
-router.post('/:formId/entries/enroll', validate(idParams, 'params'), validate(z.object({ registrationIds: z.array(id).min(1).max(200) })), registrations.enrollSelectedRegistrations);
+router.post('/:formId/entries/enroll', validate(idParams, 'params'), validate(z.object({ registrationIds: z.array(id).min(1).max(1000) })), registrations.enrollSelectedRegistrations);
 router.post('/:formId/entries/invite', validate(idParams, 'params'), validate(z.object({ registrationIds: z.array(id).max(500).optional().default([]) })), registrations.sendClassInvitations);
 router.patch('/:formId/entries/:registrationId/status', validate(registrationParams, 'params'), validate(z.object({ status: registrationStatus, note: z.string().trim().max(1000).optional().default('') })), registrations.reviewRegistration);
 router.delete('/:formId/entries/:registrationId', validate(registrationParams, 'params'), registrations.deleteRegistration);

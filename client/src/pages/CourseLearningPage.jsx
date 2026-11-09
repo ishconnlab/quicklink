@@ -77,6 +77,7 @@ const localDateTimeValue = (value) => {
 };
 const toIsoDateTime = (value) => (value ? new Date(value).toISOString() : null);
 const validObjectId = (value) => /^[0-9a-f]{24}$/i.test(value || '');
+const formatUnlockTime = (value, timeZone) => new Date(value).toLocaleString(undefined, { timeZone: timeZone || undefined, dateStyle: 'medium', timeStyle: 'short' });
 
 export default function CourseLearningPage() {
   const { id } = useParams();
@@ -204,7 +205,7 @@ export default function CourseLearningPage() {
     setBusy(true);
     try {
       const modules = data.modules.map((module) => ({ ...(validObjectId(module.id) ? { _id: module.id } : {}), title: module.title, lessons: module.lessons.map((lesson) => ({ ...(validObjectId(lesson.id) ? { _id: lesson.id } : {}), title: lesson.title, content: lesson.content, availableAt: lesson.availableAt || null, videoUrl: lesson.videoUrl, imageUrl: lesson.imageUrl || '', imagePublicId: lesson.imagePublicId || '', resources: lesson.resources || [], code: lesson.code || {}, codeBlocks: lesson.codeBlocks || [], knowledgeCheck: lesson.questions || [], passMark: Number(lesson.passMark || 70), assessmentAttempts: Number(lesson.assessmentAttempts || 3) })) }));
-      await api.patch(`/classes/${id}`, { modules, lessonAccessMode: data.lessonAccessMode || 'sequential' });
+      await api.patch(`/classes/${id}`, { modules, lessonAccessMode: data.lessonAccessMode || 'daily' });
       toast.success('Course lessons saved.');
       await load();
     } catch (error) { toast.error(apiError(error).message); }
@@ -230,7 +231,7 @@ export default function CourseLearningPage() {
       const updated = await load();
       const next = updated?.modules.flatMap((module) => module.lessons).find((lesson) => lesson.id === nextLesson.id);
       if (next?.unlocked) selectLesson(next.id);
-      else toast.success('Lesson completed. The next lesson will open when it becomes available.');
+      else toast.success(data.lessonAccessMode === 'daily' ? 'Day completed. The next day unlocks at 6:00 AM.' : 'Lesson completed. The next lesson will open when it becomes available.');
     } catch (error) { toast.error(apiError(error).message); }
     finally { setBusy(false); }
   };
@@ -366,7 +367,7 @@ export default function CourseLearningPage() {
   return <div className="space-y-5 pb-8">
     {pageHidden && <div className="fixed inset-0 z-[100] grid place-items-center bg-white/95 p-6 text-center"><div><ClipboardCheck className="mx-auto text-green-800"/><p className="mt-3 font-semibold text-slate-900">Assessment content is hidden</p><p className="mt-1 text-sm text-slate-600">Return to this tab to continue. The interruption has been recorded.</p></div></div>}
     <Link to={`/courses/${id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-green-800"><ArrowLeft size={16} />Back to {course.title}</Link>
-    <PageHeader eyebrow={admin ? 'Course builder' : 'Learning'} title={course.title} description={admin ? 'Organize course modules and lesson content.' : data.lessonAccessMode === 'scheduled' ? 'Lessons open on their scheduled dates. Your progress is saved across devices.' : 'Start with the first lesson. Complete each lesson to unlock the next; your progress is saved across devices.'} />
+    <PageHeader eyebrow={admin ? 'Course builder' : 'Learning'} title={course.title} description={admin ? 'Organize course modules and lesson content.' : data.lessonAccessMode === 'daily' ? 'Day 1 is open now. Complete each day and the next day unlocks at 6:00 AM the following day; your progress is saved across devices.' : data.lessonAccessMode === 'scheduled' ? 'Lessons open on their scheduled dates. Your progress is saved across devices.' : 'Start with the first lesson. Complete each lesson to unlock the next; your progress is saved across devices.'} />
     {admin ? <div className="grid gap-4 xl:grid-cols-[300px_minmax(0,1fr)]">
       <aside className="h-fit space-y-4"><section className="rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="font-bold text-slate-900">Course content</h2><button type="button" onClick={loadSuppliedCurriculum} disabled={curriculumLoading || busy} className="btn-secondary min-h-9 px-3 text-xs">{curriculumLoading ? <Spinner size={14} /> : <FileJson size={14} />}Preview supplied ML JSON</button></div>
@@ -379,8 +380,8 @@ export default function CourseLearningPage() {
           <details className="rounded-lg bg-white/80 p-2"><summary className="cursor-pointer text-xs font-semibold text-slate-700">Inspect source JSON</summary><pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words text-[10px] leading-4 text-slate-600">{JSON.stringify(curriculumPreview.raw, null, 2)}</pre></details>
           <button type="button" onClick={importCurriculum} disabled={busy} className="btn-primary min-h-9 w-full px-3 text-xs">{busy ? <Spinner size={14} /> : <Upload size={14} />}Import {curriculumPreview.days.length} days</button>
         </div>}
-        <label className="label mt-4" htmlFor="lesson-access-mode">Lesson access</label><select id="lesson-access-mode" className="input min-h-10" value={data.lessonAccessMode || 'sequential'} onChange={(event) => setData((currentData) => ({ ...currentData, lessonAccessMode: event.target.value }))}><option value="sequential">Sequential — complete each lesson to unlock the next</option><option value="scheduled">Scheduled — each lesson opens on its date</option></select>
-        <p className="mt-1 text-xs leading-5 text-slate-500">Optional lesson opening dates are enforced by the server in either mode.</p>
+        <label className="label mt-4" htmlFor="lesson-access-mode">Lesson access</label><select id="lesson-access-mode" className="input min-h-10" value={data.lessonAccessMode || 'daily'} onChange={(event) => setData((currentData) => ({ ...currentData, lessonAccessMode: event.target.value }))}><option value="daily">Daily — one lesson per day, unlocked at 6:00 AM</option><option value="sequential">Sequential — complete each lesson to unlock the next</option><option value="scheduled">Scheduled — each lesson opens on its date</option></select>
+        <p className="mt-1 text-xs leading-5 text-slate-500">Daily mode opens Day 1 immediately; completing a day unlocks the next day at 6:00 AM. Optional lesson opening dates are enforced by the server in every mode.</p>
       </section>
       <section className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex items-center justify-between"><h2 className="font-bold text-slate-900">Modules</h2><button onClick={() => setData({ ...data, modules: [...data.modules, { ...newModule(), id: `new-module-${Date.now()}` }] })} className="btn-secondary min-h-8 px-2.5 py-1 text-xs"><Plus size={14} />Module</button></div>
         <div className="mt-3 space-y-3">{data.modules.map((module, moduleIndex) => <section key={module.id || moduleIndex} draggable onDragStart={() => setDragged({ type: 'module', moduleIndex })} onDragOver={(event) => event.preventDefault()} onDrop={() => reorderModules(moduleIndex)} className="rounded-xl border border-slate-100 p-3"><input className="input min-h-9 px-2.5 text-sm font-semibold" value={module.title} onChange={(event) => updateAdminModule(moduleIndex, (item) => ({ ...item, title: event.target.value }))} aria-label="Module title" />
@@ -435,7 +436,7 @@ export default function CourseLearningPage() {
               {lessons[lessonIndex + 1].unlocked ? 'Next lesson' : current.hasAssessment && !current.completed ? 'Pass assessment to continue' : current.completed ? 'Next lesson unavailable' : 'Complete & next'}
             </button> : !current.completed && !current.hasAssessment ? <button onClick={markComplete} disabled={busy} className="btn-primary">{busy ? <Spinner size={16} /> : <Check size={16} />}Mark complete</button> : null}
           </div>
-        </article> : <section role="status" className="mx-auto grid min-h-72 max-w-xl place-items-center rounded-xl bg-slate-50 p-6 text-center"><div><LockKeyhole className="mx-auto text-slate-400"/><h2 className="mt-3 font-semibold text-slate-900">This lesson is locked</h2><p className="mt-1 text-sm leading-6 text-slate-600">{current.availableAt && new Date(current.availableAt) > new Date() ? <>Available {new Date(current.availableAt).toLocaleString()}.</> : 'Complete the previous lesson to unlock this one.'}</p></div></section> : <div className="grid min-h-72 place-items-center text-center"><div><BookOpen className="mx-auto text-green-700"/><p className="mt-2 font-semibold text-slate-800">No lessons available yet</p><p className="mt-1 text-sm text-slate-500">Your instructor will add the course content here.</p></div></div>}
+        </article> : <section role="status" className="mx-auto grid min-h-72 max-w-xl place-items-center rounded-xl bg-slate-50 p-6 text-center"><div><LockKeyhole className="mx-auto text-slate-400"/><h2 className="mt-3 font-semibold text-slate-900">This lesson is locked</h2><p className="mt-1 text-sm leading-6 text-slate-600">{current.unlockAt && new Date(current.unlockAt) > new Date() ? <>Unlocks {formatUnlockTime(current.unlockAt, course.timezone)}.</> : current.availableAt && new Date(current.availableAt) > new Date() ? <>Available {new Date(current.availableAt).toLocaleString()}.</> : data.lessonAccessMode === 'daily' ? 'Complete the previous day to unlock this one.' : 'Complete the previous lesson to unlock this one.'}</p></div></section> : <div className="grid min-h-72 place-items-center text-center"><div><BookOpen className="mx-auto text-green-700"/><p className="mt-2 font-semibold text-slate-800">No lessons available yet</p><p className="mt-1 text-sm text-slate-500">Your instructor will add the course content here.</p></div></div>}
       </main>
       </div>
     </div>}

@@ -37,6 +37,8 @@ export default function TrainingRegistrationsPage() {
   const [starting, setStarting] = useState(false);
   const [emailing, setEmailing] = useState('');
   const [enrolling, setEnrolling] = useState('');
+  const [selectedEntries, setSelectedEntries] = useState([]);
+  const [bulkEnrolling, setBulkEnrolling] = useState(false);
   const [copied, setCopied] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingFormId, setEditingFormId] = useState('');
@@ -47,6 +49,8 @@ export default function TrainingRegistrationsPage() {
   const selectedForm = useMemo(() => forms.find((form) => form.id === selectedId) || null, [forms, selectedId]);
   const entryPages = Math.max(1, Math.ceil(entries.length / ENTRIES_PER_PAGE));
   const visibleEntries = entries.slice((entryPage - 1) * ENTRIES_PER_PAGE, entryPage * ENTRIES_PER_PAGE);
+  const selectableEntries = entries.filter((entry) => entry.status !== 'REJECTED' && !entry.studentId);
+  const allEntriesSelected = selectableEntries.length > 0 && selectableEntries.every((entry) => selectedEntries.includes(entry.id));
   const session = currentClass?.liveSession;
   const joinUrl = session ? `${window.location.origin}/classes/join/${session.sessionCode}` : '';
   const liveRoomUrl = session ? `/classes/sessions/${session.id}/live` : '';
@@ -69,7 +73,7 @@ export default function TrainingRegistrationsPage() {
 
   useEffect(() => { loadForms(); }, [loadForms]);
 
-  useEffect(() => { setEntryPage(1); }, [selectedId]);
+  useEffect(() => { setEntryPage(1); setSelectedEntries([]); }, [selectedId]);
   useEffect(() => {
     if (entryPage > entryPages) setEntryPage(entryPages);
   }, [entryPage, entryPages]);
@@ -82,7 +86,9 @@ export default function TrainingRegistrationsPage() {
         api.get(`/registrations/${selectedForm.id}/entries`),
         api.get(`/classes/${selectedForm.classId}`),
       ]);
-      setEntries(entryResponse.data.data.registrations);
+      const nextEntries = entryResponse.data.data.registrations;
+      setEntries(nextEntries);
+      setSelectedEntries((current) => current.filter((id) => nextEntries.some((entry) => entry.id === id && entry.status !== 'REJECTED' && !entry.studentId)));
       setCurrentClass(classResponse.data.data.class);
     } catch (error) { toast.error(apiError(error).message); }
     finally { setEntryLoading(false); }
@@ -171,6 +177,25 @@ export default function TrainingRegistrationsPage() {
     finally { setEnrolling(''); }
   };
 
+  const toggleEntry = (id) => setSelectedEntries((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
+  const toggleAllEntries = () => setSelectedEntries(allEntriesSelected ? [] : selectableEntries.map((entry) => entry.id));
+
+  const enrollSelected = async () => {
+    if (!selectedForm || !selectedEntries.length) return;
+    setBulkEnrolling(true);
+    try {
+      const response = await api.post(`/registrations/${selectedForm.id}/entries/enroll`, { registrationIds: selectedEntries });
+      const results = response.data.data.results || [];
+      const enrolled = results.filter((result) => !result.error).length;
+      const failed = results.length - enrolled;
+      if (enrolled) toast.success(`${enrolled} registrant${enrolled === 1 ? '' : 's'} enrolled in the training.`);
+      if (failed) toast.error(`${failed} registrant${failed === 1 ? ' was' : 's were'} not enrolled. Check their status and try again.`);
+      setSelectedEntries([]);
+      await loadSelected();
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setBulkEnrolling(false); }
+  };
+
   const copyFormLink = async () => {
     if (!selectedForm) return;
     const url = `${window.location.origin}${selectedForm.publicUrl}`;
@@ -245,7 +270,7 @@ export default function TrainingRegistrationsPage() {
             </div>
           </div>
           <div className="card">
-            <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="font-semibold text-slate-900">Registered people</h2><p className="text-sm text-slate-500">{entries.length} registration{entries.length === 1 ? '' : 's'}</p></div><button className="btn-secondary" disabled={entryLoading} onClick={loadSelected}>Refresh</button></div>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold text-slate-900">Registered people</h2><p className="text-sm text-slate-500">{entries.length} registration{entries.length === 1 ? '' : 's'}</p></div><div className="flex flex-wrap items-center gap-2">{selectableEntries.length > 0 && <><button className="btn-secondary" onClick={toggleAllEntries}>{allEntriesSelected ? 'Clear all' : `Select all (${selectableEntries.length})`}</button><button className="btn-primary" onClick={enrollSelected} disabled={!selectedEntries.length || bulkEnrolling}>{bulkEnrolling ? <Spinner size={16} /> : <Mail size={16} />}Enroll selected ({selectedEntries.length})</button></>}<button className="btn-secondary" disabled={entryLoading} onClick={loadSelected}>Refresh</button></div></div>
             <p className="mb-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">Enroll a registrant to create their student account and email access details. Enrolled students can receive an email invitation before or during a live class; WhatsApp opens a class-specific invitation for you to send.</p>
             {entryLoading ? <div className="py-8 text-center"><Spinner size={22} /></div> : entries.length === 0 ? <EmptyState icon={UserPlus} title="No one has registered yet" description="Share the form link with prospective trainees." /> : <div className="space-y-3">
               {visibleEntries.map((entry) => {
@@ -258,7 +283,7 @@ export default function TrainingRegistrationsPage() {
                 return <article key={entry.id} className="rounded-xl border border-slate-200 p-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
-                      <h3 className="font-semibold text-slate-900">{entry.name}</h3>
+                      <div className="flex items-center gap-2"><input type="checkbox" className="shrink-0" checked={selectedEntries.includes(entry.id)} disabled={entry.status === 'REJECTED' || Boolean(entry.studentId)} onChange={() => toggleEntry(entry.id)} aria-label={`Select ${entry.name} for enrollment`} /><h3 className="font-semibold text-slate-900">{entry.name}</h3></div>
                       <div className="mt-1 flex flex-wrap items-center gap-2"><Badge color={entry.status === 'REJECTED' ? 'red' : entry.status === 'PENDING' ? 'amber' : 'green'}>{entry.status}</Badge><select className="input min-h-9 w-auto py-1 text-xs" value={entry.status} onChange={(event) => updateEntryStatus(entry, event.target.value)} aria-label={`Update ${entry.name} registration status`}>{['PENDING', 'APPROVED', 'REJECTED', 'ENROLLED', 'INVITED', 'ATTENDED', 'COMPLETED'].map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
                       <a className="mt-1 block break-all text-sm text-brand-700 hover:underline" href={`mailto:${entry.email}`}>{entry.email}</a>
                       <a className="mt-1 block text-sm text-slate-500 hover:underline" href={`tel:${entry.whatsapp}`}>{entry.whatsapp}</a>

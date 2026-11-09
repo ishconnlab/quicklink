@@ -74,7 +74,7 @@ const learningClassSchema = new mongoose.Schema({
   language: { type: String, trim: true, maxlength: 80, default: 'English' },
   instructorName: { type: String, trim: true, maxlength: 160, default: '' },
   instructorBio: { type: String, trim: true, maxlength: 3000, default: '' },
-  lessonAccessMode: { type: String, enum: ['sequential', 'scheduled'], default: 'sequential' },
+  lessonAccessMode: { type: String, enum: ['sequential', 'scheduled', 'daily'], default: 'sequential' },
   modules: { type: [moduleSchema], default: [] },
   completionRequirements: {
     requireReading: { type: Boolean, default: false },

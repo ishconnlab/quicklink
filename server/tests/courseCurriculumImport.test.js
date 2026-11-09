@@ -33,7 +33,7 @@ test('supplied Machine Learning curriculum imports all 10 days and every origina
 
   assert.equal(lessons.length, 10);
   assert.deepEqual(lessons.map((lesson) => lesson.title.split(' —')[0]), Array.from({ length: 10 }, (_, index) => `Day ${index + 1}`));
-  assert.equal(parsed.course.lessonAccessMode, 'sequential');
+  assert.equal(parsed.course.lessonAccessMode, 'daily');
   assert.equal(importedCode.length, 25);
   assert.deepEqual(importedCode, collectCode(original.course));
 

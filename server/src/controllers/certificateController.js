@@ -417,9 +417,6 @@ async function assessmentAccess(courseId, user) {
   const course = await LearningClass.findById(courseId).select(COURSE_FIELDS);
   if (!course) throw ApiError.notFound('Training not found.');
   if (user.role !== 'student') throw ApiError.forbidden('Certification assessments are for enrolled students.');
-  if (!course.students.some((student) => student.toString() === user._id.toString())) {
-    throw ApiError.forbidden('Enroll in this training to take its certification assessment.');
-  }
   await assertCanAttend(course, user);
   return course;
 }

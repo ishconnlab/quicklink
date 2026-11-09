@@ -513,7 +513,7 @@ export const createClass = asyncHandler(async (req, res) => {
     language: req.body.language || 'English',
     instructorName: req.body.instructorName || '',
     instructorBio: req.body.instructorBio || '',
-    lessonAccessMode: req.body.lessonAccessMode || 'sequential',
+    lessonAccessMode: req.body.lessonAccessMode || (offeringType === 'course' ? 'daily' : 'sequential'),
     modules: req.body.modules || [],
     completionRequirements: {
       ...(req.body.completionRequirements || {}),

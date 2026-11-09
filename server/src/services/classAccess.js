@@ -39,7 +39,9 @@ export async function assertCanAttend(learningClass, user) {
   if (!learningClass || !user) throw ApiError.forbidden('You do not have access to this class.');
   if (user.role === 'admin') return { required: false, allowed: true, status: 'not_required' };
   const enrollment = await getEnrollment(learningClass._id, user._id);
-  if (!enrollment) throw ApiError.forbidden('You are not enrolled in this class.');
+  const userId = String(user._id);
+  const listedOnRoster = (learningClass.students || []).some((student) => String(student?._id ?? student) === userId);
+  if (!enrollment && !listedOnRoster) throw ApiError.forbidden('You are not enrolled in this class.');
   const state = paymentState(learningClass, enrollment);
   if (!state.allowed) {
     throw ApiError.conflict(

@@ -149,7 +149,7 @@ export function parseCourseCurriculum(input) {
       prerequisites: Array.isArray(course.prerequisites) ? course.prerequisites.slice(0, 30).map(String) : [],
       learningObjectives: Array.isArray(course.learning_outcomes) ? course.learning_outcomes.slice(0, 30).map(String) : [],
       modules,
-      lessonAccessMode: 'sequential',
+      lessonAccessMode: 'daily',
     },
     days: modules[0].lessons.map(({ title, content, codeBlocks }) => ({
       title,

@@ -4,6 +4,10 @@ const courseLearningProgressSchema = new mongoose.Schema({
   student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningClass', required: true },
   completedLessons: [{ type: mongoose.Schema.Types.ObjectId }],
+  lessonCompletions: [{
+    lessonId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    completedAt: { type: Date, default: Date.now },
+  }],
   currentLesson: { type: mongoose.Schema.Types.ObjectId, default: null },
   assessmentAttempts: [{
     lessonId: { type: mongoose.Schema.Types.ObjectId, required: true },

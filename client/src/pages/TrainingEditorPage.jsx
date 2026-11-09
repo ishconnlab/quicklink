@@ -12,7 +12,7 @@ const blankForm = (offeringType = 'training') => ({
   offeringType,
   title: '', subject: '', trade: '', course: '', level: offeringType === 'course' ? 'L3' : 'Training', introduction: '', description: '',
   difficulty: 'Beginner', courseDuration: '', learningObjectives: [], prerequisites: [], language: 'English', slug: '', instructorName: '', instructorBio: '',
-  modules: [], lessonAccessMode: 'sequential',
+  modules: [], lessonAccessMode: offeringType === 'course' ? 'daily' : 'sequential',
   startsAt: '', endsAt: '', enrollmentOpensAt: '', enrollmentClosesAt: '', schedule: '',
   durationMinutes: 60, lateThresholdMinutes: 15, earlyThresholdPercent: 75, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Africa/Johannesburg',
   maxStudents: 300, enrollmentOpen: true, allowCancellation: true, published: true,
@@ -194,23 +194,25 @@ export default function TrainingEditorPage() {
       completionRequirements: { ...form.completionRequirements, requireAttendance: isCourse ? false : form.completionRequirements.requireAttendance, minimumScore: num(form.completionRequirements.minimumScore, 0) },
       payment: { ...form.payment, freeDays: isCourse ? 0 : num(form.payment.freeDays, 0), amount: num(form.payment.amount, 0) },
       projectSubmission: { ...form.projectSubmission },
-      ...(isCourse && form.modules.length ? {
-        lessonAccessMode: form.lessonAccessMode || 'sequential',
-        modules: form.modules.map((module) => ({
-          title: module.title,
-          lessons: module.lessons.map((lesson) => ({
-            title: lesson.title,
-            content: lesson.content,
-            availableAt: lesson.availableAt || null,
-            videoUrl: lesson.videoUrl || '',
-            resources: lesson.resources || [],
-            code: lesson.code || { language: '', source: '' },
-            codeBlocks: lesson.codeBlocks || [],
-            knowledgeCheck: lesson.knowledgeCheck || [],
-            passMark: lesson.passMark || 70,
-            assessmentAttempts: lesson.assessmentAttempts || 3,
+      ...(isCourse ? {
+        lessonAccessMode: form.lessonAccessMode || 'daily',
+        ...(form.modules.length ? {
+          modules: form.modules.map((module) => ({
+            title: module.title,
+            lessons: module.lessons.map((lesson) => ({
+              title: lesson.title,
+              content: lesson.content,
+              availableAt: lesson.availableAt || null,
+              videoUrl: lesson.videoUrl || '',
+              resources: lesson.resources || [],
+              code: lesson.code || { language: '', source: '' },
+              codeBlocks: lesson.codeBlocks || [],
+              knowledgeCheck: lesson.knowledgeCheck || [],
+              passMark: lesson.passMark || 70,
+              assessmentAttempts: lesson.assessmentAttempts || 3,
+            })),
           })),
-        })),
+        } : {}),
       } : {}),
     };
     try {
@@ -295,6 +297,7 @@ export default function TrainingEditorPage() {
         <p className="mt-1 text-sm text-slate-500">Learners find courses alongside trainings in their Trainings area. No live-class schedule or attendance is required.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Maximum students"><input type="number" min="1" max="10000" className={`input ${errors.maxStudents ? 'ring-2 ring-red-400' : ''}`} value={form.maxStudents} onChange={(event) => set('maxStudents', event.target.value)} />{errors.maxStudents && <span className="mt-1 block text-xs text-red-600">{errors.maxStudents}</span>}</Field>
+          <Field label="Lesson access" hint="Daily opens Day 1 now; each completed day unlocks the next day at 6:00 AM."><select className="input" value={form.lessonAccessMode || 'daily'} onChange={(event) => set('lessonAccessMode', event.target.value)}><option value="daily">Daily — one lesson per day at 6:00 AM</option><option value="sequential">Sequential — complete each lesson to unlock the next</option><option value="scheduled">Scheduled — each lesson opens on its date</option></select></Field>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <Toggle label="Enrollment open" description="Students can join from the Trainings area." checked={form.enrollmentOpen} onChange={(value) => set('enrollmentOpen', value)} />

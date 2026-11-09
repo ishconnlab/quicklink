@@ -4,24 +4,45 @@ import ApiError from '../utils/ApiError.js';
 import { LearningClass } from '../models/LearningClass.js';
 import { CourseLearningProgress } from '../models/CourseLearningProgress.js';
 import { isAdmin } from '../security/roles.js';
-import { isLessonAccessible } from '../services/lessonAccess.js';
+import { DAILY_UNLOCK_HOUR, DEFAULT_COURSE_TIMEZONE, isLessonAccessible, nextDailyUnlockAt } from '../services/lessonAccess.js';
 import { getEnrollment, paymentState } from '../services/classAccess.js';
 
 const idString = (value) => String(value?._id || value || '');
 function allLessons(course) {
   return (course.modules || []).flatMap((module) => (module.lessons || []).map((lesson) => ({ module, lesson })));
 }
+const completionTimesFor = (progress) => new Map((progress?.lessonCompletions || []).map((entry) => [idString(entry.lessonId), entry.completedAt]));
+function markLessonCompleted(progress, lessonId, completedAt = new Date()) {
+  const id = idString(lessonId);
+  if (!(progress.completedLessons || []).some((entry) => idString(entry) === id)) progress.completedLessons.push(lessonId);
+  if (!(progress.lessonCompletions || []).some((entry) => idString(entry.lessonId) === id)) progress.lessonCompletions.push({ lessonId, completedAt });
+}
 function safeCourse(course, progress, reveal = false) {
   const completed = new Set((progress?.completedLessons || []).map(idString));
+  const completionTimes = completionTimesFor(progress);
   const entries = allLessons(course);
-  let lessonIndex = 0;
   const accessMode = course.lessonAccessMode || 'sequential';
+  const timeZone = course.timezone || DEFAULT_COURSE_TIMEZONE;
+  const now = new Date();
+  const accessOptions = { completionTimes, timeZone, unlockHour: DAILY_UNLOCK_HOUR };
+  let lessonIndex = 0;
   const modules = (course.modules || []).map((module) => ({
     id: idString(module._id), title: module.title,
     lessons: (module.lessons || []).map((lesson) => {
       const id = idString(lesson._id);
       const done = completed.has(id);
-      const isUnlocked = isLessonAccessible(lesson, lessonIndex++, entries, accessMode, completed);
+      const index = lessonIndex;
+      lessonIndex += 1;
+      const isUnlocked = isLessonAccessible(lesson, index, entries, accessMode, completed, now, accessOptions);
+      let unlockAt = lesson.availableAt ? new Date(lesson.availableAt) : null;
+      if (accessMode === 'daily' && index > 0) {
+        const previousId = idString(entries[index - 1]?.lesson?._id);
+        if (completed.has(previousId)) {
+          const previousCompletedAt = completionTimes.get(previousId);
+          const dailyUnlock = previousCompletedAt ? nextDailyUnlockAt(previousCompletedAt, timeZone, DAILY_UNLOCK_HOUR) : null;
+          if (dailyUnlock && (!unlockAt || dailyUnlock > unlockAt)) unlockAt = dailyUnlock;
+        }
+      }
       const latest = [...(progress?.assessmentAttempts || [])].reverse().find((attempt) => idString(attempt.lessonId) === id);
       const assessmentAttempts = (progress?.assessmentAttempts || []).filter((attempt) => idString(attempt.lessonId) === id).length;
       return {
@@ -39,6 +60,7 @@ function safeCourse(course, progress, reveal = false) {
         attemptsUsed: assessmentAttempts,
         unlocked: isUnlocked || done || reveal,
         availableAt: lesson.availableAt || null,
+        unlockAt: unlockAt instanceof Date && !Number.isNaN(unlockAt.getTime()) ? unlockAt.toISOString() : null,
         completed: done,
         lastScore: latest?.score ?? null,
         lastPassed: latest?.passed ?? false,
@@ -54,9 +76,20 @@ function safeCourse(course, progress, reveal = false) {
 
 function assertLessonAccessible(course, progress, index, entries) {
   const completed = new Set((progress?.completedLessons || []).map(idString));
-  if (!isLessonAccessible(entries[index].lesson, index, entries, course.lessonAccessMode || 'sequential', completed)) {
+  const accessMode = course.lessonAccessMode || 'sequential';
+  const timeZone = course.timezone || DEFAULT_COURSE_TIMEZONE;
+  const completionTimes = completionTimesFor(progress);
+  const now = new Date();
+  if (!isLessonAccessible(entries[index].lesson, index, entries, accessMode, completed, now, { completionTimes, timeZone, unlockHour: DAILY_UNLOCK_HOUR })) {
     const availableAt = entries[index].lesson.availableAt;
-    if (availableAt && new Date(availableAt) > new Date()) throw ApiError.forbidden(`This lesson is scheduled to open on ${new Date(availableAt).toLocaleString()}.`);
+    if (availableAt && new Date(availableAt) > now) throw ApiError.forbidden(`This lesson is scheduled to open on ${new Date(availableAt).toLocaleString()}.`);
+    if (accessMode === 'daily' && index > 0) {
+      const previousId = idString(entries[index - 1].lesson._id);
+      if (!completed.has(previousId)) throw ApiError.forbidden('Complete the previous day before opening this lesson.');
+      const previousCompletedAt = completionTimes.get(previousId);
+      const unlockAt = previousCompletedAt ? nextDailyUnlockAt(previousCompletedAt, timeZone, DAILY_UNLOCK_HOUR) : null;
+      if (unlockAt && unlockAt > now) throw ApiError.forbidden(`This day unlocks on ${unlockAt.toLocaleString('en', { timeZone, dateStyle: 'medium', timeStyle: 'short' })}.`);
+    }
     throw ApiError.forbidden('Complete the previous lesson before opening this lesson.');
   }
 }
@@ -95,7 +128,7 @@ export const completeLesson = asyncHandler(async (req, res) => {
   assertLessonAccessible(course, existing, index, lessons);
   const progress = existing || new CourseLearningProgress({ student: req.user._id, course: course._id });
   if ((lessons[index].lesson.knowledgeCheck || []).length) throw ApiError.conflict('Pass this lesson assessment to complete the lesson.');
-  if (!(progress.completedLessons || []).some((id) => idString(id) === req.params.lessonId)) progress.completedLessons.push(new mongoose.Types.ObjectId(req.params.lessonId));
+  markLessonCompleted(progress, new mongoose.Types.ObjectId(req.params.lessonId));
   const next = lessons[index + 1];
   progress.currentLesson = next?.lesson?._id || null;
   await progress.save();
@@ -121,7 +154,7 @@ export const submitLessonAssessment = asyncHandler(async (req, res) => {
   const score = Math.round(correctCount / lesson.knowledgeCheck.length * 100);
   const passed = score >= lesson.passMark;
   progress.assessmentAttempts.push({ lessonId: lesson._id, answers: answers.map((answer) => answer.optionIndex), score, passed });
-  if (passed && !(progress.completedLessons || []).some((id) => idString(id) === req.params.lessonId)) progress.completedLessons.push(lesson._id);
+  if (passed) markLessonCompleted(progress, lesson._id);
   const next = lessons[index + 1];
   progress.currentLesson = passed ? next?.lesson?._id || null : lesson._id;
   await progress.save();
