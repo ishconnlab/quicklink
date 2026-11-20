@@ -1,6 +1,7 @@
 const idString = (value) => String(value?._id || value || '');
 
 export const DAILY_UNLOCK_HOUR = 6;
+export const DAILY_OPEN_LESSONS = 2;
 export const DEFAULT_COURSE_TIMEZONE = 'Africa/Johannesburg';
 
 function zonedDateParts(date, timeZone) {
@@ -56,6 +57,7 @@ export function isLessonAccessible(lesson, index, entries, accessMode, completed
   if (lesson.availableAt && new Date(lesson.availableAt).getTime() > now.getTime()) return false;
   if (accessMode === 'scheduled') return true;
   if (index === 0) return true;
+  if (accessMode === 'daily' && index < DAILY_OPEN_LESSONS) return true;
   const previous = entries[index - 1].lesson;
   const previousId = idString(previous._id);
   if (!completed.has(previousId)) return false;

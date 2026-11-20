@@ -25,22 +25,25 @@ test('scheduled access follows availability dates without requiring earlier comp
   assert.equal(isLessonAccessible(lessons[2].lesson, 2, lessons, 'scheduled', new Set(['day-3']), now), true);
 });
 
-test('daily access opens Day 1 and unlocks the next day at 06:00 in the course timezone', () => {
+test('daily access opens Days 1 and 2, then unlocks Day 3 at 06:00 in the course timezone', () => {
+  const entries = [{ lesson: { _id: 'day-1' } }, { lesson: { _id: 'day-2' } }, { lesson: { _id: 'day-3' } }, { lesson: { _id: 'day-4' } }];
   const completed = new Set();
   const completionTimes = new Map();
   const options = { completionTimes, timeZone: 'Africa/Johannesburg', unlockHour: 6 };
   const now = new Date('2026-11-09T12:00:00.000Z');
-  assert.equal(isLessonAccessible(lessons[0].lesson, 0, lessons, 'daily', completed, now, options), true);
-  assert.equal(isLessonAccessible(lessons[1].lesson, 1, lessons, 'daily', completed, now, options), false);
-  completed.add('day-1');
-  completionTimes.set('day-1', new Date('2026-11-09T10:00:00.000Z'));
-  assert.equal(isLessonAccessible(lessons[1].lesson, 1, lessons, 'daily', completed, new Date('2026-11-10T03:59:00.000Z'), options), false);
-  assert.equal(isLessonAccessible(lessons[1].lesson, 1, lessons, 'daily', completed, new Date('2026-11-10T04:00:00.000Z'), options), true);
+  assert.equal(isLessonAccessible(entries[0].lesson, 0, entries, 'daily', completed, now, options), true);
+  assert.equal(isLessonAccessible(entries[1].lesson, 1, entries, 'daily', completed, now, options), true);
+  assert.equal(isLessonAccessible(entries[2].lesson, 2, entries, 'daily', completed, now, options), false);
+  completed.add('day-2');
+  completionTimes.set('day-2', new Date('2026-11-09T10:00:00.000Z'));
+  assert.equal(isLessonAccessible(entries[2].lesson, 2, entries, 'daily', completed, new Date('2026-11-10T03:59:00.000Z'), options), false);
+  assert.equal(isLessonAccessible(entries[2].lesson, 2, entries, 'daily', completed, new Date('2026-11-10T04:00:00.000Z'), options), true);
 });
 
 test('daily access keeps legacy completions without timestamps unlocked sequentially', () => {
+  const entries = [{ lesson: { _id: 'day-1' } }, { lesson: { _id: 'day-2' } }, { lesson: { _id: 'day-3' } }];
   const options = { completionTimes: new Map(), timeZone: 'UTC' };
-  assert.equal(isLessonAccessible(lessons[1].lesson, 1, lessons, 'daily', new Set(['day-1']), new Date('2026-11-09T12:00:00.000Z'), options), true);
+  assert.equal(isLessonAccessible(entries[2].lesson, 2, entries, 'daily', new Set(['day-2']), new Date('2026-11-09T12:00:00.000Z'), options), true);
 });
 
 test('next daily unlock is 06:00 on the next calendar day in the supplied timezone', () => {

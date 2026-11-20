@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Clock3, LockKeyhole, Maximize2, Play, RefreshCw, ShieldCheck, Target, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Clock3, LockKeyhole, Play, RefreshCw, ShieldCheck, Target, X } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, ProgressBar } from './layout.jsx';
 import { Spinner } from './ui.jsx';
@@ -203,7 +203,7 @@ export default function CertificationAssessment({ courseId, initial, loading = f
 
     {taking && <div className="fixed inset-0 z-[100] overflow-y-auto bg-white" onCopy={(event) => { event.preventDefault(); recordInterruption('copy', 'Copying is disabled and the attempt was recorded.'); }} onContextMenu={(event) => { event.preventDefault(); recordInterruption('context-menu', 'Right-click is disabled and the attempt was recorded.'); }}>
       <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-4 py-4 sm:px-6 sm:py-6">
-        <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-100 bg-white/95 p-3 shadow-sm backdrop-blur sm:p-4">
+        <header className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-100 bg-white p-3 shadow-sm sm:p-4">
           <div><p className="eyebrow">Certification assessment</p><p className="mt-0.5 text-sm font-bold text-slate-900">{payload?.title}</p></div>
           <div className="flex items-center gap-2">
             {remainingSeconds !== null && <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold tabular-nums ${remainingSeconds < 60 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-800'}`}><Clock3 size={13}/>{Math.floor(remainingSeconds / 60).toString().padStart(2, '0')}:{(remainingSeconds % 60).toString().padStart(2, '0')}</span>}
@@ -238,8 +238,8 @@ export default function CertificationAssessment({ courseId, initial, loading = f
       </div>
     </div>}
 
-    {result && <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-2xl">
+    {result && <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-2xl">
         <span className={`mx-auto flex h-14 w-14 items-center justify-center rounded-2xl ${result.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{result.passed ? <CheckCircle2 size={28} /> : <Target size={28} />}</span>
         <h2 className="mt-4 text-xl font-black text-slate-950">{result.passed ? 'Assessment passed' : 'Attempt complete'}</h2>
         <p className="mt-1 text-sm text-slate-500">Attempt {result.attemptNumber} · Pass mark {result.passMark}%</p>

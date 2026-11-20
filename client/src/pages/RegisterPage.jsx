@@ -41,8 +41,6 @@ export default function RegisterPage() {
   };
 
   return <div className="relative min-h-screen overflow-hidden bg-[#fffaf5]">
-    <div className="pointer-events-none absolute -left-24 top-20 h-80 w-80 rounded-full bg-green-200/50 blur-3xl" />
-    <div className="pointer-events-none absolute -right-20 bottom-0 h-96 w-96 rounded-full bg-amber-200/40 blur-3xl" />
     <div className="relative mx-auto grid min-h-screen w-full max-w-6xl items-center gap-8 px-4 py-10 lg:grid-cols-[1.15fr_0.85fr] lg:px-8">
       <section className="order-2 hidden lg:block">
         <AuthLearningVisual />
@@ -62,7 +60,7 @@ export default function RegisterPage() {
           <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-700 text-xs font-black text-white">QL</span>
           <div><p className="font-black tracking-tight text-slate-950">QuickLink</p><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-brand-700">QuickLink Learning</p></div>
         </div>
-        <div className="rounded-3xl border border-green-100 bg-white/95 p-6 shadow-2xl shadow-green-950/[0.07] backdrop-blur sm:p-8">
+        <div className="rounded-2xl border border-green-100 bg-white p-6 shadow-lg shadow-green-950/[0.07] sm:p-8">
           <p className="eyebrow">Student registration</p>
           <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950">Create your account</h1>
           <p className="mt-1.5 text-sm text-slate-500">Your account is activated immediately. Use accurate details because certificates use your registered name.</p>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Award, BadgeCheck, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FilePenLine, RefreshCcw,
-  Search, Share2, ShieldCheck, ShieldX, SlidersHorizontal, Sparkles, Trash2,
+  Search, Share2, ShieldCheck, ShieldX, Sparkles, Trash2,
 } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, Modal, PageHeader, StatCard } from '../components/layout.jsx';

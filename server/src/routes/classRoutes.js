@@ -72,6 +72,7 @@ const completionSchema = z.object({
 const lessonQuestion = z.object({ prompt: z.string().trim().min(1).max(1200), options: z.array(z.string().trim().min(1).max(500)).length(4), correctOption: z.number().int().min(0).max(3), explanation: z.string().max(2000).optional().default('') });
 const lesson = z.object({
   _id: objectId.optional(), title: z.string().trim().min(2).max(180), content: z.string().max(30000).optional().default(''),
+  practical: z.string().max(30000).optional().default(''),
   availableAt: z.string().datetime().nullable().optional(),
   videoUrl: z.string().max(2000).optional().default(''),
   imageUrl: z.string().max(1000).optional().default(''),
@@ -127,11 +128,23 @@ const classFields = {
   assessmentLockdown: z.boolean().optional(),
   minimumAttendanceSessions: z.number().int().min(0).max(100).optional(),
 };
-const createClassSchema = z.object(classFields);
+const optionalQuizLimit = (body, context) => {
+  if (!body.modules) return;
+  const quizCount = body.modules.flatMap((module) => module.lessons || []).filter((entry) => (entry.knowledgeCheck || []).length > 0).length;
+  if (quizCount > 3) context.addIssue({
+    code: z.ZodIssueCode.custom,
+    path: ['modules'],
+    message: 'A course can include at most three quizzes.',
+  });
+};
+const createClassSchema = z.object(classFields).superRefine(optionalQuizLimit);
 const updateClassSchema = z.object({
   ...Object.fromEntries(Object.entries(classFields).map(([key, value]) => [key, value.optional()])),
   active: z.boolean().optional(),
-}).refine((body) => Object.keys(body).length > 0);
+}).superRefine((body, context) => {
+  if (Object.keys(body).length === 0) context.addIssue({ code: z.ZodIssueCode.custom, message: 'Provide at least one field to update.' });
+  optionalQuizLimit(body, context);
+});
 
 router.use(requireAuth);
 router.get('/:classId/assignments', validate(classIdParams, 'params'), assignments.listClassAssignments);

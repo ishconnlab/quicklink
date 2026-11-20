@@ -83,6 +83,55 @@ function collectResources(value) {
   return resources.filter((resource, index) => resources.findIndex((entry) => entry.url === resource.url) === index).slice(0, 30);
 }
 
+function renderPracticalContent(day) {
+  const sections = [];
+  const practicals = Array.isArray(day.practicals) ? day.practicals : day.practicals ? [day.practicals] : day.practical ? [day.practical] : [];
+  if (practicals.length) {
+    sections.push('## Guided practice');
+    practicals.forEach((item, index) => {
+      if (typeof item === 'string') { sections.push(`- ${item}`); return; }
+      if (!item || typeof item !== 'object') return;
+      sections.push(`### ${item.title || `Practical ${index + 1}`}`);
+      if (Array.isArray(item.steps) && item.steps.length) sections.push(item.steps.map((step) => `- ${step}`).join('\n'));
+      if (item.expected_output) sections.push(`**Expected output:** ${item.expected_output}`);
+      if (item.why) sections.push(`**Why it matters:** ${item.why}`);
+      if (item.exercise) sections.push(`**Your task:** ${item.exercise}`);
+    });
+  }
+  if (Array.isArray(day.exercises) && day.exercises.length) {
+    sections.push('## Exercises');
+    sections.push(day.exercises.map((item, index) => {
+      if (typeof item === 'string') return `- ${item}`;
+      if (!item || typeof item !== 'object') return '';
+      const type = item.type ? `**${labelFor(item.type)}:** ` : '';
+      return `- ${type}${item.instruction || item.prompt || item.title || `Exercise ${index + 1}`}`;
+    }).filter(Boolean).join('\n'));
+  }
+  if (Array.isArray(day.final_project_options) && day.final_project_options.length) {
+    sections.push('## Final project options');
+    day.final_project_options.forEach((option, index) => {
+      if (typeof option === 'string') { sections.push(`- ${option}`); return; }
+      if (!option || typeof option !== 'object') return;
+      const lines = [`### ${option.title || `Option ${index + 1}`}`];
+      if (option.type) lines.push(`**Type:** ${option.type}`);
+      if (option.note) lines.push(option.note);
+      if (Array.isArray(option.minimum_requirements) && option.minimum_requirements.length) {
+        lines.push('**Minimum requirements**', option.minimum_requirements.map((requirement) => `- ${requirement}`).join('\n'));
+      }
+      sections.push(lines.join('\n'));
+    });
+  }
+  if (Array.isArray(day.presentation_structure) && day.presentation_structure.length) {
+    sections.push('## Presentation structure', day.presentation_structure.map((item) => `- ${item}`).join('\n'));
+  }
+  if (day.assignment) sections.push('## Assignment', String(day.assignment));
+  if (!sections.length) {
+    const objectives = Array.isArray(day.objectives) ? day.objectives.join('; ') : '';
+    sections.push(`## Practical task\nApply the concepts from ${day.title || 'this day'}: ${day.checkpoint || objectives || 'recreate the examples from the notes in your own notebook and record the output.'}`);
+  }
+  return sections.join('\n\n').slice(0, MAX_LESSON_CONTENT);
+}
+
 function formatCourseOverview(course, codeBlocks) {
   const overview = Object.fromEntries(Object.entries(course).filter(([key]) => key !== 'days'));
   return renderCurriculumContent(overview, 'Course overview', ['Course overview'], codeBlocks);
@@ -94,8 +143,8 @@ export function parseCourseCurriculum(input) {
   if (!course || typeof course !== 'object' || Array.isArray(course)) {
     throw new Error('The JSON must contain a course object.');
   }
-  if (!Array.isArray(course.days) || course.days.length < 10 || course.days.length > 100) {
-    throw new Error('The curriculum must contain between 10 and 100 learning days.');
+  if (!Array.isArray(course.days) || course.days.length < 1 || course.days.length > 100) {
+    throw new Error('The curriculum must contain between 1 and 100 learning days.');
   }
   if (!course.title || typeof course.title !== 'string' || course.title.length > 160) {
     throw new Error('The course title must be between 1 and 160 characters.');
@@ -120,13 +169,16 @@ export function parseCourseCurriculum(input) {
     if (codeBlocks.length > MAX_CODE_BLOCKS) throw new Error(`Day ${day.day} has more than ${MAX_CODE_BLOCKS} code examples.`);
     const longCode = codeBlocks.find((block) => block.source.length > MAX_CODE_LENGTH);
     if (longCode) throw new Error(`A code example in Day ${day.day} exceeds the ${MAX_CODE_LENGTH.toLocaleString()} character limit.`);
+    let resources = collectResources(index === 0 ? [course.global_resources, day.resources] : day.resources);
+    if (!resources.length) resources = collectResources(course.global_resources);
     modules[0].lessons.push({
       title: `Day ${day.day} — ${day.title}`.slice(0, 180),
       content,
+      practical: renderPracticalContent(day),
       videoUrl: '',
       imageUrl: '',
       imagePublicId: '',
-      resources: collectResources(index === 0 ? [course.global_resources, day.resources] : day.resources),
+      resources,
       code: { language: '', source: '' },
       codeBlocks,
       knowledgeCheck: [],

@@ -36,6 +36,9 @@ test('supplied Machine Learning curriculum imports all 10 days and every origina
   assert.equal(parsed.course.lessonAccessMode, 'daily');
   assert.equal(importedCode.length, 25);
   assert.deepEqual(importedCode, collectCode(original.course));
+  assert.ok(lessons.every((lesson) => lesson.practical.trim().length > 0), 'Every imported day includes a practical task');
+  assert.ok(lessons.every((lesson) => lesson.resources.some((resource) => resource.url)), 'Every imported day includes at least one resource link');
+  assert.match(lessons[0].practical, /Open Google Colab and run your first code/);
 
   const importedText = lessons.map((lesson) => lesson.content).join('\n');
   const preservedCode = new Set(importedCode);
@@ -45,7 +48,7 @@ test('supplied Machine Learning curriculum imports all 10 days and every origina
 });
 
 test('curriculum importer rejects missing learning days and invalid content sizes', () => {
-  assert.throws(() => parseCourseCurriculum({ course: { title: 'Too short', days: [] } }), /between 10 and 100 learning days/);
+  assert.throws(() => parseCourseCurriculum({ course: { title: 'Too short', days: [] } }), /between 1 and 100 learning days/);
   const invalidDays = Array.from({ length: 10 }, (_, index) => ({ day: index + 1, title: `Day ${index + 1}` }));
   invalidDays[3].day = 5;
   assert.throws(() => parseCourseCurriculum({ course: { title: 'Invalid days', days: invalidDays } }), /listed more than once|numbered consecutively/);

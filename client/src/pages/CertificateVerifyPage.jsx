@@ -39,8 +39,6 @@ export default function CertificateVerifyPage() {
   };
 
   return <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-white px-4 py-10 sm:py-16">
-    <div className="pointer-events-none absolute -left-24 top-16 h-72 w-72 rounded-full bg-green-200/40 blur-3xl" />
-    <div className="pointer-events-none absolute -right-24 bottom-10 h-80 w-80 rounded-full bg-amber-200/40 blur-3xl" />
     <section className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-green-100 bg-white shadow-2xl shadow-green-950/[0.08]">
       <div className={`h-1.5 ${valid ? 'bg-brand-600' : revoked ? 'bg-red-600' : 'bg-slate-300'}`} />
       <div className="p-6 sm:p-9">

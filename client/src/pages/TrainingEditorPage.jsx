@@ -19,7 +19,9 @@ const blankForm = (offeringType = 'training') => ({
   studentIds: [],
   completionRequirements: { requireReading: false, requireTheory: false, requirePractical: false, requireAttendance: true, minimumScore: 0 },
   payment: { enabled: false, freeDays: 2, amount: 0, currency: 'RWF', paymentCode: '', paymentName: '', instructions: '' },
-  projectSubmission: { enabled: false, required: false, title: '', instructions: '', allowGithub: true, allowOtherLinks: true, requireDescription: true },
+  projectSubmission: offeringType === 'course'
+    ? { enabled: true, required: true, title: 'Final course assignment', instructions: 'Submit the completed final assignment, a working project link or repository, and a short description of what was built and how it works.', allowGithub: true, allowOtherLinks: true, requireDescription: true }
+    : { enabled: false, required: false, title: '', instructions: '', allowGithub: true, allowOtherLinks: true, requireDescription: true },
 });
 
 const toLocalInput = (value) => {
@@ -202,6 +204,7 @@ export default function TrainingEditorPage() {
             lessons: module.lessons.map((lesson) => ({
               title: lesson.title,
               content: lesson.content,
+              practical: lesson.practical || '',
               availableAt: lesson.availableAt || null,
               videoUrl: lesson.videoUrl || '',
               resources: lesson.resources || [],
@@ -269,6 +272,14 @@ export default function TrainingEditorPage() {
           <ol className="mt-3 grid max-h-44 gap-1 overflow-y-auto text-xs text-slate-600 sm:grid-cols-2">{curriculumPreview.days.map((day, index) => <li key={`${day.title}-${index}`} className="flex min-w-0 items-start justify-between gap-2 rounded-lg bg-slate-50 px-2.5 py-2"><span className="min-w-0 break-words">{day.title}</span><span className="shrink-0">{day.codeExamples} code</span></li>)}</ol>
         </div>}
       </section>}
+      {isCourse && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-bold text-slate-900">Course structure</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-500">
+          Each course section can contain theory, practical work, code snippets, resource links, an optional quiz, and a thumbnail or image.
+          After creation, open <b>Learn / Course builder</b> to add and edit the lesson body.
+        </p>
+        <p className="mt-3 text-xs leading-5 text-brand-900">A course may include up to three optional quizzes. Students are only required to submit them when the theory requirement below is enabled.</p>
+      </section>}
       <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
         <h2 className="flex items-center gap-2 text-base font-bold text-slate-900"><BookOpen size={18} className="text-brand-700" />{isCourse ? 'Course identity' : 'Training identity'}</h2>
         <p className="mt-1 text-sm text-slate-500">This is what students see in the catalog and on their certificate.</p>
@@ -297,7 +308,7 @@ export default function TrainingEditorPage() {
         <p className="mt-1 text-sm text-slate-500">Learners find courses alongside trainings in their Trainings area. No live-class schedule or attendance is required.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="Maximum students"><input type="number" min="1" max="10000" className={`input ${errors.maxStudents ? 'ring-2 ring-red-400' : ''}`} value={form.maxStudents} onChange={(event) => set('maxStudents', event.target.value)} />{errors.maxStudents && <span className="mt-1 block text-xs text-red-600">{errors.maxStudents}</span>}</Field>
-          <Field label="Lesson access" hint="Daily opens Day 1 now; each completed day unlocks the next day at 6:00 AM."><select className="input" value={form.lessonAccessMode || 'daily'} onChange={(event) => set('lessonAccessMode', event.target.value)}><option value="daily">Daily — one lesson per day at 6:00 AM</option><option value="sequential">Sequential — complete each lesson to unlock the next</option><option value="scheduled">Scheduled — each lesson opens on its date</option></select></Field>
+          <Field label="Lesson access" hint="Daily opens Days 1 and 2 now; each completed day unlocks the next day at 6:00 AM."><select className="input" value={form.lessonAccessMode || 'daily'} onChange={(event) => set('lessonAccessMode', event.target.value)}><option value="daily">Daily — next day unlocks at 6:00 AM</option><option value="sequential">Sequential — complete each lesson to unlock the next</option><option value="scheduled">Scheduled — each lesson opens on its date</option></select></Field>
         </div>
         <div className="mt-4 grid gap-2 sm:grid-cols-3">
           <Toggle label="Enrollment open" description="Students can join from the Trainings area." checked={form.enrollmentOpen} onChange={(value) => set('enrollmentOpen', value)} />
@@ -363,13 +374,13 @@ export default function TrainingEditorPage() {
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           {!isCourse && <Toggle label="Require attendance" description="Students must attend the configured minimum sessions." checked={form.completionRequirements.requireAttendance} onChange={(value) => set('completionRequirements', { ...form.completionRequirements, requireAttendance: value })} />}
           <Toggle label="Require practical assignments" description="All published practical work must pass." checked={form.completionRequirements.requirePractical} onChange={(value) => set('completionRequirements', { ...form.completionRequirements, requirePractical: value })} />
-          <Toggle label="Require theory assessments" description="All published quizzes must pass." checked={form.completionRequirements.requireTheory} onChange={(value) => set('completionRequirements', { ...form.completionRequirements, requireTheory: value })} />
+          <Toggle label="Require theory assessments" description="If enabled, all published quizzes must be submitted and passed. Up to three optional course quizzes are recommended." checked={form.completionRequirements.requireTheory} onChange={(value) => set('completionRequirements', { ...form.completionRequirements, requireTheory: value })} />
           <Field label="Minimum overall assignment score (%)"><input type="number" min="0" max="100" className="input" value={form.completionRequirements.minimumScore} onChange={(event) => set('completionRequirements', { ...form.completionRequirements, minimumScore: event.target.value })} /></Field>
         </div>
-        <p className="mt-3 rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900">The certification assessment and its 10 questions are configured from the {isCourse ? 'course' : 'training'} detail page after saving. Defaults come from platform settings.</p>
+        <p className="mt-3 rounded-xl bg-green-50 px-3 py-2.5 text-xs leading-5 text-brand-900">The final certification assessment is configured from the {isCourse ? 'course' : 'training'} detail page after saving. Quizzes without a pass requirement remain optional. When a quiz is enabled, every quiz must be submitted and passed.</p>
       </section>
 
-      <div className="sticky bottom-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-100 bg-white/95 p-3 shadow-lg shadow-green-950/5 backdrop-blur lg:bottom-4">
+      <div className="sticky bottom-20 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-green-100 bg-white p-3 shadow-lg shadow-green-950/5 lg:bottom-4">
         <p className="text-xs text-slate-500">Changes apply to enrolled students immediately.{!isCourse && ' A live session blocks roster changes.'}</p>
         <div className="flex gap-2"><Link to={editing ? `/courses/${id}` : (isCourse ? '/admin/courses' : '/courses')} className="btn-secondary">Cancel</Link><button type="submit" disabled={saving} className="btn-primary">{saving ? <Spinner size={17} /> : <Save size={17} />}{saving ? 'Saving…' : editing ? 'Save changes' : `Create ${isCourse ? 'course' : 'training'}`}</button></div>
       </div>

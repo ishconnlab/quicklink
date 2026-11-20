@@ -4,7 +4,7 @@ import ApiError from '../utils/ApiError.js';
 import { LearningClass } from '../models/LearningClass.js';
 import { CourseLearningProgress } from '../models/CourseLearningProgress.js';
 import { isAdmin } from '../security/roles.js';
-import { DAILY_UNLOCK_HOUR, DEFAULT_COURSE_TIMEZONE, isLessonAccessible, nextDailyUnlockAt } from '../services/lessonAccess.js';
+import { DAILY_OPEN_LESSONS, DAILY_UNLOCK_HOUR, DEFAULT_COURSE_TIMEZONE, isLessonAccessible, nextDailyUnlockAt } from '../services/lessonAccess.js';
 import { getEnrollment, paymentState } from '../services/classAccess.js';
 
 const idString = (value) => String(value?._id || value || '');
@@ -35,7 +35,7 @@ function safeCourse(course, progress, reveal = false) {
       lessonIndex += 1;
       const isUnlocked = isLessonAccessible(lesson, index, entries, accessMode, completed, now, accessOptions);
       let unlockAt = lesson.availableAt ? new Date(lesson.availableAt) : null;
-      if (accessMode === 'daily' && index > 0) {
+      if (accessMode === 'daily' && index >= DAILY_OPEN_LESSONS) {
         const previousId = idString(entries[index - 1]?.lesson?._id);
         if (completed.has(previousId)) {
           const previousCompletedAt = completionTimes.get(previousId);
@@ -47,6 +47,7 @@ function safeCourse(course, progress, reveal = false) {
       const assessmentAttempts = (progress?.assessmentAttempts || []).filter((attempt) => idString(attempt.lessonId) === id).length;
       return {
         id, title: lesson.title, content: isUnlocked || done || reveal ? lesson.content : '',
+        practical: isUnlocked || done || reveal ? lesson.practical || '' : '',
         videoUrl: isUnlocked || done || reveal ? lesson.videoUrl : '',
         imageUrl: isUnlocked || done || reveal ? lesson.imageUrl : '',
         ...(reveal ? { imagePublicId: lesson.imagePublicId || '' } : {}),
@@ -83,7 +84,7 @@ function assertLessonAccessible(course, progress, index, entries) {
   if (!isLessonAccessible(entries[index].lesson, index, entries, accessMode, completed, now, { completionTimes, timeZone, unlockHour: DAILY_UNLOCK_HOUR })) {
     const availableAt = entries[index].lesson.availableAt;
     if (availableAt && new Date(availableAt) > now) throw ApiError.forbidden(`This lesson is scheduled to open on ${new Date(availableAt).toLocaleString()}.`);
-    if (accessMode === 'daily' && index > 0) {
+    if (accessMode === 'daily' && index >= DAILY_OPEN_LESSONS) {
       const previousId = idString(entries[index - 1].lesson._id);
       if (!completed.has(previousId)) throw ApiError.forbidden('Complete the previous day before opening this lesson.');
       const previousCompletedAt = completionTimes.get(previousId);

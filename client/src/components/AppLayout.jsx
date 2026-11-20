@@ -115,14 +115,14 @@ export default function AppLayout() {
   });
   return <div className="min-h-[100dvh] bg-white">
     {!standalone && collapsed && <button onClick={toggleSidebar} title="Show sidebar" className="fixed left-0 top-1/2 z-40 hidden -translate-y-1/2 rounded-r-xl border border-l-0 border-slate-200 bg-white py-3 pl-1.5 pr-1 text-slate-400 shadow-sm transition hover:text-slate-700 lg:block"><PanelLeftOpen size={18} /></button>}
-    {!standalone && <aside className={classNames('fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-green-100/80 bg-white/95 shadow-xl shadow-green-950/5 backdrop-blur', !collapsed && 'lg:flex')}>
+    {!standalone && <aside className={classNames('fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-green-100/80 bg-white shadow-md shadow-green-950/5', !collapsed && 'lg:flex')}>
       <div className="flex h-16 items-center justify-between border-b border-slate-100 px-5"><NavLink to="/dashboard"><Brand /></NavLink><button onClick={toggleSidebar} title="Hide sidebar" className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><PanelLeftClose size={18} /></button></div>
       <NavItems groups={navGroups} />
       <div className="border-t border-slate-100 p-3"><AccountMenu placement="up" compact /></div>
     </aside>}
 
     {!standalone && mobileOpen && <div className="fixed inset-0 z-50 lg:hidden">
-      <button aria-label="Close navigation" className="absolute inset-0 bg-slate-950/40 backdrop-blur-[2px]" onClick={() => setMobileOpen(false)} />
+      <button aria-label="Close navigation" className="absolute inset-0 bg-slate-950/40" onClick={() => setMobileOpen(false)} />
       <aside className="relative flex h-full w-[86%] max-w-xs flex-col bg-white shadow-2xl">
         <div className="flex h-16 items-center justify-between border-b border-slate-100 px-5"><Brand /><button onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100" aria-label="Close menu"><X size={20} /></button></div>
         <NavItems groups={navGroups} onNavigate={() => setMobileOpen(false)} />
@@ -130,7 +130,7 @@ export default function AppLayout() {
       </aside>
     </div>}
 
-    <header className={classNames('sticky top-0 z-30 border-b border-green-100/70 bg-white/95 backdrop-blur', !standalone && 'lg:hidden')} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <header className={classNames('sticky top-0 z-30 border-b border-green-100/70 bg-white', !standalone && 'lg:hidden')} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-14 items-center justify-between gap-3 px-3 sm:h-16 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">{!standalone && <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-600 hover:bg-green-50" aria-label="Open navigation"><Menu size={20} /></button>}<NavLink to="/dashboard"><Brand short={standalone} /></NavLink></div>
         {standalone && <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto px-2 md:flex" aria-label="QuickLink navigation">{allLinks.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} aria-label={label} title={label} className={({ isActive }) => classNames('flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition', isActive ? 'bg-green-50 text-brand-800' : 'text-slate-600 hover:bg-slate-50')}><Icon size={15} /><span className="hidden xl:inline">{label}</span></NavLink>)}</nav>}
@@ -141,7 +141,7 @@ export default function AppLayout() {
       <main className={classNames('quicklink-app-main mx-auto w-full max-w-7xl px-3 pb-24 pt-3 sm:px-6 sm:pt-5', standalone ? 'md:pb-8' : 'lg:pb-12 lg:pt-8')} data-standalone={standalone ? 'true' : undefined}><div key={location.pathname} className="animate-fade-in"><Outlet /></div></main>
     </div>
 
-    <nav className={classNames('fixed inset-x-0 bottom-0 z-30 border-t border-green-100/80 bg-white/95 shadow-[0_-8px_24px_rgba(124,45,18,0.06)] backdrop-blur', standalone ? 'md:hidden' : 'lg:hidden')} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+    <nav className={classNames('fixed inset-x-0 bottom-0 z-30 border-t border-green-100/80 bg-white shadow-[0_-8px_24px_rgba(124,45,18,0.06)]', standalone ? 'md:hidden' : 'lg:hidden')} style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="grid h-16" style={{ gridTemplateColumns: `repeat(${mobileLinks.length}, minmax(0, 1fr))` }}>{mobileLinks.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} aria-label={label} title={label} className="group flex min-w-0 items-center justify-center px-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500">{({ isActive }) => <span className={classNames('flex h-10 w-10 items-center justify-center rounded-xl transition', isActive ? 'bg-green-50 text-brand-700 ring-1 ring-green-100' : 'text-slate-400 group-hover:bg-slate-50 group-hover:text-slate-600')}><Icon size={19} strokeWidth={isActive ? 2.4 : 2} /></span>}</NavLink>)}</div>
     </nav>
   </div>;

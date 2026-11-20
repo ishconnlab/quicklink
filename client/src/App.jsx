@@ -6,7 +6,6 @@ import LoginPage from './pages/LoginPage.jsx';
 import RegisterPage from './pages/RegisterPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import SplashScreen from './components/SplashScreen.jsx';
-import { PublicRoute } from './pages/PublicPages.jsx';
 
 const UsersPage = lazy(() => import('./pages/UsersPage.jsx'));
 const SettingsPage = lazy(() => import('./pages/SettingsPage.jsx'));
@@ -24,7 +23,6 @@ const StudentDashboard = lazy(() => import('./pages/StudentDashboard.jsx'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard.jsx'));
 const CertificateVerifyPage = lazy(() => import('./pages/CertificateVerifyPage.jsx'));
 const CertificateLookupPage = lazy(() => import('./pages/CertificateLookupPage.jsx'));
-const PublicTrainingRegistrationPage = lazy(() => import('./pages/PublicTrainingRegistrationPage.jsx'));
 const TrainingRegistrationsPage = lazy(() => import('./pages/TrainingRegistrationsPage.jsx'));
 const CertificatesPage = lazy(() => import('./pages/CertificatesPage.jsx'));
 const LiveSessionPage = lazy(() => import('./pages/LiveSessionPage.jsx'));
@@ -49,8 +47,7 @@ function AdminOnly({ children }) {
 function PrivateRobots() {
   const { pathname } = useLocation();
   useEffect(() => {
-    const publicPage = ['/about', '/about-ishconnect', '/programmes', '/how-learning-works', '/resources', '/contact'].includes(pathname) || /^\/(programmes|resources)\/[^/]+$/.test(pathname);
-    if (publicPage) return;
+    if (pathname === '/verify' || /^\/verify\/[^/]+$/.test(pathname)) return;
     document.head.querySelector('link[rel="canonical"]')?.remove();
     document.head.querySelector('script[data-quicklink-schema]')?.remove();
     let robots = document.head.querySelector('meta[name="robots"]');
@@ -67,19 +64,10 @@ export default function App() {
     <Suspense fallback={<SplashScreen />}>
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/about" element={<PublicRoute kind="about" />} />
-        <Route path="/about-ishconnect" element={<PublicRoute kind="about-ishconnect" />} />
-        <Route path="/programmes" element={<PublicRoute kind="programmes" />} />
-        <Route path="/programmes/:slug" element={<PublicRoute kind="programme" />} />
-        <Route path="/how-learning-works" element={<PublicRoute kind="how" />} />
-        <Route path="/contact" element={<PublicRoute kind="contact" />} />
-        <Route path="/resources" element={<PublicRoute kind="resources" />} />
-        <Route path="/resources/:slug" element={<PublicRoute kind="resource" />} />
         <Route path="/login" element={loading ? <SplashScreen /> : user ? <DashboardRedirect /> : <LoginPage />} />
         <Route path="/register" element={loading ? <SplashScreen /> : user ? <DashboardRedirect /> : <RegisterPage />} />
         <Route path="/verify" element={<CertificateLookupPage />} />
         <Route path="/verify/:code" element={<CertificateVerifyPage />} />
-        <Route path="/training-registration/:slug" element={<PublicTrainingRegistrationPage />} />
         <Route element={<Protected><AppLayout /></Protected>}>
           <Route path="/dashboard" element={user?.role === 'admin' ? <AdminOnly><AdminDashboard /></AdminOnly> : <StudentDashboard />} />
           <Route path="/courses" element={<CoursesPage offeringType="training" />} />

@@ -69,9 +69,7 @@
   min-height: 100dvh;
   place-items: center;
   padding: 1.5rem;
-  background:
-    radial-gradient(ellipse at 50% 35%, rgb(220 252 231 / 70%), transparent 58%),
-    #f8fafc;
+  background: #f8fafc;
 }
 
 .app-loader-card {
@@ -256,6 +254,81 @@
 .quicklink-app-main :where(.card, .surface, article, section) {
   min-width: 0;
   max-width: 100%;
+}
+
+.learning-admin-grid {
+  align-items: start;
+}
+
+.learning-admin-grid aside {
+  min-width: 0;
+}
+
+.learning-content {
+  scroll-behavior: smooth;
+}
+
+.learning-content article {
+  color: #334155;
+  line-height: 1.75;
+}
+
+.learning-content article h1,
+.learning-content article h2,
+.learning-content article h3 {
+  color: #0f172a;
+  line-height: 1.35;
+}
+
+.learning-content article pre {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.learning-outline button {
+  min-height: 44px;
+}
+
+.learning-status-bar > div {
+  min-width: 0;
+  border-right: 1px solid #f1f5f9;
+  padding-inline: 0.75rem;
+}
+
+.learning-status-bar > div:first-child {
+  padding-left: 0;
+}
+
+.learning-status-bar > div:last-child {
+  border-right: 0;
+  padding-right: 0;
+}
+
+@media (max-width: 639px) {
+  .learning-status-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .learning-status-bar > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .learning-status-bar > div:nth-child(n + 3) {
+    border-top: 1px solid #f1f5f9;
+    padding-top: 0.75rem;
+  }
+
+  .learning-status-bar > div:nth-child(3) {
+    padding-left: 0;
+  }
+
+  .learning-content {
+    padding: 1rem;
+  }
+
+  .learning-admin-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .quicklink-app-main :where(.card, .surface, article, section) :where(h1, h2, h3, p) {

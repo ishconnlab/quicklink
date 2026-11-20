@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertCircle, ArrowRight, Award, CalendarClock, CheckCircle2, Clock3, CreditCard, FileCheck2, GraduationCap, Radio, Sparkles, Video } from 'lucide-react';
+import { ArrowRight, Award, CalendarClock, CheckCircle2, Clock3, CreditCard, FileCheck2, GraduationCap, Radio, Sparkles, Video } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader, ProgressBar, SectionHeader, StatCard } from '../components/layout.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';

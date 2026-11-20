@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  AlertCircle, ArrowLeft, CalendarClock, CheckCircle2, Clock3, Copy, FileText, GraduationCap, Link2, Mail,
+  AlertCircle, ArrowLeft, CalendarClock, CheckCircle2, Clock3, Copy, FileText, GraduationCap, Mail,
   MessageCircle, Pencil, Play, Radio, RotateCw, Send, ShieldCheck, Users, Video, Wallet, XCircle,
 } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
-import { Badge, Modal, PageHeader } from '../components/layout.jsx';
+import { Badge, Modal } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { useAuth } from '../context/AuthContext.jsx';

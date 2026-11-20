@@ -39,6 +39,7 @@ const lessonQuestionSchema = new mongoose.Schema({
 const lessonSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 180 },
   content: { type: String, default: '', maxlength: 30000 },
+  practical: { type: String, default: '', maxlength: 30000 },
   availableAt: { type: Date, default: null },
   videoUrl: { type: String, default: '', trim: true, maxlength: 2000 },
   imageUrl: { type: String, default: '', trim: true, maxlength: 1000 },
