@@ -53,3 +53,34 @@ test('curriculum importer rejects missing learning days and invalid content size
   invalidDays[3].day = 5;
   assert.throws(() => parseCourseCurriculum({ course: { title: 'Invalid days', days: invalidDays } }), /listed more than once|numbered consecutively/);
 });
+
+test('curriculum importer preserves long theory and structured code blocks without truncation', () => {
+  const theory = 'Theory paragraph. '.repeat(2400);
+  const practicalStep = 'A complete practical step. '.repeat(1500);
+  const source = 'print("complete example")\n'.repeat(1200);
+  const parsed = parseCourseCurriculum({
+    course: {
+      title: 'Long course',
+      days: [{ day: 1, title: 'Deep theory', theory, practicals: [{ title: 'Long task', steps: [practicalStep] }], code_blocks: [{ language: 'python', source, explanation: 'Complete snippet' }] }],
+    },
+  });
+  const lesson = parsed.course.modules[0].lessons[0];
+  assert.ok(lesson.content.includes(theory));
+  assert.ok(lesson.practical.includes(practicalStep));
+  assert.equal(lesson.codeBlocks[0].source, source);
+});
+
+test('curriculum importer rejects duplicate lesson titles and duplicate code examples', () => {
+  const duplicateTitles = {
+    course: { title: 'Duplicate titles', days: [{ day: 1, title: 'Same lesson' }, { day: 2, title: ' same   lesson ' }] },
+  };
+  assert.throws(() => parseCourseCurriculum(duplicateTitles), /title .* listed more than once/);
+
+  const duplicateCode = {
+    course: { title: 'Duplicate code', days: [
+      { day: 1, title: 'First lesson', code: 'print("same")' },
+      { day: 2, title: 'Second lesson', code: 'print("same")' },
+    ] },
+  };
+  assert.throws(() => parseCourseCurriculum(duplicateCode), /duplicates another curriculum snippet/);
+});

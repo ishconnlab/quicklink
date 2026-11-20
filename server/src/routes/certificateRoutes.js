@@ -15,11 +15,19 @@ const listQuery = z.object({
   page: z.string().regex(/^\d{1,4}$/).optional(),
   limit: z.string().regex(/^\d{1,3}$/).optional(),
 });
+const manualCertificateBody = z.object({
+  studentName: z.string().trim().min(2).max(120),
+  courseTitle: z.string().trim().min(2).max(160),
+  description: z.string().trim().max(240).optional().default(''),
+  level: z.enum(['L3', 'L4', 'L5', 'Bootcamp', 'Training']),
+  issuedAt: z.string().datetime(),
+});
 router.get('/verify/:code', validate(z.object({ code: z.string().regex(/^[A-Za-z0-9_-]{32}$/) }), 'params'), certificates.verifyCertificate);
 router.get('/share/:code', validate(z.object({ code: z.string().regex(/^[A-Za-z0-9_-]{32}$/) }), 'params'), certificates.shareCertificate);
 router.use(requireAuth);
 router.get('/mine', certificates.listMyCertificates);
 router.get('/all', requireAdmin, validate(listQuery, 'query'), certificates.listAllCertificates);
+router.post('/manual', requireAdmin, validate(manualCertificateBody), certificates.issueManualCertificate);
 router.get('/:id.pdf', validate(z.object({ id: certificateIdentifier }), 'params'), certificates.downloadCertificate);
 router.patch('/:id/name', requireAdmin, validate(z.object({ id: objectId }), 'params'), validate(z.object({ studentName: z.string().trim().min(2).max(120) })), certificates.updateCertificateName);
 router.patch('/:id/print-details', requireAdmin, validate(z.object({ id: objectId }), 'params'), validate(z.object({ studentName: z.string().trim().min(2).max(120), courseTitle: z.string().trim().min(2).max(160), description: z.string().trim().max(240) })), certificates.updateCertificatePrintDetails);

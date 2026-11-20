@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, BookOpen, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardCheck, Code2, Copy, LockKeyhole, Maximize2, Minimize2, PanelLeft, Plus, Save, Trash2, X } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { PageHeader, ProgressBar } from '../components/layout.jsx';
+import MarkdownContent from '../components/MarkdownContent.jsx';
 import MarkdownEditor from '../components/MarkdownEditor.jsx';
 import { PageLoader, Spinner } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -10,44 +11,6 @@ import { useToast } from '../context/ToastContext.jsx';
 
 const newLesson = (title = 'New lesson') => ({ title, content: '', practical: '', availableAt: null, videoUrl: '', resources: [], code: { language: '', source: '' }, codeBlocks: [], knowledgeCheck: [], passMark: 70 });
 const newModule = () => ({ title: 'New module', lessons: [] });
-
-function inlineText(value) {
-  return value.split(/(\*\*[^*]+\*\*|==[^=]+==|\*[^*]+\*|`[^`]+`)/g).map((part, index) => {
-    if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
-    if (part.startsWith('==') && part.endsWith('==')) return <mark key={index} className="rounded bg-yellow-200 px-0.5 text-slate-900">{part.slice(2, -2)}</mark>;
-    if (part.startsWith('*') && part.endsWith('*')) return <em key={index}>{part.slice(1, -1)}</em>;
-    if (part.startsWith('`') && part.endsWith('`')) return <code key={index} className="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">{part.slice(1, -1)}</code>;
-    return part;
-  });
-}
-
-function LessonContent({ content }) {
-  const lines = String(content || '').split(/\r?\n/);
-  const blocks = [];
-  for (let index = 0; index < lines.length;) {
-    const line = lines[index].trim();
-    if (!line) { index += 1; continue; }
-    const heading = line.match(/^(#{1,3})\s+(.+)$/);
-    if (heading) {
-      const Tag = heading[1].length === 1 ? 'h2' : heading[1].length === 2 ? 'h3' : 'h4';
-      blocks.push(<Tag key={index} className="font-bold text-slate-900">{inlineText(heading[2])}</Tag>); index += 1; continue;
-    }
-    if (line.startsWith('- ')) {
-      const items = [];
-      while (index < lines.length && lines[index].trim().startsWith('- ')) { items.push(<li key={index}>{inlineText(lines[index].trim().slice(2))}</li>); index += 1; }
-      blocks.push(<ul key={`ul-${index}`} className="list-disc space-y-1 pl-6">{items}</ul>); continue;
-    }
-    if (line.startsWith('|')) {
-      const rows = [];
-      while (index < lines.length && lines[index].trim().startsWith('|')) { const cells = lines[index].trim().split('|').slice(1, -1).map((cell) => cell.trim()); if (!cells.every((cell) => /^:?-{2,}:?$/.test(cell))) rows.push(cells); index += 1; }
-      blocks.push(<div key={`table-${index}`} className="overflow-x-auto"><table className="min-w-full border-collapse text-left text-sm"><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex} className="border-b border-slate-200">{row.map((cell, cellIndex) => rowIndex === 0 ? <th key={cellIndex} className="bg-slate-50 px-3 py-2 font-semibold">{inlineText(cell)}</th> : <td key={cellIndex} className="px-3 py-2">{inlineText(cell)}</td>)}</tr>)}</tbody></table></div>); continue;
-    }
-    const paragraph = [line]; index += 1;
-    while (index < lines.length && lines[index].trim() && !/^#{1,3}\s/.test(lines[index].trim()) && !lines[index].trim().startsWith('- ') && !lines[index].trim().startsWith('|')) { paragraph.push(lines[index].trim()); index += 1; }
-    blocks.push(<p key={index} className="leading-7">{inlineText(paragraph.join(' '))}</p>);
-  }
-  return <div className="mt-5 max-w-3xl space-y-4 break-words text-sm text-slate-700">{blocks}</div>;
-}
 
 const codeKeywords = new Set('const let var function return if else for while class import from export default def print public private static void new async await try catch finally throw SELECT FROM WHERE INSERT UPDATE DELETE CREATE TABLE'.split(' '));
 function highlightLine(line) {
@@ -57,7 +20,7 @@ function highlightLine(line) {
   for (const match of line.matchAll(tokens)) {
     if (match.index > previous) parts.push(line.slice(previous, match.index));
     const token = match[0];
-    const kind = /^(\/\/|#)/.test(token) ? 'text-slate-500 italic' : /^['"`]/.test(token) ? 'text-amber-700' : /^\d/.test(token) ? 'text-purple-700' : codeKeywords.has(token) ? 'font-semibold text-green-800' : '';
+    const kind = /^(\/\/|#)/.test(token) ? 'text-slate-400 italic' : /^['"`]/.test(token) ? 'text-orange-300' : /^\d/.test(token) ? 'text-purple-300' : codeKeywords.has(token) ? 'font-semibold text-sky-300' : '';
     parts.push(kind ? <span key={match.index} className={kind}>{token}</span> : token);
     previous = match.index + token.length;
   }
@@ -66,7 +29,17 @@ function highlightLine(line) {
 }
 
 function MacCodeBlock({ block, copy }) {
-  return <section className="mt-5 min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-300 bg-white"><div className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-2"><div className="flex min-w-0 items-center gap-2"><span className="flex shrink-0 gap-1"><i className="h-2.5 w-2.5 rounded-full bg-red-400"/><i className="h-2.5 w-2.5 rounded-full bg-yellow-400"/><i className="h-2.5 w-2.5 rounded-full bg-green-500"/></span><span className="truncate text-xs font-medium text-slate-600">{block.language || 'Code'}</span></div><button type="button" onClick={() => copy(block.source)} className="btn-secondary min-h-8 shrink-0 px-2.5 py-1 text-xs" aria-label="Copy complete code example"><Copy size={13}/>Copy code</button></div>{block.explanation && <p className="break-words border-b border-slate-100 px-4 py-3 text-sm leading-6 text-slate-600">{block.explanation}</p>}<pre className="max-h-[480px] max-w-full overflow-auto overscroll-x-contain p-4 font-mono text-[13px] leading-6 text-slate-800"><code className="block w-max min-w-full">{block.source.split('\n').map((line, index) => <span key={index} className="grid min-w-max grid-cols-[2.5rem_max-content] gap-3"><span className="select-none text-right text-slate-400">{index + 1}</span><span>{highlightLine(line) || ' '}</span></span>)}</code></pre></section>;
+  return <section className="mt-6 min-w-0 max-w-full overflow-hidden rounded-xl border border-slate-300 shadow-sm">
+    <div className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-200 bg-[#f5f5f7] px-4 py-3">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex shrink-0 gap-1.5" aria-hidden="true"><i className="h-3 w-3 rounded-full border border-red-500/30 bg-[#ff5f57]"/><i className="h-3 w-3 rounded-full border border-yellow-500/30 bg-[#febc2e]"/><i className="h-3 w-3 rounded-full border border-green-500/30 bg-[#28c840]"/></span>
+        <span className="truncate text-xs font-semibold tracking-wide text-slate-600">{block.language || 'Code example'}</span>
+      </div>
+      <button type="button" onClick={() => copy(block.source)} className="inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50" aria-label="Copy complete code example"><Copy size={13}/>Copy code</button>
+    </div>
+    {block.explanation && <p className="break-words border-b border-slate-700 bg-[#232326] px-5 py-3 text-sm leading-6 text-slate-300">{block.explanation}</p>}
+    <pre className="max-w-full overflow-x-auto overscroll-x-contain bg-[#1c1c1e] p-5 font-mono text-[13px] leading-6 text-slate-100"><code className="block w-max min-w-full">{String(block.source || '').split('\n').map((line, index) => <span key={index} className="grid min-w-max grid-cols-[2.5rem_max-content] gap-4"><span className="select-none text-right text-slate-500">{index + 1}</span><span>{highlightLine(line) || ' '}</span></span>)}</code></pre>
+  </section>;
 }
 
 const localDateTimeValue = (value) => {
@@ -205,6 +178,28 @@ export default function CourseLearningPage() {
     setDragged(null);
   };
   const saveModules = async () => {
+    const lessonTitles = new Set();
+    const codeExamples = new Set();
+    for (const module of data.modules) {
+      for (const lesson of module.lessons) {
+        const titleKey = String(lesson.title || '').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+        if (titleKey && lessonTitles.has(titleKey)) {
+          toast.error(`Duplicate lesson title: "${lesson.title}". Rename it before saving.`);
+          return;
+        }
+        if (titleKey) lessonTitles.add(titleKey);
+        for (const block of lesson.codeBlocks || []) {
+          const source = String(block.source || '').replace(/\r\n?/g, '\n').trim();
+          if (!source) continue;
+          const codeKey = `${String(block.language || '').trim().toLocaleLowerCase()}\n${source}`;
+          if (codeExamples.has(codeKey)) {
+            toast.error('Duplicate code example found. Remove or edit the repeated snippet before saving.');
+            return;
+          }
+          codeExamples.add(codeKey);
+        }
+      }
+    }
     setBusy(true);
     try {
       const modules = data.modules.map((module) => ({ ...(validObjectId(module.id) ? { _id: module.id } : {}), title: module.title, lessons: module.lessons.map((lesson) => ({ ...(validObjectId(lesson.id) ? { _id: lesson.id } : {}), title: lesson.title, content: lesson.content, practical: lesson.practical || '', availableAt: lesson.availableAt || null, videoUrl: lesson.videoUrl, imageUrl: lesson.imageUrl || '', imagePublicId: lesson.imagePublicId || '', resources: lesson.resources || [], code: lesson.code || {}, codeBlocks: lesson.codeBlocks || [], knowledgeCheck: lesson.questions || [], passMark: Number(lesson.passMark || 70), assessmentAttempts: Number(lesson.assessmentAttempts || 3) })) }));
@@ -303,13 +298,13 @@ export default function CourseLearningPage() {
           {data.modules.map((module, moduleIndex) => module.lessons.some((lesson) => lesson.id === current.id) && <div key={module.id} className="space-y-4">
             {(() => { const lessonIndex = module.lessons.findIndex((lesson) => lesson.id === current.id); const lesson = module.lessons[lessonIndex]; const update = (changes) => updateAdminModule(moduleIndex, (item) => ({ ...item, lessons: item.lessons.map((entry, index) => index === lessonIndex ? { ...entry, ...changes } : entry) })); return <>
               <label className="block"><span className="label">Lesson title</span><input className="input" value={lesson.title} onChange={(event) => { update({ title: event.target.value }); setData((value) => value); }} /></label>
-              <div className="block"><span className="label">Theory notes</span><MarkdownEditor value={lesson.content} onChange={(content) => update({ content })} minHeight={224} placeholder="Use Markdown for headings (#, ##), lists (-), tables, bold, ==highlight==, and inline code." /></div>
-              <div className="block"><span className="label">Practical task</span><MarkdownEditor value={lesson.practical} onChange={(practical) => update({ practical })} minHeight={160} placeholder="Describe the hands-on task, steps, expected output, and what to submit." /></div>
+              <div className="block"><span className="label">Full theory</span><p className="mb-2 text-xs leading-5 text-slate-500">Write the complete lesson here. Use the formatting toolbar, or import formatted Markdown through the course JSON.</p><MarkdownEditor value={lesson.content} onChange={(content) => update({ content })} minHeight={420} /></div>
+              <div className="block"><span className="label">Practical task</span><p className="mb-2 text-xs leading-5 text-slate-500">Add the complete exercise, steps, expected output, and submission requirements.</p><MarkdownEditor value={lesson.practical} onChange={(practical) => update({ practical })} minHeight={280} /></div>
               <label className="block"><span className="label inline-flex items-center gap-1"><CalendarClock size={14} />Lesson opens at (optional)</span><span className="mb-1 block text-xs text-slate-500">Leave blank to use the course access rule only.</span><input type="datetime-local" className="input" value={localDateTimeValue(lesson.availableAt)} onChange={(event) => update({ availableAt: toIsoDateTime(event.target.value) })} /></label>
               <label className="block"><span className="label">YouTube or Instagram URL (optional)</span><input type="url" className="input" value={lesson.videoUrl || ''} onChange={(event) => update({ videoUrl: event.target.value })} placeholder="Video or reel URL" /></label>
               <label className="block"><span className="label">Lesson image</span><input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy || !/^[0-9a-f]{24}$/i.test(module.id || '') || !/^[0-9a-f]{24}$/i.test(lesson.id || '')} onChange={(event) => { const file = event.target.files?.[0]; if (file) uploadLessonImage(file, update); }} className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border file:border-slate-200 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold" />{lesson.imageUrl && <span className="mt-1 block text-xs text-green-800">Lesson image uploaded</span>}</label>
               <section className="rounded-xl border border-slate-200 p-3"><div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-semibold text-slate-800">Learning resources</h3><p className="text-xs text-slate-500">Links to references or downloadable materials.</p></div><button type="button" className="btn-secondary min-h-8 px-2.5 py-1 text-xs" onClick={() => update({ resources: [...(lesson.resources || []), { title: '', url: '' }] })}><Plus size={14}/>Add link</button></div>{(lesson.resources || []).map((resource, resourceIndex) => <div key={resourceIndex} className="mt-2 grid gap-2 sm:grid-cols-[1fr_1.5fr_auto]"><input className="input min-h-9" maxLength={180} value={resource.title} onChange={(event) => { const resources = [...lesson.resources]; resources[resourceIndex] = { ...resource, title: event.target.value }; update({ resources }); }} placeholder="Resource title"/><input className="input min-h-9" type="url" maxLength={2000} value={resource.url} onChange={(event) => { const resources = [...lesson.resources]; resources[resourceIndex] = { ...resource, url: event.target.value }; update({ resources }); }} placeholder="https://…"/><button type="button" className="btn-secondary min-h-9 px-2 text-red-700" aria-label="Remove resource" onClick={() => update({ resources: lesson.resources.filter((_, index) => index !== resourceIndex) })}><Trash2 size={14}/></button></div>)}</section>
-              <section className="rounded-xl border border-slate-200 p-3"><div className="flex items-center justify-between gap-3"><div className="flex items-center gap-2 font-semibold text-slate-800"><Code2 size={16}/>Code examples</div><button type="button" className="btn-secondary min-h-8 px-2.5 py-1 text-xs" onClick={() => update({ codeBlocks: [...(lesson.codeBlocks || []), { language: '', source: '', explanation: '' }] })}><Plus size={14}/>Add code</button></div>{(lesson.codeBlocks || []).map((block, blockIndex) => <div key={blockIndex} className="mt-3 rounded-lg bg-slate-50 p-3"><div className="flex items-center justify-between gap-2"><input className="input min-h-9 max-w-56 bg-white" value={block.language || ''} onChange={(event) => { const codeBlocks = [...lesson.codeBlocks]; codeBlocks[blockIndex] = { ...block, language: event.target.value }; update({ codeBlocks }); }} placeholder="Language"/><button type="button" className="btn-ghost text-red-700" onClick={() => update({ codeBlocks: lesson.codeBlocks.filter((_, index) => index !== blockIndex) })} aria-label="Remove code example"><Trash2 size={14}/></button></div><textarea className="input mt-2 min-h-36 bg-white font-mono text-xs" value={block.source} onChange={(event) => { const codeBlocks = [...lesson.codeBlocks]; codeBlocks[blockIndex] = { ...block, source: event.target.value }; update({ codeBlocks }); }} placeholder="Paste a code example"/><textarea className="input mt-2 min-h-16 bg-white" value={block.explanation || ''} onChange={(event) => { const codeBlocks = [...lesson.codeBlocks]; codeBlocks[blockIndex] = { ...block, explanation: event.target.value }; update({ codeBlocks }); }} placeholder="Explain this example"/></div>)}</section>
+              <section className="rounded-xl border border-slate-200 p-3"><div className="flex items-center justify-between gap-3"><div><div className="flex items-center gap-2 font-semibold text-slate-800"><Code2 size={16}/>Code examples</div><p className="mt-1 text-xs text-slate-500">Add complete, runnable snippets; they appear in a polished code window for learners.</p></div><button type="button" className="btn-secondary min-h-8 px-2.5 py-1 text-xs" onClick={() => update({ codeBlocks: [...(lesson.codeBlocks || []), { language: '', source: '', explanation: '' }] })}><Plus size={14}/>Add code</button></div>{(lesson.codeBlocks || []).map((block, blockIndex) => <div key={blockIndex} className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3"><div className="flex items-center justify-between gap-2"><label className="min-w-0 flex-1"><span className="label">Programming language</span><input className="input min-h-9 max-w-56 bg-white" value={block.language || ''} onChange={(event) => { const codeBlocks = [...lesson.codeBlocks]; codeBlocks[blockIndex] = { ...block, language: event.target.value }; update({ codeBlocks }); }} /></label><button type="button" className="btn-ghost text-red-700" onClick={() => update({ codeBlocks: lesson.codeBlocks.filter((_, index) => index !== blockIndex) })} aria-label="Remove code example"><Trash2 size={14}/></button></div><label className="mt-3 block"><span className="label">Complete code snippet</span><textarea maxLength={50000} className="input mt-1 min-h-64 resize-y bg-white font-mono text-xs leading-6" value={block.source} onChange={(event) => { const codeBlocks = [...lesson.codeBlocks]; codeBlocks[blockIndex] = { ...block, source: event.target.value }; update({ codeBlocks }); }} /></label><label className="mt-3 block"><span className="label">Explanation</span><textarea maxLength={2000} className="input mt-1 min-h-20 resize-y bg-white" value={block.explanation || ''} onChange={(event) => { const codeBlocks = [...lesson.codeBlocks]; codeBlocks[blockIndex] = { ...block, explanation: event.target.value }; update({ codeBlocks }); }} /></label></div>)}</section>
               <div className="rounded-xl border border-slate-200 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-semibold text-slate-800">Intermediate assessment</p>              <p className="text-xs text-slate-500">Optional quiz; choose 5 or 10 questions with four choices each. A course can contain up to three quiz-based lessons.</p></div>{!lesson.questions?.length && <div className="flex gap-2">{[5, 10].map((count) => <button key={count} className="btn-secondary min-h-8 px-2.5 py-1 text-xs" onClick={() => update({ questions: Array.from({ length: count }, () => ({ prompt: '', options: ['', '', '', ''], correctOption: 0, explanation: '' })) })}>Add {count} questions</button>)}</div>}</div>
                 {lesson.questions?.length > 0 && <div className="mt-3 grid gap-3 sm:grid-cols-2"><label><span className="label">Passing percentage</span><input type="number" min="1" max="100" className="input" value={lesson.passMark || 70} onChange={(event) => update({ passMark: Number(event.target.value) })}/></label><label><span className="label">Attempt limit</span><input type="number" min="1" max="10" className="input" value={lesson.assessmentAttempts || 3} onChange={(event) => update({ assessmentAttempts: Number(event.target.value) })}/></label></div>}
                 {(lesson.questions || []).map((question, questionIndex) => <div key={questionIndex} className="mt-3 rounded-lg bg-slate-50 p-3"><label className="block text-xs font-semibold text-slate-700">Question {questionIndex + 1}<input className="input mt-1 bg-white" value={question.prompt} onChange={(event) => { const questions = [...lesson.questions]; questions[questionIndex] = { ...question, prompt: event.target.value }; update({ questions }); }} /></label><div className="mt-2 grid gap-2 sm:grid-cols-2">{question.options.map((option, optionIndex) => <label key={optionIndex} className="flex min-w-0 items-center gap-2 text-xs"><input type="radio" checked={question.correctOption === optionIndex} onChange={() => { const questions = [...lesson.questions]; questions[questionIndex] = { ...question, correctOption: optionIndex }; update({ questions }); }} aria-label={`Correct answer option ${optionIndex + 1}`} /><input className="input min-h-9 bg-white" value={option} onChange={(event) => { const questions = [...lesson.questions]; const options = [...question.options]; options[optionIndex] = event.target.value; questions[questionIndex] = { ...question, options }; update({ questions }); }} placeholder={`Option ${optionIndex + 1}`} /></label>)}</div><input className="input mt-2 bg-white" value={question.explanation || ''} onChange={(event) => { const questions = [...lesson.questions]; questions[questionIndex] = { ...question, explanation: event.target.value }; update({ questions }); }} placeholder="Explanation after assessment" /></div>)}
@@ -333,8 +328,8 @@ export default function CourseLearningPage() {
             {contentFullscreen ? <Minimize2 size={16}/> : <Maximize2 size={16}/>}<span className="hidden sm:inline">{contentFullscreen ? 'Exit full screen' : 'Full screen'}</span>
           </button>
         </div>
-        {current ? current.unlocked ? <article className="mx-auto min-w-0 max-w-5xl"><p className="eyebrow">{current.moduleTitle}</p><h2 className="mt-1 break-words text-2xl font-bold text-slate-950">{current.title}</h2><LessonContent content={current.content || 'This lesson does not have written content yet.'}/>
-          {current.practical && <section className="mt-7 border-t border-slate-100 pt-5"><h3 className="flex items-center gap-2 font-bold text-slate-900"><ClipboardCheck size={18} className="text-green-800" />Practical task</h3><LessonContent content={current.practical} /></section>}
+        {current ? current.unlocked ? <article className="mx-auto min-w-0 max-w-5xl"><p className="eyebrow">{current.moduleTitle}</p><h2 className="mt-1 break-words text-2xl font-bold text-slate-950">{current.title}</h2><MarkdownContent content={current.content || 'This lesson does not have written content yet.'} className="mt-5 max-w-4xl"/>
+          {current.practical && <section className="mt-7 border-t border-slate-100 pt-5"><h3 className="flex items-center gap-2 font-bold text-slate-900"><ClipboardCheck size={18} className="text-green-800" />Practical task</h3><MarkdownContent content={current.practical} className="mt-3 max-w-4xl" /></section>}
           {current.imageUrl && <img src={current.imageUrl} alt={`${current.title} lesson illustration`} loading="lazy" className="mt-5 max-h-[560px] w-full rounded-xl border border-slate-200 object-contain" />}
           {current.videoUrl && <div className="mt-5 aspect-video overflow-hidden rounded-xl bg-slate-950">{(() => { let embed = ''; try { const url = new URL(current.videoUrl); if (['youtube.com', 'www.youtube.com'].includes(url.hostname)) { const videoId = url.searchParams.get('v'); if (videoId) embed = `https://www.youtube-nocookie.com/embed/${videoId}`; } else if (url.hostname === 'youtu.be') embed = `https://www.youtube-nocookie.com/embed/${url.pathname.slice(1)}`; else if (['instagram.com', 'www.instagram.com'].includes(url.hostname)) { const match = url.pathname.match(/^\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/); if (match) embed = `https://www.instagram.com/p/${match[1]}/embed`; } } catch {} return embed ? <iframe title={`${current.title} video`} src={embed} className="h-full w-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /> : <a className="grid h-full place-items-center text-sm text-white underline" href={current.videoUrl} target="_blank" rel="noreferrer">Open lesson video</a>; })()}</div>}
           {(current.codeBlocks?.length ? current.codeBlocks : current.code?.source ? [current.code] : []).map((block, index) => <MacCodeBlock key={`${block.language}-${index}`} block={block} copy={copyCode}/>)}

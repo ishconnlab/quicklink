@@ -182,6 +182,32 @@ export const listAllCertificates = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { certificates: certificates.map(certificateJson), page, limit, total, pages: Math.max(1, Math.ceil(total / limit)) } });
 });
 
+export const issueManualCertificate = asyncHandler(async (req, res) => {
+  const issuedAt = new Date(req.body.issuedAt);
+  const certificate = await CourseCertificate.create({
+    code: randomBytes(24).toString('base64url'),
+    kind: 'manual',
+    student: null,
+    course: null,
+    book: null,
+    studentName: req.body.studentName.trim(),
+    courseTitle: req.body.courseTitle.trim(),
+    description: req.body.description.trim(),
+    level: req.body.level,
+    completionDate: issuedAt,
+    issuedAt,
+    issuedBy: req.user._id,
+    paymentStatus: 'not_required',
+  });
+  await recordActivity(req, {
+    action: 'certificate.manually_issued',
+    resourceType: 'certificate',
+    resourceId: certificate._id,
+    message: `Manually issued ${certificate.courseTitle} certificate to ${certificate.studentName}.`,
+  });
+  res.status(201).json({ success: true, data: { certificate: certificateJson(certificate) } });
+});
+
 export const listCourseCertificates = asyncHandler(async (req, res) => {
   const course = await LearningClass.findById(req.params.id).select('title students');
   if (!course) throw ApiError.notFound('Training not found.');
@@ -777,7 +803,7 @@ export const downloadCertificate = asyncHandler(async (req, res) => {
     ? await CourseCertificate.findById(req.params.id)
     : await CourseCertificate.findOne({ code: req.params.id });
   if (!certificate || certificate.revokedAt || !['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required')) throw ApiError.notFound('Certificate is unavailable.');
-  if (req.user.role !== 'admin' && certificate.student.toString() !== req.user._id.toString()) throw ApiError.forbidden('You cannot download another student certificate.');
+  if (!isAdmin(req.user) && certificate.student?.toString() !== req.user._id.toString()) throw ApiError.forbidden('You cannot download another student certificate.');
   const appUrl = config.mail.appUrl || config.corsOrigin[0];
   if (!appUrl) throw ApiError.conflict('The public application URL is not configured.');
   const verificationUrl = new URL(`/verify/${certificate.code}`, appUrl).toString();
@@ -794,6 +820,7 @@ export default {
   issueCertificate,
   listMyCertificates,
   listAllCertificates,
+  issueManualCertificate,
   listCourseCertificates,
   listCertificateCandidates,
   issueCertificates,

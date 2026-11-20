@@ -71,20 +71,44 @@ const completionSchema = z.object({
 });
 const lessonQuestion = z.object({ prompt: z.string().trim().min(1).max(1200), options: z.array(z.string().trim().min(1).max(500)).length(4), correctOption: z.number().int().min(0).max(3), explanation: z.string().max(2000).optional().default('') });
 const lesson = z.object({
-  _id: objectId.optional(), title: z.string().trim().min(2).max(180), content: z.string().max(30000).optional().default(''),
-  practical: z.string().max(30000).optional().default(''),
+  _id: objectId.optional(), title: z.string().trim().min(2).max(180), content: z.string().max(100000).optional().default(''),
+  practical: z.string().max(100000).optional().default(''),
   availableAt: z.string().datetime().nullable().optional(),
   videoUrl: z.string().max(2000).optional().default(''),
   imageUrl: z.string().max(1000).optional().default(''),
   imagePublicId: z.string().max(255).optional().default(''),
   resources: z.array(z.object({ title: z.string().trim().max(180), url: z.string().url().max(2000) })).max(30).optional().default([]),
-  code: z.object({ language: z.string().max(40).optional().default(''), source: z.string().max(20000).optional().default('') }).optional().default({}),
-  codeBlocks: z.array(z.object({ language: z.string().max(40).optional().default(''), source: z.string().max(20000), explanation: z.string().max(2000).optional().default('') })).max(20).optional().default([]),
+  code: z.object({ language: z.string().max(40).optional().default(''), source: z.string().max(50000).optional().default('') }).optional().default({}),
+  codeBlocks: z.array(z.object({ language: z.string().max(40).optional().default(''), source: z.string().max(50000), explanation: z.string().max(2000).optional().default('') })).max(20).optional().default([]),
   knowledgeCheck: z.array(lessonQuestion).refine((questions) => [0, 5, 10].includes(questions.length), { message: 'An intermediate assessment must contain 5 or 10 questions.' }).optional().default([]),
   passMark: z.number().int().min(1).max(100).optional().default(70),
   assessmentAttempts: z.number().int().min(1).max(10).optional().default(3),
 });
-const modulesSchema = z.array(z.object({ _id: objectId.optional(), title: z.string().trim().min(2).max(180), lessons: z.array(lesson).max(100).default([]) })).max(100);
+const modulesSchema = z.array(z.object({ _id: objectId.optional(), title: z.string().trim().min(2).max(180), lessons: z.array(lesson).max(100).default([]) })).max(100).superRefine((modules, context) => {
+  const lessonTitles = new Set();
+  const codeExamples = new Set();
+  modules.forEach((module, moduleIndex) => module.lessons.forEach((entry, lessonIndex) => {
+    const title = entry.title.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    if (lessonTitles.has(title)) context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: [moduleIndex, 'lessons', lessonIndex, 'title'],
+      message: `Lesson title "${entry.title}" is duplicated.`,
+    });
+    lessonTitles.add(title);
+    const blocks = [...(entry.code?.source ? [entry.code] : []), ...(entry.codeBlocks || [])];
+    blocks.forEach((block) => {
+      const source = block.source.replace(/\r\n?/g, '\n').trim();
+      if (!source) return;
+      const key = `${String(block.language || '').trim().toLocaleLowerCase()}\n${source}`;
+      if (codeExamples.has(key)) context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: [moduleIndex, 'lessons', lessonIndex, 'codeBlocks'],
+        message: 'A code example is duplicated.',
+      });
+      codeExamples.add(key);
+    });
+  }));
+});
 const classFields = {
   title: z.string().trim().min(2).max(160),
   offeringType: z.enum(['training', 'course']).optional(),

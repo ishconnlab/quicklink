@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Award, BadgeCheck, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FilePenLine, RefreshCcw,
+  Award, BadgeCheck, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FilePenLine, FilePlus2, RefreshCcw,
   Search, Share2, ShieldCheck, ShieldX, Sparkles, Trash2,
 } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
@@ -14,6 +14,17 @@ import { formatDateTime } from '../lib/format.js';
 import { isAdmin } from '../lib/roles.js';
 
 const PAGE_SIZE = 10;
+const todayDateInput = () => {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
+const emptyManualCertificate = () => ({
+  studentName: '',
+  courseTitle: '',
+  description: '',
+  level: 'Training',
+  issueDate: todayDateInput(),
+});
 
 export default function CertificatesPage() {
   const { user } = useAuth();
@@ -38,6 +49,9 @@ export default function CertificatesPage() {
   const [revokeTarget, setRevokeTarget] = useState(null);
   const [revokeReason, setRevokeReason] = useState('');
   const [saving, setSaving] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualForm, setManualForm] = useState(emptyManualCertificate);
+  const [creatingManual, setCreatingManual] = useState(false);
 
   useEffect(() => () => { if (previewUrl) URL.revokeObjectURL(previewUrl); }, [previewUrl]);
 
@@ -195,6 +209,31 @@ export default function CertificatesPage() {
     finally { setBusyId(''); }
   };
 
+  const createManualCertificate = async (event) => {
+    event.preventDefault();
+    setCreatingManual(true);
+    try {
+      const response = await api.post('/certificates/manual', {
+        studentName: manualForm.studentName.trim(),
+        courseTitle: manualForm.courseTitle.trim(),
+        description: manualForm.description.trim(),
+        level: manualForm.level,
+        issuedAt: new Date(`${manualForm.issueDate}T12:00:00.000Z`).toISOString(),
+      });
+      setCertificates((current) => [response.data.data.certificate, ...current].slice(0, PAGE_SIZE));
+      setTotal((current) => current + 1);
+      setPage(1);
+      setSearch('');
+      setQuery('');
+      setStatus('');
+      setCourseId('');
+      setManualOpen(false);
+      setManualForm(emptyManualCertificate());
+      toast.success('Manual certificate created and added to the registry.');
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setCreatingManual(false); }
+  };
+
   const validCount = certificates.filter((certificate) => !certificate.revoked).length;
   const revokedCount = certificates.filter((certificate) => certificate.revoked).length;
 
@@ -203,7 +242,7 @@ export default function CertificatesPage() {
       eyebrow={admin ? 'Credential registry' : 'Your achievements'}
       title={admin ? 'Certificates' : 'My certificates'}
       subtitle={admin ? 'Search the registry, correct printed names, revoke credentials, and reissue with a fresh verification code. Issue new certificates from a training page.' : 'Download, share, and verify the certificates you earned through QuickLink trainings. Every certificate has a public verification page.'}
-      actions={admin ? <Link to="/courses" className="btn-primary"><Award size={17} />Issue from trainings</Link> : <Link to="/courses" className="btn-secondary"><Sparkles size={17} />Find another training</Link>}
+      actions={admin ? <div className="flex flex-wrap gap-2"><button type="button" className="btn-secondary" onClick={() => { setManualForm(emptyManualCertificate()); setManualOpen(true); }}><FilePlus2 size={16} />Create manual certificate</button><Link to="/courses" className="btn-primary"><Award size={17} />Issue from trainings</Link></div> : <Link to="/courses" className="btn-secondary"><Sparkles size={17} />Find another training</Link>}
     />
 
     {admin && <div className="mb-5 grid min-w-0 grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
@@ -229,7 +268,7 @@ export default function CertificatesPage() {
             <div className="flex min-w-0 items-start gap-3">
               <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${certificate.revoked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-brand-700'}`}>{certificate.revoked ? <ShieldX size={21} /> : <Award size={21} />}</span>
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5"><h2 className="break-words font-bold text-slate-900">{certificate.courseTitle}</h2><Badge color={certificate.revoked ? 'red' : certificate.paymentStatus === 'pending' ? 'amber' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? 'slate' : 'green'}>{certificate.revoked ? 'Revoked' : certificate.paymentStatus === 'pending' ? 'Payment pending' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? `Payment ${certificate.paymentStatus}` : 'Valid'}</Badge><Badge color="slate">{certificate.level}</Badge>{certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}</div>
+                <div className="flex flex-wrap items-center gap-1.5"><h2 className="break-words font-bold text-slate-900">{certificate.courseTitle}</h2><Badge color={certificate.revoked ? 'red' : certificate.paymentStatus === 'pending' ? 'amber' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? 'slate' : 'green'}>{certificate.revoked ? 'Revoked' : certificate.paymentStatus === 'pending' ? 'Payment pending' : ['unpaid', 'rejected'].includes(certificate.paymentStatus) ? `Payment ${certificate.paymentStatus}` : 'Valid'}</Badge><Badge color="slate">{certificate.level}</Badge>{certificate.kind === 'manual' && <Badge color="slate">Manual issue</Badge>}{certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}</div>
                 <p className="mt-1 text-sm text-slate-600">Awarded to <strong className="text-slate-800">{certificate.studentName}</strong></p>
                 <p className="mt-1 break-all text-xs text-slate-400">Code {certificate.code} · Issued {formatDateTime(certificate.issuedAt)}</p>
                 {certificate.printDetailsUpdatedAt && <p className="mt-1 text-[11px] font-medium text-amber-700">Admin edited · {formatDateTime(certificate.printDetailsUpdatedAt)}</p>}
@@ -247,7 +286,7 @@ export default function CertificatesPage() {
               {!certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button>}
               {['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required') && <a className="btn-secondary" href={verifyUrl(certificate)} target="_blank" rel="noreferrer"><ExternalLink size={15} />Verify</a>}
               {admin && <>
-                <Link to={`/courses/${certificate.courseId}`} className="btn-secondary"><Award size={15} />Training</Link>
+                {certificate.courseId && <Link to={`/courses/${certificate.courseId}`} className="btn-secondary"><Award size={15} />Training</Link>}
                 {certificate.paymentStatus === 'pending' && <><button className="btn-primary" onClick={() => reviewPayment(certificate, 'paid')} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <BadgeCheck size={15} />}Approve payment</button><button className="btn-secondary text-red-700" onClick={() => reviewPayment(certificate, 'rejected')} disabled={busyId === certificate.id}>Reject payment</button></>}
                 {!certificate.revoked && <button className="btn-secondary" onClick={() => openPrintEditor(certificate)}><FilePenLine size={15} />Edit print details</button>}
                 {!certificate.revoked && <button className="btn-ghost text-red-600" onClick={() => { setRevokeTarget(certificate); setRevokeReason(''); }}>Revoke</button>}
@@ -260,6 +299,19 @@ export default function CertificatesPage() {
       </div>
       {admin && pages > 1 && <nav className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3" aria-label="Certificate pagination"><p className="text-xs text-slate-500">{total} certificate{total === 1 ? '' : 's'} · Page {page} of {pages}</p><div className="flex gap-2"><button className="btn-secondary min-h-9 px-3 text-xs" disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)}><ChevronLeft size={15} />Previous</button><button className="btn-secondary min-h-9 px-3 text-xs" disabled={page >= pages || loading} onClick={() => setPage((value) => value + 1)}>Next<ChevronRight size={15} /></button></div></nav>}
     </>}
+
+    {admin && <Modal open={manualOpen} onClose={() => !creatingManual && setManualOpen(false)} title="Create manual certificate" footer={<><button className="btn-secondary" type="button" onClick={() => setManualOpen(false)} disabled={creatingManual}>Cancel</button><button className="btn-primary" type="submit" form="manual-certificate-form" disabled={creatingManual || manualForm.studentName.trim().length < 2 || manualForm.courseTitle.trim().length < 2}>{creatingManual ? <Spinner size={16} /> : <FilePlus2 size={16} />}Generate certificate</button></>}>
+      <form id="manual-certificate-form" onSubmit={createManualCertificate} className="space-y-4">
+        <p className="text-sm leading-6 text-slate-600">Create a standalone certificate without selecting a student account or changing the normal course-completion issuance flow. The certificate will be verifiable by its generated code, but will not appear in a learner’s account.</p>
+        <label className="block"><span className="label">Student name</span><input className="input" required minLength={2} maxLength={120} value={manualForm.studentName} onChange={(event) => setManualForm((current) => ({ ...current, studentName: event.target.value }))} autoFocus /></label>
+        <label className="block"><span className="label">Course or programme title</span><input className="input" required minLength={2} maxLength={160} value={manualForm.courseTitle} onChange={(event) => setManualForm((current) => ({ ...current, courseTitle: event.target.value }))} /></label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block"><span className="label">Level</span><select className="input" value={manualForm.level} onChange={(event) => setManualForm((current) => ({ ...current, level: event.target.value }))}>{['L3', 'L4', 'L5', 'Bootcamp', 'Training'].map((level) => <option key={level}>{level}</option>)}</select></label>
+          <label className="block"><span className="label">Issue date</span><input className="input" type="date" required value={manualForm.issueDate} onChange={(event) => setManualForm((current) => ({ ...current, issueDate: event.target.value }))} /></label>
+        </div>
+        <label className="block"><span className="label">Completion statement</span><textarea className="input min-h-20" maxLength={240} value={manualForm.description} onChange={(event) => setManualForm((current) => ({ ...current, description: event.target.value }))} /><span className="mt-1 block text-xs text-slate-500">Optional; leave blank to use “has successfully completed”.</span></label>
+      </form>
+    </Modal>}
 
     {admin && <Modal open={Boolean(printTarget)} onClose={() => !saving && setPrintTarget(null)} title="Edit certificate before printing" footer={<><button className="btn-secondary" onClick={() => setPrintTarget(null)} disabled={saving}>Cancel</button><button className="btn-primary" onClick={savePrintDetails} disabled={saving || printDetails.studentName.trim().length < 2 || printDetails.courseTitle.trim().length < 2}>{saving ? <Spinner size={16} /> : <FilePenLine size={16} />}Save print details</button></>}>
       <div className="space-y-4">

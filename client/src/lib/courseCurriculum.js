@@ -1,6 +1,7 @@
-const MAX_LESSON_CONTENT = 30000;
+const MAX_LESSON_CONTENT = 100000;
+const MAX_PRACTICAL_CONTENT = 100000;
 const MAX_CODE_BLOCKS = 20;
-const MAX_CODE_LENGTH = 20000;
+const MAX_CODE_LENGTH = 50000;
 
 const labelFor = (value) => String(value)
   .replace(/_/g, ' ')
@@ -35,6 +36,24 @@ function renderCurriculumContent(value, label, path, codeBlocks, depth = 2) {
     return Object.entries(value).map(([key, child]) => {
       const heading = labelFor(key);
       const childPath = [...path, heading];
+      const normalizedKey = key.toLowerCase().replace(/[_-]/g, '');
+      if (['codeblocks', 'codeexamples', 'codesnippets', 'snippets'].includes(normalizedKey) && Array.isArray(child)) {
+        child.forEach((block, index) => {
+          if (typeof block === 'string' && block.trim()) {
+            codeBlocks.push({ language: 'python', source: block, explanation: `${path.join(' · ')} · ${heading} ${index + 1}`.slice(0, 2000) });
+          } else if (block && typeof block === 'object' && !Array.isArray(block)) {
+            const source = block.source ?? block.code ?? block.snippet;
+            if (typeof source === 'string' && source.trim()) {
+              codeBlocks.push({
+                language: String(block.language || block.lang || 'python').slice(0, 40),
+                source,
+                explanation: String(block.explanation || block.description || `${path.join(' · ')} · ${heading} ${index + 1}`).slice(0, 2000),
+              });
+            }
+          }
+        });
+        return codeBlocks.length ? `**${codeBlocks.length} code example${codeBlocks.length === 1 ? '' : 's'} from ${heading} appear below.**` : '';
+      }
       const rendered = renderCurriculumContent(child, key, childPath, codeBlocks, depth + 1);
       if (!rendered) return '';
       if (key.toLowerCase() === 'code' && typeof child === 'string') {
@@ -129,7 +148,7 @@ function renderPracticalContent(day) {
     const objectives = Array.isArray(day.objectives) ? day.objectives.join('; ') : '';
     sections.push(`## Practical task\nApply the concepts from ${day.title || 'this day'}: ${day.checkpoint || objectives || 'recreate the examples from the notes in your own notebook and record the output.'}`);
   }
-  return sections.join('\n\n').slice(0, MAX_LESSON_CONTENT);
+  return sections.join('\n\n');
 }
 
 function formatCourseOverview(course, codeBlocks) {
@@ -151,6 +170,8 @@ export function parseCourseCurriculum(input) {
   }
   const days = [...course.days].sort((first, second) => Number(first?.day) - Number(second?.day));
   const seenDays = new Set();
+  const seenTitles = new Set();
+  const seenCodeExamples = new Set();
   const modules = [{ title: `${course.days.length}-Day Curriculum`, lessons: [] }];
   const overviewCodeBlocks = [];
   const overview = formatCourseOverview(course, overviewCodeBlocks);
@@ -162,6 +183,9 @@ export function parseCourseCurriculum(input) {
     if (seenDays.has(day.day)) throw new Error(`Learning day ${day.day} is listed more than once.`);
     seenDays.add(day.day);
     if (day.day !== index + 1) throw new Error(`Learning days must be numbered consecutively from Day 1; Day ${index + 1} is missing.`);
+    const titleKey = day.title.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+    if (seenTitles.has(titleKey)) throw new Error(`Learning day title "${day.title}" is listed more than once.`);
+    seenTitles.add(titleKey);
     const codeBlocks = [];
     let content = renderCurriculumContent(day, `Day ${day.day}`, [`Day ${day.day}`], codeBlocks);
     if (index === 0 && overview) content = `${overview}\n\n${content}`;
@@ -169,12 +193,19 @@ export function parseCourseCurriculum(input) {
     if (codeBlocks.length > MAX_CODE_BLOCKS) throw new Error(`Day ${day.day} has more than ${MAX_CODE_BLOCKS} code examples.`);
     const longCode = codeBlocks.find((block) => block.source.length > MAX_CODE_LENGTH);
     if (longCode) throw new Error(`A code example in Day ${day.day} exceeds the ${MAX_CODE_LENGTH.toLocaleString()} character limit.`);
+    for (const block of codeBlocks) {
+      const codeKey = `${String(block.language || '').trim().toLocaleLowerCase()}\n${String(block.source).replace(/\r\n?/g, '\n').trim()}`;
+      if (seenCodeExamples.has(codeKey)) throw new Error(`A code example in Day ${day.day} duplicates another curriculum snippet.`);
+      seenCodeExamples.add(codeKey);
+    }
+    const practical = renderPracticalContent(day);
+    if (practical.length > MAX_PRACTICAL_CONTENT) throw new Error(`Day ${day.day} practical content exceeds the ${MAX_PRACTICAL_CONTENT.toLocaleString()} character limit.`);
     let resources = collectResources(index === 0 ? [course.global_resources, day.resources] : day.resources);
     if (!resources.length) resources = collectResources(course.global_resources);
     modules[0].lessons.push({
       title: `Day ${day.day} — ${day.title}`.slice(0, 180),
       content,
-      practical: renderPracticalContent(day),
+      practical,
       videoUrl: '',
       imageUrl: '',
       imagePublicId: '',

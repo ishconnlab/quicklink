@@ -107,7 +107,12 @@ export default function AppLayout() {
       { label: 'Account', links: [{ to: '/settings', label: 'Settings', icon: Settings }] },
     ];
   const allLinks = navGroups.flatMap((group) => group.links);
-  const mobileLinks = standalone ? allLinks : allLinks.slice(0, 5);
+  const mobileLinks = standalone ? allLinks : admin
+    ? [
+      navGroups[0].links[0],
+      ...navGroups[1].links.filter(({ label }) => ['Courses', 'Live classes', 'Enrollments & payments', 'Certificates'].includes(label)),
+    ]
+    : allLinks.slice(0, 5);
   const toggleSidebar = () => setCollapsed((value) => {
     const next = !value;
     localStorage.setItem('quicklink.sidebar.collapsed', next ? '1' : '0');

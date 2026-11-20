@@ -9,8 +9,8 @@ const reissueHistorySchema = new mongoose.Schema({
 
 const certificateSchema = new mongoose.Schema({
   code: { type: String, required: true, unique: true, index: true },
-  student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
-  kind: { type: String, enum: ['course', 'book'], default: 'course', index: true },
+  student: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null, required() { return this.kind !== 'manual'; }, index: true },
+  kind: { type: String, enum: ['course', 'book', 'manual'], default: 'course', index: true },
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningClass', default: null, index: true },
   book: { type: mongoose.Schema.Types.ObjectId, ref: 'LearningBook', default: null, index: true },
   studentName: { type: String, required: true, trim: true, maxlength: 120 },
@@ -36,6 +36,11 @@ const certificateSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 certificateSchema.pre('validate', function validateCertificateTarget(next) {
+  if (this.kind === 'manual') {
+    if (this.student || this.course || this.book) return next(new Error('A manual certificate cannot be linked to a student, course, or book.'));
+    return next();
+  }
+  if (!this.student) return next(new Error('A certificate must reference a student.'));
   if (!this.course && !this.book) return next(new Error('A certificate must reference a course or a learning book.'));
   if (this.book && !this.course) this.kind = 'book';
   if (!this.completionDate) this.completionDate = this.issuedAt || new Date();
