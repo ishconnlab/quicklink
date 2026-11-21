@@ -49,7 +49,7 @@ export default function TrainingRegistrationsPage() {
   const selectedForm = useMemo(() => forms.find((form) => form.id === selectedId) || null, [forms, selectedId]);
   const entryPages = Math.max(1, Math.ceil(entries.length / ENTRIES_PER_PAGE));
   const visibleEntries = entries.slice((entryPage - 1) * ENTRIES_PER_PAGE, entryPage * ENTRIES_PER_PAGE);
-  const selectableEntries = entries.filter((entry) => entry.status !== 'REJECTED' && !entry.studentId);
+  const selectableEntries = entries.filter((entry) => ['APPROVED', 'ASSIGNED'].includes(entry.status) && !entry.studentId);
   const allEntriesSelected = selectableEntries.length > 0 && selectableEntries.every((entry) => selectedEntries.includes(entry.id));
   const session = currentClass?.liveSession;
   const joinUrl = session ? `${window.location.origin}/classes/join/${session.sessionCode}` : '';
@@ -88,7 +88,7 @@ export default function TrainingRegistrationsPage() {
       ]);
       const nextEntries = entryResponse.data.data.registrations;
       setEntries(nextEntries);
-      setSelectedEntries((current) => current.filter((id) => nextEntries.some((entry) => entry.id === id && entry.status !== 'REJECTED' && !entry.studentId)));
+      setSelectedEntries((current) => current.filter((id) => nextEntries.some((entry) => entry.id === id && ['APPROVED', 'ASSIGNED'].includes(entry.status) && !entry.studentId)));
       setCurrentClass(classResponse.data.data.class);
     } catch (error) { toast.error(apiError(error).message); }
     finally { setEntryLoading(false); }
@@ -284,14 +284,14 @@ export default function TrainingRegistrationsPage() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2"><input type="checkbox" className="shrink-0" checked={selectedEntries.includes(entry.id)} disabled={entry.status === 'REJECTED' || Boolean(entry.studentId)} onChange={() => toggleEntry(entry.id)} aria-label={`Select ${entry.name} for enrollment`} /><h3 className="font-semibold text-slate-900">{entry.name}</h3></div>
-                      <div className="mt-1 flex flex-wrap items-center gap-2"><Badge color={entry.status === 'REJECTED' ? 'red' : entry.status === 'PENDING' ? 'amber' : 'green'}>{entry.status}</Badge><select className="input min-h-9 w-auto py-1 text-xs" value={entry.status} onChange={(event) => updateEntryStatus(entry, event.target.value)} aria-label={`Update ${entry.name} registration status`}>{['PENDING', 'APPROVED', 'REJECTED', 'ENROLLED', 'INVITED', 'ATTENDED', 'COMPLETED'].map((status) => <option key={status} value={status}>{status}</option>)}</select></div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2"><Badge color={entry.status === 'REJECTED' ? 'red' : entry.status === 'PENDING' ? 'amber' : entry.status === 'UNDER_REVIEW' ? 'brand' : 'green'}>{entry.status.replace('_', ' ')}</Badge><select className="input min-h-9 w-auto py-1 text-xs" value={entry.status} onChange={(event) => updateEntryStatus(entry, event.target.value)} aria-label={`Update ${entry.name} application status`}>{['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ASSIGNED', 'ENROLLED', 'INVITED', 'ATTENDED', 'COMPLETED'].map((status) => <option key={status} value={status}>{status.replace('_', ' ')}</option>)}</select></div>
                       <a className="mt-1 block break-all text-sm text-brand-700 hover:underline" href={`mailto:${entry.email}`}>{entry.email}</a>
                       <a className="mt-1 block text-sm text-slate-500 hover:underline" href={`tel:${entry.whatsapp}`}>{entry.whatsapp}</a>
                       <p className="mt-2 text-xs text-slate-400">Registered {formatDateTime(entry.createdAt)}</p>
                       {selectedForm.fields?.filter((field) => entry.answers[field.key]).map((field) => <p key={field.key} className="mt-2 text-sm text-slate-600"><span className="font-medium">{field.label}:</span> {entry.answers[field.key]}</p>)}
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
-                      {entry.studentId ? <button className="btn-secondary" disabled={emailing === entry.id || enrolling === entry.id} onClick={() => sendEmail(entry)}>{emailing === entry.id ? <Spinner size={15} /> : <Mail size={15} />}Email invite</button> : <button className="btn-secondary" disabled={entry.status === 'REJECTED' || enrolling === entry.id || emailing === entry.id} title={entry.status === 'REJECTED' ? 'A rejected registration cannot be enrolled.' : 'Create a student account, enroll them in the class, and email their access details.'} onClick={() => enrollRegistrant(entry)}>{enrolling === entry.id ? <Spinner size={15} /> : <Mail size={15} />}{entry.status === 'REJECTED' ? 'Rejected' : 'Enroll & email access'}</button>}
+                      {entry.studentId ? <button className="btn-secondary" disabled={emailing === entry.id || enrolling === entry.id} onClick={() => sendEmail(entry)}>{emailing === entry.id ? <Spinner size={15} /> : <Mail size={15} />}Email invite</button> : <button className="btn-secondary" disabled={!['APPROVED', 'ASSIGNED'].includes(entry.status) || enrolling === entry.id || emailing === entry.id} title={!['APPROVED', 'ASSIGNED'].includes(entry.status) ? 'Approve this application before assignment.' : 'Create a student account, assign the offering, and email access details.'} onClick={() => enrollRegistrant(entry)}>{enrolling === entry.id ? <Spinner size={15} /> : <Mail size={15} />}{['APPROVED', 'ASSIGNED'].includes(entry.status) ? 'Approve & assign' : 'Approval required'}</button>}
                       {waUrl ? <a className="btn-secondary" href={waUrl} target="_blank" rel="noreferrer"><MessageCircle size={15} />WhatsApp</a> : <button className="btn-secondary" disabled title="This registration has no usable WhatsApp number."><MessageCircle size={15} />WhatsApp</button>}
                       <button className="btn-ghost text-red-700" onClick={() => deleteEntry(entry)} aria-label={`Delete registration entry for ${entry.name}`}><Trash2 size={15} />Delete entry</button>
                     </div>

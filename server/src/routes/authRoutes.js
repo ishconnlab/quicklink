@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import multer from 'multer';
 import * as auth from '../controllers/authController.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -7,6 +8,10 @@ import { loginSchema, registerSchema, changePasswordSchema, updateProfileSchema 
 import config from '../config/env.js';
 
 const router = Router();
+const uploadProfileImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024, files: 1, fields: 0 },
+});
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 20,
@@ -28,6 +33,7 @@ router.post('/register', registerLimiter, validate(registerSchema), auth.registe
 router.post('/login', loginLimiter, validate(loginSchema), auth.login);
 router.get('/me', requireAuth, auth.me);
 router.patch('/profile', requireAuth, validate(updateProfileSchema), auth.updateProfile);
+router.post('/profile/image', requireAuth, uploadProfileImage.single('image'), auth.updateProfileImage);
 router.post('/change-password', requireAuth, validate(changePasswordSchema), auth.changePassword);
 router.post('/logout', requireAuth, auth.logout);
 export default router;

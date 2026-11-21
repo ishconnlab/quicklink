@@ -1,12 +1,13 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useId, useRef, useState } from 'react';
 import {
-  Award, BookOpen, ChevronDown, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, PanelLeftClose,
+  Award, Bell, BookOpen, ChevronDown, ClipboardList, GraduationCap, LayoutDashboard, LogOut, Menu, PanelLeftClose,
   PanelLeftOpen, ReceiptText, Settings, Users, Video, X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { classNames } from '../lib/format.js';
 import { isAdmin, roleLabel } from '../lib/roles.js';
+import api from '../api/client.js';
 
 function Brand({ compact = false, short = false }) {
   return (
@@ -72,6 +73,7 @@ export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem('quicklink.sidebar.collapsed') === '1');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [standalone, setStandalone] = useState(() => typeof window !== 'undefined' && (window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true));
+  const [unreadCount, setUnreadCount] = useState(0);
   const admin = isAdmin(user);
   useEffect(() => { setMobileOpen(false); }, [location.pathname]);
   useEffect(() => {
@@ -80,27 +82,35 @@ export default function AppLayout() {
     media?.addEventListener?.('change', update);
     return () => media?.removeEventListener?.('change', update);
   }, []);
+  useEffect(() => {
+    let active = true;
+    api.get('/users/notifications', { params: { limit: 100 } })
+      .then((response) => {
+        if (active) setUnreadCount(response.data.data.unreadCount || 0);
+      })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [location.pathname]);
   const navGroups = admin
     ? [
       { label: 'Overview', links: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
-      { label: 'Training operations', links: [
-        { to: '/courses', label: 'Trainings', icon: GraduationCap },
+      { label: 'Learning management', links: [
         { to: '/admin/courses', label: 'Courses', icon: BookOpen },
-        { to: '/dashboard#submission-inbox', label: 'Project submissions', icon: ReceiptText },
+        { to: '/courses', label: 'Trainings', icon: GraduationCap },
         { to: '/classes', label: 'Live classes', icon: Video },
-        { to: '/enrollments', label: 'Enrollments & payments', icon: ReceiptText },
         { to: '/certificates', label: 'Certificates', icon: Award },
       ] },
       { label: 'People', links: [
         { to: '/students', label: 'Students', icon: Users },
-        { to: '/registrations', label: 'Registrations', icon: ClipboardList },
+        { to: '/registrations', label: 'Applications', icon: ClipboardList },
+        { to: '/enrollments', label: 'Enrollments & assignments', icon: ReceiptText },
       ] },
       { label: 'Account', links: [{ to: '/settings', label: 'Settings', icon: Settings }] },
     ]
     : [
       { label: 'Overview', links: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
       { label: 'My learning', links: [
-        { to: '/courses', label: 'Trainings', icon: GraduationCap },
+        { to: '/courses', label: 'My courses', icon: GraduationCap },
         { to: '/classes', label: 'Live classes', icon: Video },
         { to: '/certificates', label: 'My certificates', icon: Award },
       ] },
@@ -110,7 +120,8 @@ export default function AppLayout() {
   const mobileLinks = standalone ? allLinks : admin
     ? [
       navGroups[0].links[0],
-      ...navGroups[1].links.filter(({ label }) => ['Courses', 'Live classes', 'Enrollments & payments', 'Certificates'].includes(label)),
+      ...navGroups[1].links.filter(({ label }) => ['Courses', 'Live classes', 'Certificates'].includes(label)),
+      navGroups[2].links.find(({ label }) => label === 'Applications'),
     ]
     : allLinks.slice(0, 5);
   const toggleSidebar = () => setCollapsed((value) => {
@@ -138,6 +149,17 @@ export default function AppLayout() {
     <header className={classNames('sticky top-0 z-30 border-b border-green-100/70 bg-white', !standalone && 'lg:hidden')} style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       <div className="flex h-14 items-center justify-between gap-3 px-3 sm:h-16 sm:px-4">
         <div className="flex min-w-0 items-center gap-2">{!standalone && <button onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-slate-600 hover:bg-green-50" aria-label="Open navigation"><Menu size={20} /></button>}<NavLink to="/dashboard"><Brand short={standalone} /></NavLink></div>
+        <div className="flex shrink-0 items-center gap-1">
+          <NavLink
+            to="/dashboard#notifications"
+            aria-label={unreadCount ? `${unreadCount} unread notifications` : 'Notifications'}
+            className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-600 transition hover:bg-green-50 hover:text-brand-700"
+          >
+            <Bell size={18} />
+            {unreadCount > 0 && <span className="absolute right-0.5 top-0.5 flex min-h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+          </NavLink>
+          <div className="hidden sm:block"><AccountMenu /></div>
+        </div>
         {standalone && <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 overflow-x-auto px-2 md:flex" aria-label="QuickLink navigation">{allLinks.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} aria-label={label} title={label} className={({ isActive }) => classNames('flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium transition', isActive ? 'bg-green-50 text-brand-800' : 'text-slate-600 hover:bg-slate-50')}><Icon size={15} /><span className="hidden xl:inline">{label}</span></NavLink>)}</nav>}
       </div>
     </header>

@@ -3,6 +3,8 @@ import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { signToken } from '../utils/token.js';
 import { normalizeRole } from '../security/roles.js';
+import config from '../config/env.js';
+import { deleteCloudinaryAsset, uploadCloudinaryBuffer } from '../services/cloudinary.js';
 
 export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
@@ -56,10 +58,41 @@ export const me = asyncHandler(async (req, res) => {
 export const updateProfile = asyncHandler(async (req, res) => {
   const user = await User.findById(req.user._id);
   if (!user) throw ApiError.unauthorized();
-  for (const field of ['name', 'whatsapp', 'country', 'province']) {
+  for (const field of [
+    'name', 'whatsapp', 'country', 'province', 'location', 'institution',
+    'educationLevel', 'biography', 'skills', 'githubUrl', 'linkedinUrl',
+    'portfolioUrl', 'socialUrl',
+  ]) {
     if (req.body[field] !== undefined) user[field] = req.body[field];
   }
   await user.save();
+  res.json({ success: true, data: { user: user.toSafeJSON() } });
+});
+
+export const updateProfileImage = asyncHandler(async (req, res) => {
+  if (!req.file?.buffer) throw ApiError.badRequest('Choose a PNG, JPEG, or WebP image.');
+  const buffer = req.file.buffer;
+  const isPng = buffer.subarray(0, 8).toString('hex') === '89504e470d0a1a0a';
+  const isJpeg = buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  const isWebp = buffer.subarray(0, 4).toString() === 'RIFF' && buffer.subarray(8, 12).toString() === 'WEBP';
+  if (!isPng && !isJpeg && !isWebp) throw ApiError.badRequest('Profile image must be a PNG, JPEG, or WebP file.');
+  if (!config.cloudinary.enabled) throw ApiError.conflict('Cloudinary is not configured. Contact the administrator.');
+
+  const user = await User.findById(req.user._id);
+  if (!user) throw ApiError.unauthorized();
+  const previousPublicId = user.profileImagePublicId;
+  const uploaded = await uploadCloudinaryBuffer({
+    buffer,
+    folder: null,
+    resourceType: 'image',
+  });
+  if (!uploaded?.secureUrl) throw ApiError.conflict('The profile image could not be uploaded.');
+  user.profileImageUrl = uploaded.secureUrl;
+  user.profileImagePublicId = uploaded.publicId;
+  await user.save();
+  if (previousPublicId) {
+    await deleteCloudinaryAsset({ publicId: previousPublicId, resourceType: 'image' }).catch(() => {});
+  }
   res.json({ success: true, data: { user: user.toSafeJSON() } });
 });
 
@@ -79,4 +112,4 @@ export const logout = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { message: 'Signed out successfully' } });
 });
 
-export default { login, register, me, updateProfile, changePassword, logout };
+export default { login, register, me, updateProfile, updateProfileImage, changePassword, logout };

@@ -2,8 +2,10 @@ import mongoose from 'mongoose';
 
 export const REGISTRATION_STATUSES = Object.freeze([
   'PENDING',
+  'UNDER_REVIEW',
   'APPROVED',
   'REJECTED',
+  'ASSIGNED',
   'ENROLLED',
   'INVITED',
   'ATTENDED',

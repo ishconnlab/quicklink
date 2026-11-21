@@ -19,7 +19,7 @@ const assignmentSchema = new mongoose.Schema({
   submissionRequirements: { type: String, default: '', trim: true, maxlength: 4000 },
   submissionTypes: [{ type: String, enum: ['text', 'link', 'file'] }],
   rubric: [{ criterion: { type: String, trim: true, maxlength: 500 }, points: { type: Number, min: 0, max: 10000 } }],
-  type: { type: String, enum: ['assignment', 'practical', 'quiz'], default: 'assignment' },
+  type: { type: String, enum: ['assignment', 'practical', 'project', 'quiz'], default: 'assignment' },
   questions: { type: [questionSchema], default: [] },
   dueAt: { type: Date, default: null, index: true },
   maxPoints: { type: Number, min: 0, max: 10000, default: 100 },

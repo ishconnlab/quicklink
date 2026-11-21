@@ -13,7 +13,7 @@ const slug = z.string().regex(/^[A-Za-z0-9_-]{32,48}$/);
 const slugParams = z.object({ slug });
 const idParams = z.object({ formId: id });
 const registrationParams = z.object({ formId: id, registrationId: id });
-const registrationStatus = z.enum(['PENDING', 'APPROVED', 'REJECTED', 'ENROLLED', 'INVITED', 'ATTENDED', 'COMPLETED']);
+const registrationStatus = z.enum(['PENDING', 'UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ASSIGNED']);
 const fields = z.array(z.object({
   key: z.string().regex(/^custom_[a-z0-9_-]+$/).max(40),
   label: z.string().trim().min(1).max(80),

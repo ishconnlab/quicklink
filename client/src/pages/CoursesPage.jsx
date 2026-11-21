@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, CalendarClock, GraduationCap, PlusCircle, Search, SlidersHorizontal, Trash2, Users, Wallet } from 'lucide-react';
+import { ArrowRight, CalendarClock, GraduationCap, PlusCircle, Search, SlidersHorizontal, Trash2, Users } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
@@ -8,17 +8,14 @@ import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useDialog } from '../context/DialogContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
-import { formatDateTime, formatMoney } from '../lib/format.js';
+import { formatDateTime } from '../lib/format.js';
 import { isAdmin } from '../lib/roles.js';
 
-const paymentTone = { not_required: 'slate', unpaid: 'amber', pending: 'brand', paid: 'green', rejected: 'red', waived: 'green' };
-const paymentLabel = { not_required: 'No payment', unpaid: 'Payment due', pending: 'Under review', paid: 'Paid', rejected: 'Needs attention', waived: 'Waived' };
 
 function CourseCard({ course, admin, onDelete, deleting }) {
   const isCourse = course.offeringType === 'course';
   const label = isCourse ? 'course' : 'training';
   const action = admin ? `Manage ${label}` : course.enrolled ? `Open ${label}` : course.enrollmentStatus === 'open' ? 'View and enroll' : 'View details';
-  const payment = course.enrollment?.payment;
   return <article className="group flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/[0.03] transition duration-200 hover:-translate-y-0.5 hover:border-green-200 hover:shadow-md">
     <div className="relative aspect-[16/9] overflow-hidden">
       <CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="absolute inset-0 transition duration-300 group-hover:scale-[1.02]" />
@@ -32,14 +29,12 @@ function CourseCard({ course, admin, onDelete, deleting }) {
       <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1"><Users size={13} />{course.enrolledCount}{course.maxStudents ? ` / ${course.maxStudents}` : ''} enrolled</span>
         {course.startsAt && <span className="inline-flex items-center gap-1"><CalendarClock size={13} />{formatDateTime(course.startsAt)}</span>}
-        {course.payment?.enabled && <span className="inline-flex items-center gap-1 font-semibold text-slate-700"><Wallet size={13} />{formatMoney(course.payment.amount, course.payment.currency)}</span>}
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {admin ? <>
+        {admin && <>
           <Badge color={course.active ? (course.published ? 'green' : 'amber') : 'slate'}>{course.active ? (course.published ? 'Published' : 'Draft') : 'Archived'}</Badge>
           <Badge color={course.enrollmentOpen ? 'brand' : 'slate'}>{course.enrollmentOpen ? 'Enrollment open' : 'Enrollment closed'}</Badge>
-          {course.payment?.enabled && <Badge color="amber">Paid training</Badge>}
-        </> : payment ? <Badge color={paymentTone[payment.status] || 'slate'}>{paymentLabel[payment.status] || payment.status}</Badge> : null}
+        </>}
       </div>
       <div className="mt-auto flex gap-2 pt-4"><Link to={admin ? `/courses/${course.id}/edit` : `/courses/${course.id}`} className={`${admin ? 'btn-secondary' : 'btn-primary'} min-w-0 flex-1`}>{action}<ArrowRight size={15} /></Link>{admin && <button type="button" className="btn-ghost shrink-0 px-3 text-red-700" onClick={() => onDelete(course)} disabled={deleting} aria-label={`Delete ${course.title}`} title={`Delete ${label}`}>{deleting ? <Spinner size={16} /> : <Trash2 size={16} />}</button>}</div>
     </div>

@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CheckCircle2, Download, KeyRound, LockKeyhole, LogOut, Mail, MapPin, Phone, Save, ShieldCheck, Smartphone, User } from 'lucide-react';
+import { CheckCircle2, Download, KeyRound, LockKeyhole, LogOut, Mail, MapPin, Phone, Save, ShieldCheck, Smartphone, User, Palette } from 'lucide-react';
 import { PageHeader } from '../components/layout.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { apiError } from '../api/client.js';
+import api, { apiError } from '../api/client.js';
 import { formatDateTime } from '../lib/format.js';
 import { roleLabel } from '../lib/roles.js';
 import { Spinner } from '../components/ui.jsx';
 
 export default function SettingsPage() {
-  const { user, updateProfile, changePassword, logout } = useAuth();
+  const { user, updateProfile, changePassword, logout, refresh } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
-  const [profile, setProfile] = useState({ name: '', whatsapp: '', country: '', province: '' });
+  const [profile, setProfile] = useState({ name: '', whatsapp: '', country: '', province: '', location: '', institution: '', educationLevel: '', biography: '', skills: '', githubUrl: '', linkedinUrl: '', portfolioUrl: '', socialUrl: '' });
+  const [theme, setTheme] = useState(() => localStorage.getItem('quicklink.theme') || 'system');
   const [profileErrors, setProfileErrors] = useState({});
   const [profileSaving, setProfileSaving] = useState(false);
+  const [profileImage, setProfileImage] = useState(null);
+  const [profileImageSaving, setProfileImageSaving] = useState(false);
   const [password, setPassword] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [passwordErrors, setPasswordErrors] = useState({});
   const [passwordSaving, setPasswordSaving] = useState(false);
@@ -23,7 +26,12 @@ export default function SettingsPage() {
   const [installed, setInstalled] = useState(() => window.matchMedia?.('(display-mode: standalone)').matches || false);
 
   useEffect(() => {
-    if (user) setProfile({ name: user.name || '', whatsapp: user.whatsapp || '', country: user.country || '', province: user.province || '' });
+    if (user) setProfile({
+      name: user.name || '', whatsapp: user.whatsapp || '', country: user.country || '', province: user.province || '',
+      location: user.location || '', institution: user.institution || '', educationLevel: user.educationLevel || '',
+      biography: user.biography || '', skills: user.skills || '', githubUrl: user.githubUrl || '',
+      linkedinUrl: user.linkedinUrl || '', portfolioUrl: user.portfolioUrl || '', socialUrl: user.socialUrl || '',
+    });
   }, [user]);
 
   useEffect(() => {
@@ -37,6 +45,12 @@ export default function SettingsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('quicklink.theme', theme);
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+    document.documentElement.classList.toggle('dark', theme === 'dark' || (theme === 'system' && prefersDark));
+  }, [theme]);
+
   const saveProfile = async (event) => {
     event.preventDefault();
     const errors = {};
@@ -48,10 +62,38 @@ export default function SettingsPage() {
     if (Object.keys(errors).length) return;
     setProfileSaving(true);
     try {
-      await updateProfile({ name: profile.name.trim(), whatsapp: profile.whatsapp.trim(), country: profile.country.trim(), province: profile.province.trim() });
+      await updateProfile({
+        name: profile.name.trim(),
+        whatsapp: profile.whatsapp.trim(),
+        country: profile.country.trim(),
+        province: profile.province.trim(),
+        location: profile.location.trim(),
+        institution: profile.institution.trim(),
+        educationLevel: profile.educationLevel,
+        biography: profile.biography.trim(),
+        skills: profile.skills.trim(),
+        githubUrl: profile.githubUrl.trim(),
+        linkedinUrl: profile.linkedinUrl.trim(),
+        portfolioUrl: profile.portfolioUrl.trim(),
+        socialUrl: profile.socialUrl.trim(),
+      });
       toast.success('Profile updated.');
     } catch (error) { toast.error(apiError(error).message); }
     finally { setProfileSaving(false); }
+  };
+
+  const saveProfileImage = async () => {
+    if (!profileImage) return;
+    setProfileImageSaving(true);
+    try {
+      const body = new FormData();
+      body.append('image', profileImage);
+      const response = await api.post('/auth/profile/image', body);
+      await refresh();
+      setProfileImage(null);
+      toast.success('Profile picture updated.');
+    } catch (error) { toast.error(apiError(error).message); }
+    finally { setProfileImageSaving(false); }
   };
 
   const savePassword = async (event) => {
@@ -92,14 +134,52 @@ export default function SettingsPage() {
           <div><h2 className="flex items-center gap-2 text-base font-bold text-slate-950"><User size={18} className="text-brand-700" />Profile</h2><p className="mt-1 text-sm text-slate-500">Used on class rosters, invitations, and your certificate.</p></div>
           <div className="flex shrink-0 items-center gap-2"><Badge>{roleLabel(user?.role)}</Badge><button type="button" onClick={signOut} className="btn-ghost min-h-9 px-2.5 text-xs text-slate-600"><LogOut size={14} />Sign out</button></div>
         </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
+          {user?.profileImageUrl ? (
+            <img src={user.profileImageUrl} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-white" />
+          ) : (
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-700 text-lg font-bold text-white">{user?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
+          )}
+          <label className="min-w-48 flex-1 text-xs text-slate-500">
+            Profile picture
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="mt-1 block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-700"
+              onChange={(event) => setProfileImage(event.target.files?.[0] || null)}
+            />
+          </label>
+          <button type="button" className="btn-secondary" disabled={!profileImage || profileImageSaving} onClick={saveProfileImage}>
+            {profileImageSaving ? <Spinner size={16} /> : <Save size={16} />}Upload
+          </button>
+        </div>
         <form onSubmit={saveProfile} className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="sm:col-span-2"><span className="label">Full name</span><input className={`input ${profileErrors.name ? 'ring-2 ring-red-400' : ''}`} autoComplete="name" required minLength={2} maxLength={120} value={profile.name} onChange={(event) => setProfile({ ...profile, name: event.target.value })} />{profileErrors.name && <span className="mt-1 block text-xs text-red-600">{profileErrors.name}</span>}</label>
           <label><span className="label">Email</span><div className="relative"><Mail size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className="input bg-slate-50 pl-9 text-slate-500" value={user?.email || ''} readOnly aria-describedby="email-help" /></div><span id="email-help" className="mt-1 block text-xs text-slate-400">Contact an administrator to change your sign-in email.</span></label>
           <label><span className="label">WhatsApp number</span><div className="relative"><Phone size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className={`input pl-9 ${profileErrors.whatsapp ? 'ring-2 ring-red-400' : ''}`} type="tel" autoComplete="tel" maxLength={40} value={profile.whatsapp} onChange={(event) => setProfile({ ...profile, whatsapp: event.target.value })} placeholder="+250 700 000 000" /></div>{profileErrors.whatsapp && <span className="mt-1 block text-xs text-red-600">{profileErrors.whatsapp}</span>}</label>
           <label><span className="label">Country</span><div className="relative"><MapPin size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input className={`input pl-9 ${profileErrors.country ? 'ring-2 ring-red-400' : ''}`} autoComplete="country-name" maxLength={120} value={profile.country} onChange={(event) => setProfile({ ...profile, country: event.target.value })} /></div>{profileErrors.country && <span className="mt-1 block text-xs text-red-600">{profileErrors.country}</span>}</label>
           <label><span className="label">Province / state / region</span><input className={`input ${profileErrors.province ? 'ring-2 ring-red-400' : ''}`} autoComplete="address-level1" maxLength={120} value={profile.province} onChange={(event) => setProfile({ ...profile, province: event.target.value })} />{profileErrors.province && <span className="mt-1 block text-xs text-red-600">{profileErrors.province}</span>}</label>
+          <label><span className="label">Location</span><input className="input" maxLength={120} value={profile.location} onChange={(event) => setProfile({ ...profile, location: event.target.value })} placeholder="City or neighbourhood" /></label>
+          <label><span className="label">Institution</span><input className="input" maxLength={180} value={profile.institution} onChange={(event) => setProfile({ ...profile, institution: event.target.value })} placeholder="School or organisation" /></label>
+          <label><span className="label">Education level</span><select className="input" value={profile.educationLevel} onChange={(event) => setProfile({ ...profile, educationLevel: event.target.value })}><option value="">Select level</option>{['L3', 'L4', 'L5', 'Bootcamp', 'Training'].map((level) => <option key={level}>{level}</option>)}</select></label>
+          <label className="sm:col-span-2"><span className="label">Short biography</span><textarea className="input min-h-24 resize-y" maxLength={2000} value={profile.biography} onChange={(event) => setProfile({ ...profile, biography: event.target.value })} placeholder="Tell the learning team about yourself." /></label>
+          <label className="sm:col-span-2"><span className="label">Skills and interests</span><input className="input" maxLength={1000} value={profile.skills} onChange={(event) => setProfile({ ...profile, skills: event.target.value })} placeholder="Networking, JavaScript, project management" /></label>
+          <label><span className="label">GitHub URL</span><input className="input" type="url" maxLength={500} value={profile.githubUrl} onChange={(event) => setProfile({ ...profile, githubUrl: event.target.value })} placeholder="https://github.com/username" /></label>
+          <label><span className="label">LinkedIn URL</span><input className="input" type="url" maxLength={500} value={profile.linkedinUrl} onChange={(event) => setProfile({ ...profile, linkedinUrl: event.target.value })} placeholder="https://linkedin.com/in/username" /></label>
+          <label><span className="label">Portfolio URL</span><input className="input" type="url" maxLength={500} value={profile.portfolioUrl} onChange={(event) => setProfile({ ...profile, portfolioUrl: event.target.value })} placeholder="https://yourportfolio.example" /></label>
+          <label><span className="label">Other social link</span><input className="input" type="url" maxLength={500} value={profile.socialUrl} onChange={(event) => setProfile({ ...profile, socialUrl: event.target.value })} placeholder="https://..." /></label>
           <div className="flex flex-wrap items-center justify-between gap-2 sm:col-span-2"><p className="text-xs text-slate-400">Last sign-in: {formatDateTime(user?.lastLoginAt)}</p><button className="btn-primary" disabled={profileSaving}>{profileSaving ? <Spinner size={16} /> : <Save size={16} />}{profileSaving ? 'Saving…' : 'Save profile'}</button></div>
         </form>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
+        <h2 className="flex items-center gap-2 text-base font-bold text-slate-950"><Palette size={18} className="text-brand-700" />Appearance</h2>
+        <p className="mt-1 text-sm text-slate-500">Choose how QuickLink looks on this device.</p>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {[['light', 'Light'], ['dark', 'Dark'], ['system', 'System']].map(([value, label]) => (
+            <button key={value} type="button" onClick={() => setTheme(value)} className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${theme === value ? 'border-brand-500 bg-green-50 text-brand-800 ring-1 ring-green-100' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{label}</button>
+          ))}
+        </div>
       </section>
 
       <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">

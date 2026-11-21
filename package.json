@@ -2,7 +2,6 @@
   "name": "quicklink",
   "version": "1.0.0",
   "private": true,
-  "description": "QuickLink student learning library",
   "engines": {
     "node": ">=20.19.0"
   },

@@ -25,7 +25,7 @@ const assignmentFields = {
   submissionRequirements: z.string().trim().max(4000).optional().default(''),
   submissionTypes: z.array(z.enum(['text', 'link', 'file'])).max(3).optional().default(['text']),
   rubric: z.array(z.object({ criterion: z.string().trim().min(1).max(500), points: z.number().min(0).max(10000) })).max(30).optional().default([]),
-  type: z.enum(['assignment', 'practical', 'quiz']).default('practical'),
+  type: z.enum(['assignment', 'practical', 'project', 'quiz']).default('practical'),
   questions: z.array(assignmentQuestion).max(50).optional().default([]),
   dueAt: z.string().datetime().nullable().optional(), maxPoints: z.number().min(1).max(10000).default(100),
   passMark: z.number().min(0).max(10000).default(50), allowLate: z.boolean().default(false),

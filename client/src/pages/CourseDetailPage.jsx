@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Award, BadgeCheck, BookOpen, CalendarClock, CheckCircle2, ClipboardCheck, Clock3, Download,
   ExternalLink, FileCheck2, GraduationCap, Link2, LockKeyhole, Pencil, PlayCircle, Send, Share2,
-  ShieldCheck, Target, Trash2, Users, Video, Wallet,
+  ShieldCheck, Target, Trash2, Users, Video,
 } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, Modal, ProgressBar } from '../components/layout.jsx';
@@ -11,14 +11,13 @@ import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import CertificationAssessment from '../components/CertificationAssessment.jsx';
 import AssessmentSettingsEditor from '../components/AssessmentSettingsEditor.jsx';
+import ProjectTasksSection from '../components/ProjectTasksSection.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useDialog } from '../context/DialogContext.jsx';
-import { formatDateTime, formatMoney } from '../lib/format.js';
+import { formatDateTime } from '../lib/format.js';
 import { isAdmin } from '../lib/roles.js';
 
-const paymentTone = { not_required: 'slate', unpaid: 'amber', pending: 'brand', paid: 'green', rejected: 'red', waived: 'green' };
-const paymentLabel = { not_required: 'No payment required', unpaid: 'Payment due', pending: 'Payment under review', paid: 'Payment confirmed', rejected: 'Payment needs attention', waived: 'Payment waived' };
 const projectTone = { submitted: 'brand', approved: 'green', changes_requested: 'amber' };
 const projectLabel = { submitted: 'Submitted — awaiting review', approved: 'Approved', changes_requested: 'Changes requested' };
 
@@ -50,8 +49,6 @@ export default function CourseDetailPage() {
   const [adminData, setAdminData] = useState({ candidates: [], submissions: [], courseCertificates: [] });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
-  const [paymentForm, setPaymentForm] = useState({ reference: '', note: '' });
-  const [certificatePaymentForm, setCertificatePaymentForm] = useState({ reference: '', note: '' });
   const [projectForm, setProjectForm] = useState({ linkUrl: '', description: '' });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [reviewing, setReviewing] = useState(null);
@@ -147,18 +144,6 @@ export default function CourseDetailPage() {
     finally { setBusy(''); }
   };
 
-  const submitPayment = async (event) => {
-    event.preventDefault();
-    setBusy('payment');
-    try {
-      await api.post(`/courses/${id}/payment-reference`, paymentForm);
-      toast.success('Payment reference submitted. The administrator will review it.');
-      setPaymentForm({ reference: '', note: '' });
-      await load();
-    } catch (error) { toast.error(apiError(error).message); }
-    finally { setBusy(''); }
-  };
-
   const submitProject = async (event) => {
     event.preventDefault();
     setBusy('project');
@@ -175,19 +160,7 @@ export default function CourseDetailPage() {
     try {
       const response = await api.post(`/courses/${id}/certificate`);
       setCertificates((current) => [response.data.data.certificate, ...current.filter((item) => item.id !== response.data.data.certificate.id)]);
-      toast.success(response.data.data.certificate.paymentStatus === 'unpaid' ? 'Certificate earned. Submit its payment reference to unlock the PDF.' : 'Certificate issued.');
-    } catch (error) { toast.error(apiError(error).message); }
-    finally { setBusy(''); }
-  };
-
-  const submitCertificatePayment = async (event) => {
-    event.preventDefault();
-    setBusy('certificate-payment');
-    try {
-      const response = await api.post(`/courses/${id}/certificate/payment-reference`, certificatePaymentForm);
-      setCertificates((current) => [response.data.data.certificate, ...current.filter((item) => item.id !== response.data.data.certificate.id)]);
-      setCertificatePaymentForm({ reference: '', note: '' });
-      toast.success('Certificate payment submitted for review.');
+      toast.success('Certificate issued.');
     } catch (error) { toast.error(apiError(error).message); }
     finally { setBusy(''); }
   };
@@ -290,7 +263,6 @@ export default function CourseDetailPage() {
   const isCourse = course.offeringType === 'course';
   const itemLabel = isCourse ? 'course' : 'training';
   const adminListPath = isCourse ? '/admin/courses' : '/courses';
-  const payment = course.enrollment?.payment || null;
   const assessmentConfigured = course.assessment?.enabled;
   const eligibleCandidates = adminData.candidates.filter((candidate) => candidate.eligible && !candidate.certificate);
 
@@ -307,7 +279,6 @@ export default function CourseDetailPage() {
           <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-slate-500">
             <span className="inline-flex items-center gap-1.5"><Users size={14} />{course.enrolledCount}{course.maxStudents ? `/${course.maxStudents}` : ''} enrolled</span>
             {course.startsAt && <span className="inline-flex items-center gap-1.5"><CalendarClock size={14} />Starts {formatDateTime(course.startsAt)}</span>}
-            {course.payment?.enabled && <span className="inline-flex items-center gap-1.5 font-semibold text-slate-700"><Wallet size={14} />{formatMoney(course.payment.amount, course.payment.currency)}{!isCourse && ` · ${course.payment.freeDays} free days`}</span>}
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
             {admin ? <>
@@ -329,6 +300,7 @@ export default function CourseDetailPage() {
 
     <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
       <div className="min-w-0 space-y-5">
+        {(admin || course.enrolled) && <ProjectTasksSection classId={id} admin={admin} />}
         {admin ? <>
           <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="eyebrow">{isCourse ? 'Course' : 'Training'} overview</p><h2 className="mt-1 text-base font-bold text-slate-950">Operations snapshot</h2></div><Link to={`/enrollments?search=${encodeURIComponent(course.title)}`} className="btn-secondary">Enrollment ledger</Link></div>
@@ -336,7 +308,6 @@ export default function CourseDetailPage() {
               <Fact icon={Users} label="Enrolled" value={`${course.enrolledCount} / ${course.maxStudents}`} />
               <Fact icon={Target} label="Assessment" value={assessmentConfigured ? `${course.assessment.questionCount} questions` : 'Not enabled'} />
               <Fact icon={ClipboardCheck} label="Project" value={course.projectSubmission?.enabled ? (course.projectSubmission.required ? 'Required' : 'Optional') : 'Disabled'} />
-              <Fact icon={Wallet} label="Payment" value={course.payment?.enabled ? `${formatMoney(course.payment.amount, course.payment.currency)} · ${course.payment.freeDays} days free` : 'Not required'} />
             </div>
           </section>
 
@@ -355,16 +326,6 @@ export default function CourseDetailPage() {
             {course.students?.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{course.students.map((student) => <div key={student.id} className="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-brand-800">{student.name?.slice(0, 1)?.toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800">{student.name}</span><span className="block truncate text-xs text-slate-400">{student.email}</span></span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">No students enrolled.</p>}
           </section>
         </> : <>
-          {course.enrolled && payment && course.payment?.enabled && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Payment</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><Wallet size={18} className="text-brand-700" />{isCourse ? 'Course payment' : 'Training payment'}</h2></div><Badge color={paymentTone[payment.status] || 'slate'}>{paymentLabel[payment.status] || payment.status}</Badge></div>
-            <div className="mt-3 grid gap-2 sm:grid-cols-3"><Fact icon={Wallet} label="Amount" value={formatMoney(payment.amount, payment.currency)} />{!isCourse && <Fact icon={Clock3} label="Free access" value={payment.allowed ? `Until ${formatDateTime(payment.freeUntil)}` : `Ended ${formatDateTime(payment.freeUntil)}`} />}<Fact icon={ShieldCheck} label="Status" value={payment.allowed ? 'Access active' : 'Payment required'} /></div>
-            {!['paid', 'waived'].includes(payment.status) && <>
-              <div className="mt-3 rounded-xl bg-green-50 p-3 text-sm"><p className="font-semibold text-brand-950">Pay using code {payment.paymentCode || course.payment.paymentCode}</p><p className="text-xs text-brand-900">Account name: {payment.paymentName || course.payment.paymentName || '—'}</p><p className="mt-1 text-xs leading-5 text-brand-800">{payment.instructions || course.payment.instructions || 'Submit your transaction reference after payment.'}</p></div>
-              {payment.status === 'pending' ? <p className="mt-3 rounded-xl bg-blue-50 px-3 py-2.5 text-sm text-blue-800">Your reference {payment.paymentReference ? `(${payment.paymentReference}) ` : ''}is under review. You will be notified when it is verified.</p> : <form onSubmit={submitPayment} className="mt-3 grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]"><input required minLength={3} maxLength={200} className="input" value={paymentForm.reference} onChange={(event) => setPaymentForm({ ...paymentForm, reference: event.target.value })} placeholder="Transaction reference" aria-label="Transaction reference" /><input maxLength={1000} className="input" value={paymentForm.note} onChange={(event) => setPaymentForm({ ...paymentForm, note: event.target.value })} placeholder="Optional note" aria-label="Payment note" /><button className="btn-primary" disabled={busy === 'payment'}>{busy === 'payment' ? <Spinner size={16} /> : <Send size={15} />}Submit</button></form>}
-              {payment.status === 'rejected' && <p className="mt-2 text-xs font-semibold text-red-700">Your previous reference was rejected. Review any note and submit again.</p>}
-            </>}
-            {['paid', 'waived'].includes(payment.status) && <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">Payment verified. You have full access to live classes and submissions.</p>}
-          </section>}
 
           {course.enrolled && <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="eyebrow">Completion</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><BadgeCheck size={18} className="text-brand-700" />Your certificate requirements</h2></div>{completion ? <Badge color={completion.eligible ? 'green' : 'amber'}>{completion.eligible ? 'Eligible' : 'In progress'}</Badge> : null}</div>
@@ -382,7 +343,7 @@ export default function CourseDetailPage() {
 
           {course.enrolled && <section id="certificate" className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="eyebrow">Certification</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><Award size={18} className="text-brand-700" />Your certificate</h2></div>{certificate && <Badge color={certificate.revoked ? 'red' : 'green'}>{certificate.revoked ? 'Revoked' : 'Valid'}</Badge>}</div>
-            {certificate ? <div className="mt-3"><p className="text-sm text-slate-600">{certificate.studentName} · {certificate.courseTitle}</p><p className="mt-1 text-xs text-slate-400">Issued {formatDateTime(certificate.issuedAt)} · {certificate.code}</p>{certificate.revoked ? <p className="mt-2 text-xs text-red-700">This certificate was revoked{certificate.revocationReason ? `: ${certificate.revocationReason}` : '.'}</p> : ['unpaid', 'pending', 'rejected'].includes(certificate.paymentStatus) ? <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3"><p className="font-semibold text-amber-950">Certificate payment · {certificate.paymentStatus === 'pending' ? 'Under review' : formatMoney(certificate.paymentAmount, certificate.paymentCurrency)}</p>{certificate.paymentStatus === 'pending' ? <p className="mt-1 text-sm text-amber-900">Reference {certificate.paymentReference} was submitted and is awaiting administrator confirmation.</p> : <><p className="mt-1 text-sm text-amber-900">Pay using code {course.certificatePayment?.paymentCode} · account {course.certificatePayment?.paymentName}.</p>{course.certificatePayment?.instructions && <p className="mt-1 text-xs leading-5 text-amber-900">{course.certificatePayment.instructions}</p>}{certificate.paymentStatus === 'rejected' && certificate.paymentNote && <p className="mt-2 text-xs text-red-800">Review note: {certificate.paymentNote}</p>}<form onSubmit={submitCertificatePayment} className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]"><input required minLength={3} maxLength={200} className="input bg-white" value={certificatePaymentForm.reference} onChange={(event) => setCertificatePaymentForm({ ...certificatePaymentForm, reference: event.target.value })} placeholder="Payment reference" aria-label="Certificate payment reference"/><input maxLength={1000} className="input bg-white" value={certificatePaymentForm.note} onChange={(event) => setCertificatePaymentForm({ ...certificatePaymentForm, note: event.target.value })} placeholder="Optional note" aria-label="Certificate payment note"/><button className="btn-primary" disabled={busy === 'certificate-payment'}>{busy === 'certificate-payment' ? <Spinner size={15}/> : <Send size={15}/>}Submit</button></form></>}</div> : <><div className="mt-3 flex flex-wrap gap-2"><button className="btn-primary" onClick={() => download(certificate)}><Download size={15} />Download PDF</button><button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button><Link to={`/verify/${certificate.code}`} className="btn-secondary"><ShieldCheck size={15} />Verify</Link></div></>}</div> : completion?.eligible ? <div className="mt-3"><p className="text-sm text-slate-600">All requirements are complete. {course.certificatePayment?.enabled ? 'Earn your certificate, then submit its payment reference to unlock the verified PDF.' : 'Your certificate will be free.'}</p><button className="btn-primary mt-3" onClick={issueCertificate} disabled={busy === 'certificate'}>{busy === 'certificate' ? <Spinner size={16} /> : <Award size={16} />}Generate certificate</button></div> : <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Complete all requirements above to unlock your certificate.</div>}
+            {certificate ? <div className="mt-3"><p className="text-sm text-slate-600">{certificate.studentName} · {certificate.courseTitle}</p><p className="mt-1 text-xs text-slate-400">Issued {formatDateTime(certificate.issuedAt)} · {certificate.code}</p>{certificate.revoked ? <p className="mt-2 text-xs text-red-700">This certificate was revoked{certificate.revocationReason ? `: ${certificate.revocationReason}` : '.'}</p> : <div className="mt-3 flex flex-wrap gap-2"><button className="btn-primary" onClick={() => download(certificate)}><Download size={15} />Download PDF</button><button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button><Link to={`/verify/${certificate.code}`} className="btn-secondary"><ShieldCheck size={15} />Verify</Link></div>}</div> : completion?.eligible ? <div className="mt-3"><p className="text-sm text-slate-600">All requirements are complete. Your certificate is ready to generate.</p><button className="btn-primary mt-3" onClick={issueCertificate} disabled={busy === 'certificate'}>{busy === 'certificate' ? <Spinner size={16} /> : <Award size={16} />}Generate certificate</button></div> : <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm text-slate-500">Complete all requirements above to unlock your certificate.</div>}
           </section>}
         </>}
       </div>

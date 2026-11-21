@@ -15,6 +15,7 @@ import { User } from '../models/User.js';
 import { deleteCloudinaryAsset, uploadCloudinaryBuffer } from '../services/cloudinary.js';
 import { assertCanManageClass, isAdmin } from '../security/roles.js';
 import { recordActivity } from '../services/activityLog.js';
+import { notifyUsers } from '../services/notifications.js';
 
 const IMAGE_ROOT = path.resolve(config.registrationImageDir || fileURLToPath(new URL('../../registration-images/', import.meta.url)));
 const ACCOUNT_CLAIM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -27,9 +28,11 @@ const imageTypes = [
 ];
 
 const TRANSITIONS = {
-  PENDING: ['APPROVED', 'REJECTED', 'ENROLLED'],
-  APPROVED: ['PENDING', 'REJECTED', 'ENROLLED'],
-  REJECTED: ['PENDING', 'APPROVED'],
+  PENDING: ['UNDER_REVIEW', 'APPROVED', 'REJECTED', 'ENROLLED'],
+  UNDER_REVIEW: ['PENDING', 'APPROVED', 'REJECTED'],
+  APPROVED: ['PENDING', 'UNDER_REVIEW', 'REJECTED', 'ASSIGNED', 'ENROLLED'],
+  REJECTED: ['PENDING', 'UNDER_REVIEW', 'APPROVED'],
+  ASSIGNED: ['APPROVED', 'REJECTED', 'ENROLLED'],
   ENROLLED: ['INVITED', 'ATTENDED', 'COMPLETED'],
   INVITED: ['ENROLLED', 'ATTENDED', 'COMPLETED'],
   ATTENDED: ['COMPLETED'],
@@ -227,11 +230,17 @@ async function enrollRegistration(form, registration, req) {
   if (!alreadyEnrolled) await LearningClass.updateOne({ _id: learningClass._id }, { $addToSet: { students: student._id } });
   await ensureEnrollment(learningClass, student._id);
   registration.student = student._id;
-  statusTransition(registration, 'ENROLLED', req.user, 'Registration approved and student enrolled.');
+  statusTransition(registration, 'ASSIGNED', req.user, 'Application approved and student manually assigned.');
   registration.accountClaimTokenHash = null;
   registration.accountClaimExpiresAt = null;
   await registration.save();
   const emailSent = await sendEnrollmentEmail({ student, learningClass, temporaryPassword: created ? password : '' });
+  await notifyUsers([student._id], {
+    type: 'account',
+    title: 'Course or class assignment confirmed',
+    message: `You have been assigned to ${learningClass.title}.`,
+    href: `/courses/${learningClass._id}`,
+  });
   return {
     registration: safeRegistration(registration),
     student: student.toSafeJSON(),
@@ -393,6 +402,13 @@ export const submitRegistration = asyncHandler(async (req, res) => {
       statusHistory: [{ status: 'PENDING', at: new Date(), note: 'Registration submitted.' }],
       accountClaimTokenHash: createHash('sha256').update(accountClaimToken).digest('hex'),
       accountClaimExpiresAt: new Date(Date.now() + ACCOUNT_CLAIM_TTL_MS),
+    });
+    const admins = await User.find({ role: 'admin', isActive: true }).distinct('_id');
+    await notifyUsers(admins, {
+      type: 'application',
+      title: 'New application received',
+      message: `${req.body.name} applied for ${form.learningClass?.title || form.title || 'a program'}.`,
+      href: '/registrations',
     });
     res.status(201).json({ success: true, data: { registration: { id: registration._id.toString(), name: registration.name, email: registration.email, status: registration.status }, accountClaimToken } });
   } catch (error) {
@@ -619,6 +635,16 @@ export const reviewRegistration = asyncHandler(async (req, res) => {
   const registration = await registrationFor(form, req.params.registrationId);
   statusTransition(registration, req.body.status, req.user, req.body.note);
   await registration.save();
+  if (registration.student) {
+    await notifyUsers([registration.student], {
+      type: 'application',
+      title: req.body.status === 'APPROVED' ? 'Application approved' : req.body.status === 'REJECTED' ? 'Application rejected' : 'Application status updated',
+      message: req.body.status === 'APPROVED'
+        ? 'Your application was approved. An administrator will now assign your course or class.'
+        : `Your application status is now ${req.body.status.replace('_', ' ').toLowerCase()}.`,
+      href: '/dashboard',
+    });
+  }
   await recordActivity(req, { action: 'registration.status_changed', resourceType: 'registration', resourceId: registration._id, message: `Registration for ${registration.email} set to ${registration.status}.` });
   res.json({ success: true, data: { registration: safeRegistration(registration) } });
 });
@@ -634,7 +660,9 @@ export const deleteRegistration = asyncHandler(async (req, res) => {
 export const enrollRegistrationStudent = asyncHandler(async (req, res) => {
   const form = await formWithClass(req.params.formId, req.user);
   const registration = await registrationFor(form, req.params.registrationId);
-  if (registration.status === 'REJECTED') throw ApiError.conflict('Approve this registration before enrolling the student.');
+  if (!['APPROVED', 'ASSIGNED'].includes(registration.status)) {
+    throw ApiError.conflict('Approve this application before assigning the student.');
+  }
   const result = await enrollRegistration(form, registration, req);
   await recordActivity(req, { action: 'registration.enrolled', resourceType: 'registration', resourceId: registration._id, message: `Enrolled ${registration.email} as a student.` });
   res.json({ success: true, data: result });

@@ -26,6 +26,7 @@ const CertificateLookupPage = lazy(() => import('./pages/CertificateLookupPage.j
 const TrainingRegistrationsPage = lazy(() => import('./pages/TrainingRegistrationsPage.jsx'));
 const CertificatesPage = lazy(() => import('./pages/CertificatesPage.jsx'));
 const LiveSessionPage = lazy(() => import('./pages/LiveSessionPage.jsx'));
+const PublicRegistrationPage = lazy(() => import('./pages/PublicRegistrationPage.jsx'));
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -68,6 +69,7 @@ export default function App() {
         <Route path="/register" element={loading ? <SplashScreen /> : user ? <DashboardRedirect /> : <RegisterPage />} />
         <Route path="/verify" element={<CertificateLookupPage />} />
         <Route path="/verify/:code" element={<CertificateVerifyPage />} />
+        <Route path="/training-registration/:slug" element={<PublicRegistrationPage />} />
         <Route element={<Protected><AppLayout /></Protected>}>
           <Route path="/dashboard" element={user?.role === 'admin' ? <AdminOnly><AdminDashboard /></AdminOnly> : <StudentDashboard />} />
           <Route path="/courses" element={<CoursesPage offeringType="training" />} />

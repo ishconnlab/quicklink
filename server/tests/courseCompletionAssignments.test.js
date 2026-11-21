@@ -4,6 +4,7 @@ import { evaluateAssignmentRequirements, evaluateAttendanceRequirement } from '.
 
 const theory = { _id: '0123456789abcdef01234567', type: 'quiz', passMark: 8 };
 const practical = { _id: '0123456789abcdef01234568', type: 'practical', passMark: 70 };
+const project = { _id: '0123456789abcdef01234569', type: 'project', passMark: 70 };
 
 test('a passed theory-only assignment does not require an unassigned practical assignment', () => {
   const checks = evaluateAssignmentRequirements(
@@ -29,6 +30,20 @@ test('theory and practical work are both required when both types are assigned',
   assert.equal(checks.length, 2);
   assert.equal(checks[0].complete, true);
   assert.equal(checks[1].complete, false);
+});
+
+test('project tasks are included in practical completion requirements', () => {
+  const pending = evaluateAssignmentRequirements(
+    [project],
+    [{ assignment: project._id, attempt: 1, status: 'submitted', score: null }],
+  );
+  assert.equal(pending[0].complete, false);
+
+  const passed = evaluateAssignmentRequirements(
+    [project],
+    [{ assignment: project._id, attempt: 1, status: 'passed', score: 75 }],
+  );
+  assert.equal(passed[0].complete, true);
 });
 
 test('the latest assignment attempt determines completion', () => {

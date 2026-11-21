@@ -45,6 +45,7 @@ const enrollmentQuery = z.object({
   search: z.string().trim().max(120).optional(),
   classId: objectId.optional(),
   studentId: objectId.optional(),
+  offeringType: z.enum(['training', 'course']).optional(),
   status: z.enum(['enrolled', 'cancelled']).optional(),
   paymentStatus: z.enum(['not_required', 'unpaid', 'pending', 'paid', 'rejected', 'waived']).optional(),
 });

@@ -47,5 +47,14 @@ export const updateProfileSchema = z.object({
   whatsapp: z.string().trim().max(40).optional(),
   country: z.string().trim().max(120).optional(),
   province: z.string().trim().max(120).optional(),
+  location: z.string().trim().max(120).optional(),
+  institution: z.string().trim().max(180).optional(),
+  educationLevel: z.enum(['', 'L3', 'L4', 'L5', 'Bootcamp', 'Training']).optional(),
+  biography: z.string().trim().max(2000).optional(),
+  skills: z.string().trim().max(1000).optional(),
+  githubUrl: z.string().trim().url().max(500).optional().or(z.literal('')),
+  linkedinUrl: z.string().trim().url().max(500).optional().or(z.literal('')),
+  portfolioUrl: z.string().trim().url().max(500).optional().or(z.literal('')),
+  socialUrl: z.string().trim().url().max(500).optional().or(z.literal('')),
 }).refine((value) => Object.keys(value).length > 0, 'Provide at least one profile field to update');
 export const idParamSchema = z.object({ id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid id') });

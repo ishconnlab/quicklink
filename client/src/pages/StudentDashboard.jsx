@@ -1,21 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Award, CalendarClock, CheckCircle2, Clock3, CreditCard, FileCheck2, GraduationCap, Radio, Sparkles, Video } from 'lucide-react';
+import { ArrowRight, Award, Bell, CalendarClock, CheckCheck, CheckCircle2, Clock3, FileCheck2, GraduationCap, Radio, Sparkles, Video } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader, ProgressBar, SectionHeader, StatCard } from '../components/layout.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { EmptyState, PageLoader } from '../components/ui.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { formatDateTime, formatMoney } from '../lib/format.js';
+import { formatDateTime } from '../lib/format.js';
 
-const paymentLabel = { not_required: 'No payment', unpaid: 'Payment due', pending: 'Under review', paid: 'Paid', rejected: 'Needs attention', waived: 'Waived' };
-const paymentTone = { not_required: 'slate', unpaid: 'amber', pending: 'brand', paid: 'green', rejected: 'red', waived: 'green' };
 
 export default function StudentDashboard() {
   const { user } = useAuth();
   const toast = useToast();
-  const [state, setState] = useState({ loading: true, courses: [], certificates: [], classes: [], completion: {}, learning: {} });
+  const [state, setState] = useState({ loading: true, courses: [], certificates: [], classes: [], completion: {}, learning: {}, notifications: [] });
 
   useEffect(() => {
     let active = true;
@@ -23,7 +21,8 @@ export default function StudentDashboard() {
       api.get('/courses', { params: { enrolled: true, limit: 100 } }),
       api.get('/certificates/mine'),
       api.get('/classes', { params: { limit: 50 } }),
-    ]).then(async ([coursesResponse, certificatesResponse, classesResponse]) => {
+      api.get('/users/notifications', { params: { limit: 20 } }),
+    ]).then(async ([coursesResponse, certificatesResponse, classesResponse, notificationsResponse]) => {
       const courses = coursesResponse.data.data.courses;
       const completionPairs = await Promise.all(courses.map(async (course) => {
         const [completion, learning] = await Promise.allSettled([api.get(`/courses/${course.id}/completion`), api.get(`/classes/${course.id}/learning`)]);
@@ -40,6 +39,7 @@ export default function StudentDashboard() {
         classes: classesResponse.data.data.classes || [],
         completion: Object.fromEntries(completionPairs.map(([courseId, value]) => [courseId, value.completion])),
         learning: Object.fromEntries(completionPairs.map(([courseId, value]) => [courseId, value.learning])),
+        notifications: notificationsResponse.data.data.notifications,
       });
     }).catch((error) => {
       if (!active) return;
@@ -54,10 +54,21 @@ export default function StudentDashboard() {
   const firstName = user?.name?.split(' ')[0] || 'there';
   const liveClasses = state.classes.filter((item) => item.liveSession);
   const upcoming = state.classes.filter((item) => !item.liveSession && item.startsAt && new Date(item.startsAt) > new Date()).sort((a, b) => new Date(a.startsAt) - new Date(b.startsAt)).slice(0, 4);
-  const paymentDue = state.courses.filter((course) => course.enrollment?.payment && !course.enrollment.payment.allowed).length;
-  const validCertificates = state.certificates.filter((certificate) => !certificate.revoked && ['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required'));
-  const certificatesAwaitingPayment = state.certificates.some((certificate) => !certificate.revoked && !['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required'));
+  const validCertificates = state.certificates.filter((certificate) => !certificate.revoked);
   const completedTrainings = Object.values(state.completion).filter((item) => item?.eligible).length;
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await api.patch('/users/notifications/read-all');
+      setState((current) => ({
+        ...current,
+        notifications: current.notifications.map((item) => ({ ...item, read: true })),
+      }));
+      toast.success('All notifications marked as read.');
+    } catch (error) {
+      toast.error(apiError(error).message);
+    }
+  };
 
   const progressFor = (course) => {
     const learningProgress = state.learning[course.id]?.progress;
@@ -76,10 +87,6 @@ export default function StudentDashboard() {
       actions={<><Link to="/courses" className="btn-secondary">Explore trainings</Link><Link to="/classes" className="btn-primary"><Video size={16} />My live classes</Link></>}
     />
 
-    {paymentDue > 0 && <Link to="/courses" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-green-50 p-4 transition hover:border-amber-300">
-      <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><CreditCard size={19} /></span><div><p className="text-sm font-bold text-amber-950">{paymentDue} training{paymentDue === 1 ? '' : 's'} need payment attention</p><p className="text-xs text-amber-700">Submit your payment reference to keep accessing live classes.</p></div></div>
-      <span className="inline-flex items-center gap-1 text-sm font-semibold text-amber-800">Review <ArrowRight size={15} /></span>
-    </Link>}
 
     <section className="mb-7">
       <SectionHeader title="Your snapshot" description="A quick view of your current learning." icon={Sparkles} />
@@ -96,7 +103,6 @@ export default function StudentDashboard() {
       {state.courses.length ? <div className="grid min-w-0 gap-3 sm:gap-4 md:grid-cols-2">
         {state.courses.map((course) => {
           const progress = progressFor(course);
-          const payment = course.enrollment?.payment;
           return <article key={course.id} className="relative min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
             <CourseThumbnail imageUrl={course.thumbnailUrl} title={course.title} className="aspect-[16/5] w-full sm:aspect-[16/7]" />
             <div className="min-w-0 p-4 sm:p-5">
@@ -105,9 +111,7 @@ export default function StudentDashboard() {
               <p className="mt-1.5 line-clamp-2 break-words text-sm leading-6 text-slate-500">{course.introduction || course.description || 'Open the training to see your requirements and next step.'}</p>
               <div className="mt-4"><div className="mb-1.5 flex items-center justify-between text-xs text-slate-500"><span>Requirements completed</span><span className="font-semibold text-slate-700">{progress}%</span></div><ProgressBar value={progress} /></div>
               <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                <Badge color={paymentTone[payment?.status] || 'slate'}>{payment ? paymentLabel[payment.status] || payment.status : 'No payment'}</Badge>
                 {course.startsAt && <span className="inline-flex items-center gap-1 text-slate-500"><CalendarClock size={13} />{formatDateTime(course.startsAt)}</span>}
-                {payment?.required && <span className="font-semibold text-amber-700">{formatMoney(payment.amount, payment.currency)} due</span>}
               </div>
               <div className="mt-4 grid min-w-0 grid-cols-1 gap-2 min-[360px]:grid-cols-[minmax(0,1fr)_auto]"><Link to={state.learning[course.id]?.progress?.totalLessons ? `/courses/${course.id}/learn` : `/courses/${course.id}`} className="btn-primary min-w-0">{state.learning[course.id]?.progress?.totalLessons ? 'Continue learning' : 'Open training'}</Link><Link to={`/classes/${course.id}`} className="btn-secondary min-w-0"><Video size={16} />Classroom</Link></div>
             </div>
@@ -127,9 +131,49 @@ export default function StudentDashboard() {
 
       <section>
         <SectionHeader title="Certificates" description="Your verified achievements." icon={Award} action={validCertificates.length > 0 ? <Link to="/certificates" className="text-sm font-semibold text-brand-700">Open certificates</Link> : null} />
-        {validCertificates.length ? <div className="space-y-2">{validCertificates.slice(0, 3).map((certificate) => <Link key={certificate.id} to="/certificates" className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-green-200 sm:p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700"><Award size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{certificate.courseTitle}</span><span className="block truncate text-xs text-slate-500">{certificate.level} · Issued {formatDateTime(certificate.issuedAt)}</span></span><FileCheck2 size={16} className="shrink-0 text-emerald-600" /></Link>)}</div> : <EmptyState icon={Award} title={certificatesAwaitingPayment ? 'Certificate awaiting payment approval' : 'No certificates yet'} description={certificatesAwaitingPayment ? 'Your certificate will appear here once its payment is approved by an administrator. You can check or submit payment from the training page.' : 'Complete your training requirements to unlock your certificate.'} />}
+        {validCertificates.length ? <div className="space-y-2">{validCertificates.slice(0, 3).map((certificate) => <Link key={certificate.id} to="/certificates" className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 transition hover:border-green-200 sm:p-4"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700"><Award size={18} /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold text-slate-900">{certificate.courseTitle}</span><span className="block truncate text-xs text-slate-500">{certificate.level} · Issued {formatDateTime(certificate.issuedAt)}</span></span><FileCheck2 size={16} className="shrink-0 text-emerald-600" /></Link>)}</div> : <EmptyState icon={Award} title="No certificates yet" description="Complete your training requirements to unlock your certificate." />}
       </section>
     </div>
+
+    <section id="notifications" className="mb-8 rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5">
+      <SectionHeader
+        title="Notifications"
+        description="Applications, assignments, classes, feedback, and certificate updates."
+        icon={Bell}
+        action={state.notifications.some((item) => !item.read) ? (
+          <button type="button" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700" onClick={markAllNotificationsRead}>
+            <CheckCheck size={15} />Mark all read
+          </button>
+        ) : null}
+      />
+      {state.notifications.length ? (
+        <div className="divide-y divide-slate-100">
+          {state.notifications.slice(0, 8).map((item) => (
+            <Link
+              key={item.id}
+              to={item.href || '/dashboard'}
+              onClick={async () => {
+                if (!item.read) {
+                  try {
+                    await api.patch(`/users/notifications/${item.id}/read`);
+                    setState((current) => ({ ...current, notifications: current.notifications.map((notification) => notification.id === item.id ? { ...notification, read: true } : notification) }));
+                  } catch (error) { toast.error(apiError(error).message); }
+                }
+              }}
+              className={`flex items-start gap-3 rounded-xl px-2 py-3 transition hover:bg-green-50/40 ${item.read ? '' : 'bg-green-50/60'}`}
+            >
+              <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${item.read ? 'bg-slate-200' : 'bg-brand-600'}`} />
+              <span className="min-w-0 flex-1">
+                <span className="block break-words text-sm font-semibold text-slate-900">{item.title}</span>
+                <span className="mt-0.5 block break-words text-xs leading-5 text-slate-500">{item.message}</span>
+              </span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <EmptyState icon={Bell} title="No notifications" description="Updates for your applications and learning activity will appear here." />
+      )}
+    </section>
 
     <section className="rounded-2xl border border-green-100 bg-green-50 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-xl bg-white text-brand-700  ring-1 ring-green-100"><Clock3 size={20} /></span><div><p className="font-bold text-slate-900">Keep your streak going</p><p className="text-sm text-slate-500">Check your requirements before each session so nothing blocks your certificate.</p></div></div><Link to="/courses" className="btn-secondary">Review requirements <ArrowRight size={15} /></Link></div>

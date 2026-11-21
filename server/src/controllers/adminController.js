@@ -41,6 +41,7 @@ function enrollmentJson(enrollment) {
       title: learningClass.title,
       subject: learningClass.subject,
       level: learningClass.level,
+      offeringType: learningClass.offeringType || 'training',
       startsAt: learningClass.startsAt,
       endsAt: learningClass.endsAt,
       paymentEnabled: Boolean(learningClass.payment?.enabled),
@@ -283,6 +284,21 @@ export const listEnrollments = asyncHandler(async (req, res) => {
   if (req.query.studentId) filter.student = req.query.studentId;
   if (req.query.paymentStatus) filter.paymentStatus = req.query.paymentStatus;
   if (req.query.status) filter.status = req.query.status;
+  if (req.query.offeringType) {
+    const offeringFilter = req.query.offeringType === 'course'
+      ? { offeringType: 'course' }
+      : { offeringType: { $ne: 'course' } };
+    const classIds = await LearningClass.find(offeringFilter).distinct('_id');
+    if (filter.learningClass) {
+      filter.$and = [
+        { learningClass: filter.learningClass },
+        { learningClass: { $in: classIds } },
+      ];
+      delete filter.learningClass;
+    } else {
+      filter.learningClass = { $in: classIds };
+    }
+  }
   if (req.query.search) {
     const search = new RegExp(escapeRegex(req.query.search), 'i');
     const [studentIds, classIds] = await Promise.all([
@@ -294,7 +310,7 @@ export const listEnrollments = asyncHandler(async (req, res) => {
   const [enrollments, total] = await Promise.all([
     Enrollment.find(filter)
       .populate('student', 'name email whatsapp country province')
-      .populate('learningClass', 'title subject level startsAt endsAt payment')
+      .populate('learningClass', 'title subject level offeringType startsAt endsAt payment')
       .sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Enrollment.countDocuments(filter),
   ]);
@@ -364,7 +380,7 @@ export const verifyPayment = asyncHandler(async (req, res) => {
     resourceId: enrollment._id,
     message: `Set payment to ${req.body.status} for ${enrollment.student?.name || 'a student'} in ${enrollment.learningClass.title}.`,
   });
-  res.json({ success: true, data: { enrollment: enrollmentJson(await enrollment.populate([{ path: 'student', select: 'name email whatsapp country province' }, { path: 'learningClass', select: 'title subject level startsAt endsAt payment' }])) } });
+  res.json({ success: true, data: { enrollment: enrollmentJson(await enrollment.populate([{ path: 'student', select: 'name email whatsapp country province' }, { path: 'learningClass', select: 'title subject level offeringType startsAt endsAt payment' }])) } });
 });
 
 export const createEnrollment = asyncHandler(async (req, res) => {

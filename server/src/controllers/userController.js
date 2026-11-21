@@ -16,6 +16,14 @@ export const markNotificationRead = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { read: true } });
 });
 
+export const markAllNotificationsRead = asyncHandler(async (req, res) => {
+  const result = await Notification.updateMany(
+    { recipient: req.user._id, readAt: null },
+    { $set: { readAt: new Date() } }
+  );
+  res.json({ success: true, data: { updated: result.modifiedCount || 0 } });
+});
+
 export const listUsers = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page || 1));
   const limit = Math.min(200, Math.max(1, Number(req.query.limit || 100)));
@@ -107,4 +115,4 @@ export const deleteUser = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { user: { id: user._id.toString(), deleted: true } } });
 });
 
-export default { listUsers, createUser, updateUser, deleteUser };
+export default { listUsers, createUser, updateUser, deleteUser, listNotifications, markNotificationRead, markAllNotificationsRead };

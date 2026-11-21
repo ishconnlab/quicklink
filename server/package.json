@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "QuickLink learning library API",
+  "description": "QuickLink course, live class, application, assignment, certificate, and notification API",
   "main": "src/index.js",
   "engines": {
     "node": ">=18.17.0"

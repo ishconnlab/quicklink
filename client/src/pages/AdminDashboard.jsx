@@ -1,15 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Activity, ArrowRight, Award, BookOpen, CreditCard, GraduationCap, PlusCircle, Radio, ReceiptText, Sparkles, UserCheck, Users, Video } from 'lucide-react';
+import { Activity, ArrowRight, Award, BookOpen, GraduationCap, PlusCircle, Radio, ReceiptText, Sparkles, UserCheck, Users, Video } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader, SectionHeader, StatCard } from '../components/layout.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';
 import { EmptyState, PageLoader } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import { formatDateTime, formatMoney } from '../lib/format.js';
-
-const paymentTone = { not_required: 'slate', unpaid: 'amber', pending: 'brand', paid: 'green', rejected: 'red', waived: 'green' };
-const paymentLabel = { not_required: 'Not required', unpaid: 'Unpaid', pending: 'Pending review', paid: 'Paid', rejected: 'Rejected', waived: 'Waived' };
+import { formatDateTime } from '../lib/format.js';
 
 export default function AdminDashboard() {
   const toast = useToast();
@@ -37,7 +34,6 @@ export default function AdminDashboard() {
   if (!state.data) return <EmptyState title="Dashboard could not load" description="Check the server connection and try again." action={<button className="btn-primary" onClick={load}>Try again</button>} />;
 
   const { stats, recentEnrollments, upcomingTrainings, recentActivity, recentProjectSubmissions = [] } = state.data;
-  const revenue = stats.revenueByCurrency?.length ? stats.revenueByCurrency.map((item) => formatMoney(item.total, item.currency)).join(' · ') : 'No payments recorded';
   const submissionNotifications = state.notifications.filter((item) => ['assignment', 'project'].includes(item.type));
 
   const markRead = async (item) => {
@@ -52,8 +48,8 @@ export default function AdminDashboard() {
       className="quicklink-dashboard-header"
       eyebrow="Administration"
       title="Training command center"
-      subtitle="Monitor enrollments, payments, live sessions, assessments, and certificates across the platform."
-      actions={<><Link to="/enrollments?paymentStatus=pending" className="btn-secondary"><CreditCard size={16} />Verify payments</Link><Link to="/courses/new?type=course" className="btn-secondary"><BookOpen size={16} />New course</Link><Link to="/courses/new" className="btn-primary"><PlusCircle size={17} />New training</Link></>}
+      subtitle="Monitor enrollments, live sessions, assessments, applications, and certificates across the platform."
+      actions={<><Link to="/registrations" className="btn-secondary"><UserCheck size={16} />Review applications</Link><Link to="/courses/new?type=course" className="btn-secondary"><BookOpen size={16} />New course</Link><Link to="/courses/new" className="btn-primary"><PlusCircle size={17} />New training</Link></>}
     />
 
     <section className="mb-7">
@@ -61,7 +57,6 @@ export default function AdminDashboard() {
       <div className="quicklink-dashboard-stats grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Active students" value={stats.activeStudents} icon={GraduationCap} hint={`${stats.students} total student accounts`} />
         <StatCard label="Active trainings" value={stats.trainings} icon={Video} hint={`${stats.enrollments} current enrollments`} />
-        <StatCard label="Pending payments" value={stats.pendingPayments} icon={CreditCard} accent="amber" hint="Waiting for verification" />
         <StatCard label="Live now" value={stats.liveClasses} icon={Radio} accent={stats.liveClasses ? 'red' : 'slate'} hint={stats.liveClasses ? 'Sessions in progress' : 'No live sessions'} />
         <StatCard label="Certificates" value={stats.certificates} icon={Award} accent="green" hint="Valid certificates issued" />
         <StatCard label="Projects" value={stats.projectSubmissions} icon={ReceiptText} accent="purple" hint="Project submissions received" />
@@ -84,21 +79,12 @@ export default function AdminDashboard() {
       {submissionNotifications.length ? <div className="divide-y divide-slate-100">{submissionNotifications.slice(0, 8).map((item) => <div key={item.id} className={`flex min-w-0 items-center gap-3 py-3 ${item.read ? '' : 'bg-green-50/60'}`}><span className="min-w-0 flex-1"><span className="block break-words text-sm font-semibold text-slate-800">{item.title}</span><span className="block break-words text-xs leading-4 text-slate-500">{item.message} · {formatDateTime(item.createdAt)}</span></span><Link to={item.href || '/courses'} onClick={() => markRead(item)} className="btn-secondary min-h-9 shrink-0 px-3">Review</Link></div>)}</div> : <p className="text-sm text-slate-500">New assignment and project submissions will appear here.</p>}
     </section>
 
-    <section className="mb-6 rounded-2xl border border-emerald-200/70 bg-green-50 p-4 sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0 flex-1"><p className="eyebrow text-emerald-700">Verified revenue</p><p className="mt-1 break-words text-lg font-black tracking-tight text-slate-950 sm:text-2xl">{revenue}</p><p className="mt-0.5 text-xs text-slate-500">Confirmed and waived enrollments are not included in revenue.</p></div>
-        <Link to="/enrollments" className="btn-secondary">Open enrollment ledger <ArrowRight size={15} /></Link>
-      </div>
-    </section>
-
     <div className="mb-7 grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
       <section className="rounded-2xl border border-slate-200/80 bg-white">
         <div className="border-b border-slate-100 p-4 sm:p-5"><SectionHeader title="Recent enrollments" description="The latest students who joined a training." action={<Link to="/enrollments" className="text-sm font-semibold text-brand-700">View all</Link>} icon={Users} /></div>
         {recentEnrollments.length ? <div className="divide-y divide-slate-100">{recentEnrollments.map((enrollment) => <div key={enrollment.id} className="flex flex-wrap items-center gap-3 p-4 transition hover:bg-green-50/30">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-brand-800 ring-1 ring-green-100">{enrollment.student?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">{enrollment.student?.name || 'Student'}</p><p className="truncate text-xs text-slate-500">{enrollment.class?.title || 'Training'} · {formatDateTime(enrollment.enrolledAt)}</p></div>
-          <Badge color={paymentTone[enrollment.paymentStatus] || 'slate'}>{paymentLabel[enrollment.paymentStatus] || enrollment.paymentStatus}</Badge>
-          {enrollment.paymentReference && <Link to={`/enrollments?search=${encodeURIComponent(enrollment.student?.email || '')}`} className="text-xs font-semibold text-brand-700 hover:underline">Review</Link>}
         </div>)}</div> : <div className="p-5"><EmptyState title="No enrollments yet" description="Student enrollments will appear here." /></div>}
       </section>
 
@@ -112,7 +98,6 @@ export default function AdminDashboard() {
           <SectionHeader title="Quick actions" icon={Sparkles} />
           <div className="grid gap-2 sm:grid-cols-2">
             {[
-              { to: '/enrollments?paymentStatus=pending', label: 'Verify payments', icon: CreditCard },
               { to: '/students', label: 'Manage students', icon: Users },
               { to: '/registrations', label: 'Registration queue', icon: UserCheck },
               { to: '/certificates', label: 'Certificates', icon: Award },

@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const notificationSchema = new mongoose.Schema({
   recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  type: { type: String, enum: ['class', 'invitation', 'assignment', 'grade', 'announcement', 'account'], required: true },
+  type: { type: String, enum: ['class', 'invitation', 'assignment', 'project', 'grade', 'announcement', 'account', 'application', 'certificate'], required: true },
   title: { type: String, required: true, trim: true, maxlength: 180 },
   message: { type: String, default: '', trim: true, maxlength: 1000 },
   href: { type: String, default: '' },

@@ -28,7 +28,7 @@ export function evaluateAssignmentRequirements(assignments, submissions) {
   }
   const categories = [
     { key: 'theory', label: 'Pass theory assessments', types: new Set(['quiz']) },
-    { key: 'practical', label: 'Pass practical assignments', types: new Set(['practical', 'assignment']) },
+    { key: 'practical', label: 'Pass practical assignments', types: new Set(['practical', 'assignment', 'project']) },
   ];
   return categories.flatMap(({ key, label, types }) => {
     const required = assignments.filter((assignment) => types.has(assignment.type));
@@ -63,7 +63,7 @@ export async function evaluateCourseCompletion(course, studentId) {
     ? await Assignment.find({
       learningClass: course._id,
       published: true,
-      type: { $in: ['quiz', 'practical', 'assignment'] },
+      type: { $in: ['quiz', 'practical', 'assignment', 'project'] },
     }).select('_id type passMark maxPoints').lean()
     : [];
   const requirementsConfigured = Boolean(assessmentEnabled || projectRequired || attendanceRequired || assignments.length || rules.minimumScore > 0 || lessonCount > 0);

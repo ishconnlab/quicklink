@@ -4,6 +4,7 @@ import { Assignment } from '../models/Assignment.js';
 import { AssignmentSubmission } from '../models/AssignmentSubmission.js';
 import { LearningClass } from '../models/LearningClass.js';
 import { User } from '../models/User.js';
+import { isSupportedProjectLink } from '../utils/projectLinks.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -115,7 +116,7 @@ export const createAssignment = asyncHandler(async (req, res) => {
   if (totalPoints > req.body.maxPoints) throw ApiError.badRequest('Question points cannot exceed the assignment maximum.');
   if (req.body.passMark > req.body.maxPoints) throw ApiError.badRequest('Pass mark cannot exceed the assignment maximum.');
   const assignment = await Assignment.create({ ...req.body, learningClass: item._id, createdBy: req.user._id });
-  if (assignment.published) await notifyUsers(item.students, { type: 'assignment', title: `New ${assignment.type}: ${assignment.title}`, message: item.title, href: '/assignments' });
+  if (assignment.published) await notifyUsers(item.students, { type: 'assignment', title: `New ${assignment.type}: ${assignment.title}`, message: item.title, href: assignment.type === 'project' ? `/courses/${item._id}#project-tasks` : `/courses/${item._id}` });
   res.status(201).json({ success: true, data: { assignment: assignmentJson(assignment, null, true) } });
 });
 
@@ -129,15 +130,15 @@ export const updateAssignment = asyncHandler(async (req, res) => {
   if (totalPoints > assignment.maxPoints) throw ApiError.badRequest('Question points cannot exceed the assignment maximum.');
   if (assignment.passMark > assignment.maxPoints) throw ApiError.badRequest('Pass mark cannot exceed the assignment maximum.');
   const saved = await Assignment.findByIdAndUpdate(assignment._id, { $set: req.body }, { new: true, runValidators: true });
-  if (!wasPublished && saved.published) await notifyUsers(item.students, { type: 'assignment', title: `New ${saved.type}: ${saved.title}`, message: item.title, href: '/assignments' });
+  if (!wasPublished && saved.published) await notifyUsers(item.students, { type: 'assignment', title: `New ${saved.type}: ${saved.title}`, message: item.title, href: saved.type === 'project' ? `/courses/${item._id}#project-tasks` : `/courses/${item._id}` });
   res.json({ success: true, data: { assignment: assignmentJson(saved, null, true) } });
 });
 
 export const deleteAssignment = asyncHandler(async (req, res) => {
   const { assignment, teacher } = await assignmentAccess(req.params.id, req.user);
   if (!teacher) throw ApiError.forbidden('Only an assigned teacher or admin can delete an assignment.');
-  if (!['practical', 'assignment'].includes(assignment.type)) {
-    throw ApiError.badRequest('Only practical assignments can be deleted from this page.');
+  if (!['practical', 'assignment', 'project'].includes(assignment.type)) {
+    throw ApiError.badRequest('Only practical assignments and project tasks can be deleted from this page.');
   }
   if (req.user.role !== 'admin' && String(assignment.createdBy || '') !== req.user._id.toString()) {
     throw ApiError.forbidden('You can delete only practical assignments you created.');
@@ -170,6 +171,10 @@ export const submitAssignment = asyncHandler(async (req, res) => {
     if (!['https:', 'http:'].includes(parsed.protocol) || parsed.username || parsed.password) throw ApiError.badRequest('Submission links must use HTTP or HTTPS without embedded credentials.');
     return parsed.href;
   });
+  if (assignment.type === 'project') {
+    if (!links.length) throw ApiError.badRequest('Submit a GitHub repository or Google Drive link for this project.');
+    if (links.some((link) => !isSupportedProjectLink(link))) throw ApiError.badRequest('Project links must use GitHub or Google Drive over HTTPS.');
+  }
   const previous = await AssignmentSubmission.findOne({ assignment: assignment._id, student: req.user._id }).sort({ attempt: -1 });
   const isDraft = req.body.draft === true || req.body.draft === 'true';
   if (previous && previous.status !== 'draft' && (!assignment.allowResubmission || previous.status === 'submitted' || previous.status === 'passed')) throw ApiError.conflict('A submission already exists and resubmission is not available.');
@@ -177,7 +182,7 @@ export const submitAssignment = asyncHandler(async (req, res) => {
   if (answers.some((answer) => !validIds.has(answer.questionId))) throw ApiError.badRequest('Submission contains an unknown question.');
   const questionById = new Map(assignment.questions.map((question) => [question._id.toString(), question]));
   let autoScore = 0;
-  let hasManual = false;
+  let hasManual = assignment.type === 'project';
   for (const answer of answers) {
     const question = questionById.get(answer.questionId);
     if (question.type === 'single-choice') {
@@ -231,7 +236,7 @@ export const gradeSubmission = asyncHandler(async (req, res) => {
   submission.gradedAt = new Date();
   submission.gradingHistory.push({ score: submission.score, feedback: submission.feedback, status: decision, gradedBy: req.user._id, gradedAt: submission.gradedAt });
   await submission.save();
-  await notifyUsers([submission.student], { type: 'grade', title: `Grade posted: ${assignment.title}`, message: `${submission.score}/${assignment.maxPoints}${submission.feedback ? ` â€” ${submission.feedback}` : ''}`, href: '/assignments' });
+  await notifyUsers([submission.student], { type: 'grade', title: `Grade posted: ${assignment.title}`, message: `${submission.score}/${assignment.maxPoints}${submission.feedback ? ` â€” ${submission.feedback}` : ''}`, href: assignment.type === 'project' ? `/courses/${item._id}#project-tasks` : `/courses/${item._id}` });
   res.json({ success: true, data: { submission: { id: submission._id.toString(), status: submission.status, score: submission.score, feedback: submission.feedback, gradedAt: submission.gradedAt, gradingHistory: submission.gradingHistory } } });
 });
 

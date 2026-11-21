@@ -13,9 +13,11 @@ const listQuery = z.object({
   search: z.string().trim().max(120).optional(),
 });
 
-router.use(requireAuth, requireAdmin);
+router.use(requireAuth);
 router.get('/notifications', users.listNotifications);
 router.patch('/notifications/:id/read', validate(idParamSchema), users.markNotificationRead);
+router.patch('/notifications/read-all', users.markAllNotificationsRead);
+router.use(requireAdmin);
 router.get('/', validate(listQuery, 'query'), users.listUsers);
 router.post('/', validate(createUserSchema), users.createUser);
 router.patch('/:id', validate(idParamSchema, 'params'), validate(updateUserSchema), users.updateUser);
