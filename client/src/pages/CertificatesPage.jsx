@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Award, BadgeCheck, ChevronLeft, ChevronRight, Download, ExternalLink, Eye, FilePenLine, FilePlus2, RefreshCcw,
-  Search, Share2, ShieldCheck, ShieldX, Sparkles, Trash2,
+  Search, Share2, ShieldCheck, ShieldX, Sparkles, Trash2, ChevronDown,
 } from 'lucide-react';
 import api, { apiError } from '../api/client.js';
 import { Badge, Modal, PageHeader, StatCard } from '../components/layout.jsx';
@@ -253,36 +253,52 @@ export default function CertificatesPage() {
 
     {loading && !certificates.length ? <PageLoader label="Loading certificates…" /> : visible.length === 0 ? <EmptyState icon={Award} title={certificates.length ? 'No matching certificates' : admin ? 'No certificates issued' : 'No certificates yet'} description={certificates.length ? 'Try changing the search or filters.' : admin ? 'Open a training, verify completion, then issue individual or bulk certificates.' : 'Complete all training requirements, including the assessment and project when required, to unlock your certificate.'} action={!certificates.length && (admin ? <Link to="/courses" className="btn-primary">Open trainings</Link> : <Link to="/courses" className="btn-primary">Browse trainings</Link>)} /> : <>
       <div className="space-y-3">
-        {visible.map((certificate) => <article key={certificate.id} className={`overflow-hidden rounded-2xl border bg-white shadow-sm shadow-slate-900/[0.03] ${certificate.revoked ? 'border-red-200' : 'border-slate-200/80'}`}>
-          <div className={`h-1 ${certificate.revoked ? 'bg-red-500' : 'bg-brand-600'}`} />
-          <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+        {visible.map((certificate) => <article key={certificate.id} className={`relative rounded-2xl border bg-white shadow-sm shadow-slate-900/[0.03] ${certificate.revoked ? 'border-red-200' : 'border-slate-200/80'}`}>
+          <div className={`h-1 rounded-t-2xl ${certificate.revoked ? 'bg-red-500' : 'bg-brand-600'}`} />
+          <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_14rem] lg:items-start">
             <div className="flex min-w-0 items-start gap-3">
               <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${certificate.revoked ? 'bg-red-50 text-red-600' : 'bg-green-50 text-brand-700'}`}>{certificate.revoked ? <ShieldX size={21} /> : <Award size={21} />}</span>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5"><h2 className="break-words font-bold text-slate-900">{certificate.courseTitle}</h2><Badge color={certificate.revoked ? 'red' : 'green'}>{certificate.revoked ? 'Revoked' : 'Valid'}</Badge><Badge color="slate">{certificate.level}</Badge>{certificate.kind === 'manual' && <Badge color="slate">Manual issue</Badge>}{certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}</div>
-                <p className="mt-1 text-sm text-slate-600">Awarded to <strong className="text-slate-800">{certificate.studentName}</strong></p>
-                <p className="mt-1 break-all text-xs text-slate-400">Code {certificate.code} · Issued {formatDateTime(certificate.issuedAt)}</p>
+              <div className="min-w-0 flex-1">
+                <h2 className="break-words text-base font-bold leading-snug text-slate-900 sm:text-lg">{certificate.courseTitle}</h2>
+                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                  <Badge color={certificate.revoked ? 'red' : 'green'}>{certificate.revoked ? 'Revoked' : 'Valid'}</Badge>
+                  <Badge color="slate">{certificate.level}</Badge>
+                  {certificate.kind === 'manual' && <Badge color="slate">Manual issue</Badge>}
+                  {certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}
+                </div>
+                <p className="mt-2 text-sm text-slate-600">Awarded to <strong className="text-slate-800">{certificate.studentName}</strong></p>
+                <p className="mt-1 break-all text-xs text-slate-500">Code {certificate.code}</p>
+                <p className="mt-1 text-xs text-slate-500">Issued {formatDateTime(certificate.issuedAt)}</p>
                 {certificate.printDetailsUpdatedAt && <p className="mt-1 text-[11px] font-medium text-amber-700">Admin edited · {formatDateTime(certificate.printDetailsUpdatedAt)}</p>}
-                <button type="button" onClick={() => openPreview(certificate)} disabled={busyId === certificate.id || certificate.revoked} className="mt-2 block w-full max-w-[13rem] rounded-lg border border-green-200 bg-white p-1.5 text-left transition hover:border-green-500 hover:bg-green-50/50 disabled:cursor-not-allowed disabled:opacity-60" aria-label={`Open full preview for ${certificate.studentName}'s ${certificate.courseTitle} certificate`}>
-                  <span className="block rounded-md border border-slate-200 bg-white px-2 py-1.5 text-center"><span className="block text-[7px] font-bold uppercase tracking-[0.14em] text-green-800">QuickLink · Certificate</span><span className="mt-0.5 block truncate text-[9px] font-semibold text-slate-800">{certificate.studentName}</span><span className="block truncate text-[7px] text-slate-500">{certificate.description || 'has successfully completed'}</span><span className="block truncate text-[9px] font-bold text-green-900">{certificate.courseTitle}</span></span>
-                  <span className="mt-1 block text-center text-[9px] font-semibold text-green-800">{busyId === certificate.id ? 'Loading full preview…' : 'Open certificate'}</span>
-                </button>
-                {certificate.revoked && <p className="mt-2 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs leading-5 text-red-700">Revoked {formatDateTime(certificate.revokedAt)}{certificate.revocationReason ? `: ${certificate.revocationReason}` : '.'}</p>}
+                {certificate.revoked && <p className="mt-3 rounded-lg bg-red-50 px-2.5 py-1.5 text-xs leading-5 text-red-700">Revoked {formatDateTime(certificate.revokedAt)}{certificate.revocationReason ? `: ${certificate.revocationReason}` : '.'}</p>}
               </div>
             </div>
-            <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
-              {!certificate.revoked && <button className="btn-primary" onClick={() => openPreview(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <Eye size={15} />}Preview & print</button>}
-              {!certificate.revoked && <button className="btn-secondary" onClick={() => download(certificate)} disabled={busyId === certificate.id}><Download size={15} />Download PDF</button>}
-              {!certificate.revoked && <button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button>}
-              <a className="btn-secondary" href={verifyUrl(certificate)} target="_blank" rel="noreferrer"><ExternalLink size={15} />Verify</a>
-              {admin && <>
-                {certificate.courseId && <Link to={`/courses/${certificate.courseId}`} className="btn-secondary"><Award size={15} />Training</Link>}
-                {!certificate.revoked && <button className="btn-secondary" onClick={() => openPrintEditor(certificate)}><FilePenLine size={15} />Edit print details</button>}
-                {!certificate.revoked && <button className="btn-ghost text-red-600" onClick={() => { setRevokeTarget(certificate); setRevokeReason(''); }}>Revoke</button>}
-                {certificate.revoked && <button className="btn-secondary" onClick={() => reissue(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} /> : <RefreshCcw size={15} />}Reissue</button>}
-                <button className="btn-ghost text-red-700" onClick={() => deleteCertificate(certificate)} disabled={busyId === certificate.id} aria-label="Delete certificate record">{busyId === certificate.id ? <Spinner size={15} /> : <Trash2 size={15} />}Delete</button>
-              </>}
-            </div>
+
+            {!certificate.revoked && <button type="button" onClick={() => openPreview(certificate)} disabled={busyId === certificate.id} className="w-full max-w-[14rem] justify-self-start rounded-xl border border-green-200 bg-green-50/40 p-2 text-left transition hover:border-green-500 hover:bg-green-50 disabled:cursor-wait disabled:opacity-60 lg:justify-self-end" aria-label={`Open certificate preview for ${certificate.studentName}`}>
+              <span className="block rounded-lg border border-slate-200 bg-white px-3 py-3 text-center shadow-sm">
+                <span className="block text-[9px] font-bold uppercase tracking-[0.14em] text-green-800">QuickLink · Certificate</span>
+                <span className="mt-2 block truncate text-xs font-semibold text-slate-800">{certificate.studentName}</span>
+                <span className="mt-1 block truncate text-[10px] text-slate-500">{certificate.description || 'has successfully completed'}</span>
+                <span className="mt-1 block truncate text-xs font-bold text-green-900">{certificate.courseTitle}</span>
+              </span>
+              <span className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold text-green-800">{busyId === certificate.id ? <Spinner size={13} /> : <Eye size={13} />}{busyId === certificate.id ? 'Loading preview…' : 'Preview certificate'}</span>
+            </button>}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3 sm:px-5">
+            {!certificate.revoked && <button className="btn-secondary" onClick={() => download(certificate)} disabled={busyId === certificate.id}><Download size={15} />Download PDF</button>}
+            {!certificate.revoked && <button className="btn-secondary" onClick={() => share(certificate)}><Share2 size={15} />Share</button>}
+            <a className="btn-secondary" href={verifyUrl(certificate)} target="_blank" rel="noreferrer"><ExternalLink size={15} />Verify</a>
+            {admin && <details className="relative ml-auto">
+              <summary className="btn-secondary list-none cursor-pointer"><span>More actions</span><ChevronDown size={15} /></summary>
+              <div className="absolute right-0 top-full z-50 mt-1 flex min-w-48 flex-col rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl">
+                {certificate.courseId && <Link to={`/courses/${certificate.courseId}`} className="rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50"><Award size={15} className="mr-2 inline" />Training</Link>}
+                {!certificate.revoked && <button className="rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={() => openPrintEditor(certificate)}><FilePenLine size={15} className="mr-2 inline" />Edit print details</button>}
+                {!certificate.revoked && <button className="rounded-lg px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50" onClick={() => { setRevokeTarget(certificate); setRevokeReason(''); }}><ShieldX size={15} className="mr-2 inline" />Revoke</button>}
+                {certificate.revoked && <button className="rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={() => reissue(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} className="mr-2 inline" /> : <RefreshCcw size={15} className="mr-2 inline" />}Reissue</button>}
+                <button className="rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" onClick={() => deleteCertificate(certificate)} disabled={busyId === certificate.id}>{busyId === certificate.id ? <Spinner size={15} className="mr-2 inline" /> : <Trash2 size={15} className="mr-2 inline" />}Delete certificate</button>
+              </div>
+            </details>}
           </div>
         </article>)}
       </div>
