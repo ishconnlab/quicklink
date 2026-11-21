@@ -5,8 +5,6 @@ test('Cloudinary uploads support foldered assets and folderless image uploads', 
   process.env.CLOUDINARY_CLOUD_NAME = ' test-cloud ';
   process.env.CLOUDINARY_API_KEY = ' test-api-key ';
   process.env.CLOUDINARY_API_SECRET = ' test-api-secret ';
-  process.env.CLOUDINARY_FOLDER_PREFIX = ' quicklink ';
-
   const [{ uploadCloudinaryBuffer }, { v2: cloudinary }] = await Promise.all([
     import('../src/services/cloudinary.js'),
     import('cloudinary'),
@@ -71,6 +69,27 @@ test('Cloudinary uploads support foldered assets and folderless image uploads', 
       assert.equal('folder' in captured, false);
       assert.equal(result.publicId, 'lesson-image');
       assert.equal(result.folder, '');
+    });
+
+    await t.test('uses the default quicklink folder without a configurable prefix', async () => {
+      let captured;
+      cloudinary.uploader.upload_stream = (options, callback) => {
+        captured = options;
+        return {
+          end() {
+            callback(null, {
+              public_id: 'quicklink/image',
+              resource_type: 'image',
+              secure_url: 'https://res.cloudinary.com/test-cloud/image/upload/quicklink/image.jpg',
+              bytes: 3,
+            });
+          },
+        };
+      };
+
+      const result = await uploadCloudinaryBuffer({ buffer: Buffer.from('img'), resourceType: 'image' });
+      assert.equal(captured.folder, 'quicklink');
+      assert.equal(result.folder, 'quicklink');
     });
   } finally {
     cloudinary.uploader.upload_stream = originalUpload;

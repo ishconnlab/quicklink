@@ -70,6 +70,15 @@ export function AuthProvider({ children }) {
     return account;
   }, []);
 
+  const updateProfileImage = useCallback(async (file) => {
+    const body = new FormData();
+    body.append('image', file);
+    const res = await api.post('/auth/profile/image', body);
+    const account = normalizeUser(res.data.data.user);
+    setUser(account);
+    return account;
+  }, []);
+
   const changePassword = useCallback(async (currentPassword, newPassword) => {
     await api.post('/auth/change-password', { currentPassword, newPassword });
     setToken(null);
@@ -85,6 +94,7 @@ export function AuthProvider({ children }) {
         register,
         logout,
         updateProfile,
+        updateProfileImage,
         changePassword,
         refresh: loadUser,
       }}

@@ -40,8 +40,6 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
-      - key: CLOUDINARY_FOLDER_PREFIX
-        value: quicklink
       - key: OWNER_NAME
         value: QuickLink Owner
       - key: OWNER_EMAIL

@@ -5,6 +5,7 @@ import {
   PanelLeftOpen, ReceiptText, Settings, Users, Video, X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
+import UserAvatar from './UserAvatar.jsx';
 import { classNames } from '../lib/format.js';
 import { isAdmin, roleLabel } from '../lib/roles.js';
 import api from '../api/client.js';
@@ -49,12 +50,12 @@ function AccountMenu({ placement = 'down', compact = false }) {
   };
   return <div className="relative" ref={ref}>
     <button ref={triggerRef} type="button" onClick={() => setOpen((value) => !value)} className={compact ? 'flex w-full items-center gap-2.5 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-2 text-left transition hover:border-brand-200 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/60' : 'flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition hover:bg-green-50'} aria-label="Account menu" aria-haspopup="true" aria-expanded={open} aria-controls={open ? menuId : undefined}>
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-white shadow-sm">{user?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
+      <UserAvatar name={user?.name} imageUrl={user?.profileImageUrl} className="h-9 w-9 text-xs shadow-sm" />
       {compact && <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-slate-800">{user?.name}</span><span className="block truncate text-xs text-slate-400">{roleLabel(user?.role)}</span></span>}
       <ChevronDown size={compact ? 16 : 14} className={classNames('shrink-0 text-slate-400 transition-transform', open && 'rotate-180')} />
     </button>
     {open && <div id={menuId} className={classNames('absolute right-0 z-50 w-64 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-1.5 shadow-2xl shadow-slate-900/10', placement === 'up' ? 'bottom-full mb-2' : 'top-full mt-2')}>
-      <div className="flex items-center gap-3 rounded-xl bg-green-50/70 px-3 py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-white">{user?.name?.slice(0, 1)?.toUpperCase() || '?'}</span><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{user?.name}</p><p className="truncate text-xs text-slate-400">{user?.email}</p></div></div>
+      <div className="flex items-center gap-3 rounded-xl bg-green-50/70 px-3 py-3"><UserAvatar name={user?.name} imageUrl={user?.profileImageUrl} className="h-9 w-9 text-xs" /><div className="min-w-0"><p className="truncate text-sm font-semibold text-slate-800">{user?.name}</p><p className="truncate text-xs text-slate-400">{user?.email}</p></div></div>
       <div className="mt-1 space-y-0.5">
         <button type="button" onClick={() => { setOpen(false); navigate('/settings'); }} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"><Settings size={15} /> Settings</button>
         <button type="button" onClick={signOut} className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"><LogOut size={15} /> Sign out</button>

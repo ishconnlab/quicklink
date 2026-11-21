@@ -73,7 +73,6 @@ export const config = {
       && (process.env.CLOUDINARY_API_KEY || '').trim()
       && (process.env.CLOUDINARY_API_SECRET || '').trim(),
     ),
-    folderPrefix: (process.env.CLOUDINARY_FOLDER_PREFIX || '').trim() || 'quicklink',
   },
   learning: {
     supportedFormats: learningFormats.length ? learningFormats : ALLOWED_LEARNING_FORMATS,

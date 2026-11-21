@@ -5,6 +5,7 @@ import App from './App.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { DialogProvider } from './context/DialogContext.jsx';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 import AppErrorBoundary from './components/AppErrorBoundary.jsx';
 import '@fontsource-variable/geist/wght.css';
 import './index.css';
@@ -40,9 +41,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <BrowserRouter future={{ v7_relativeSplatPath: true }}>
         <ToastProvider>
           <DialogProvider>
-            <AuthProvider>
-              <App />
-            </AuthProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <App />
+              </AuthProvider>
+            </ThemeProvider>
           </DialogProvider>
         </ToastProvider>
       </BrowserRouter>

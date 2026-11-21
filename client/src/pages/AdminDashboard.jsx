@@ -4,6 +4,7 @@ import { Activity, ArrowRight, Award, BookOpen, GraduationCap, PlusCircle, Radio
 import api, { apiError } from '../api/client.js';
 import { Badge, PageHeader, SectionHeader, StatCard } from '../components/layout.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';
+import UserAvatar from '../components/UserAvatar.jsx';
 import { EmptyState, PageLoader } from '../components/ui.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { formatDateTime } from '../lib/format.js';
@@ -69,7 +70,7 @@ export default function AdminDashboard() {
         <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">Recent project submissions</h3>
         {recentProjectSubmissions.map((submission) => <article key={submission.id} className="rounded-xl border border-slate-100 p-3.5">
           <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-800">{submission.student?.name || 'Student'} <span className="font-normal text-slate-400">· {submission.course?.title || 'Course'}</span></p><p className="mt-0.5 text-xs text-slate-400">{submission.student?.email} · {formatDateTime(submission.submittedAt)}</p></div>
+            <div className="flex min-w-0 items-center gap-2.5"><UserAvatar name={submission.student?.name} imageUrl={submission.student?.profileImageUrl} className="h-8 w-8 text-xs" /><div className="min-w-0"><p className="break-words text-sm font-semibold text-slate-800">{submission.student?.name || 'Student'} <span className="font-normal text-slate-400">· {submission.course?.title || 'Course'}</span></p><p className="mt-0.5 text-xs text-slate-400">{submission.student?.email} · {formatDateTime(submission.submittedAt)}</p></div></div>
             <Badge color={submission.status === 'approved' ? 'green' : submission.status === 'changes_requested' ? 'amber' : 'brand'}>{submission.status === 'changes_requested' ? 'Changes requested' : submission.status === 'approved' ? 'Approved' : 'Awaiting review'}</Badge>
           </div>
           <p className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600">{submission.description || 'No description submitted.'}</p>
@@ -83,7 +84,7 @@ export default function AdminDashboard() {
       <section className="rounded-2xl border border-slate-200/80 bg-white">
         <div className="border-b border-slate-100 p-4 sm:p-5"><SectionHeader title="Recent enrollments" description="The latest students who joined a training." action={<Link to="/enrollments" className="text-sm font-semibold text-brand-700">View all</Link>} icon={Users} /></div>
         {recentEnrollments.length ? <div className="divide-y divide-slate-100">{recentEnrollments.map((enrollment) => <div key={enrollment.id} className="flex flex-wrap items-center gap-3 p-4 transition hover:bg-green-50/30">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-brand-800 ring-1 ring-green-100">{enrollment.student?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
+          <UserAvatar name={enrollment.student?.name} imageUrl={enrollment.student?.profileImageUrl} className="h-9 w-9 text-xs ring-1 ring-green-100" />
           <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-slate-900">{enrollment.student?.name || 'Student'}</p><p className="truncate text-xs text-slate-500">{enrollment.class?.title || 'Training'} · {formatDateTime(enrollment.enrolledAt)}</p></div>
         </div>)}</div> : <div className="p-5"><EmptyState title="No enrollments yet" description="Student enrollments will appear here." /></div>}
       </section>

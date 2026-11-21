@@ -1,23 +1,27 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Download, KeyRound, LockKeyhole, LogOut, Mail, MapPin, Phone, Save, ShieldCheck, Smartphone, User, Palette } from 'lucide-react';
 import { PageHeader } from '../components/layout.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { useTheme } from '../context/ThemeContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
-import api, { apiError } from '../api/client.js';
+import { apiError } from '../api/client.js';
 import { formatDateTime } from '../lib/format.js';
 import { roleLabel } from '../lib/roles.js';
 import { Spinner } from '../components/ui.jsx';
+import UserAvatar from '../components/UserAvatar.jsx';
 
 export default function SettingsPage() {
-  const { user, updateProfile, changePassword, logout, refresh } = useAuth();
+  const { user, updateProfile, updateProfileImage, changePassword, logout } = useAuth();
+  const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const toast = useToast();
   const [profile, setProfile] = useState({ name: '', whatsapp: '', country: '', province: '', location: '', institution: '', educationLevel: '', biography: '', skills: '', githubUrl: '', linkedinUrl: '', portfolioUrl: '', socialUrl: '' });
-  const [theme, setTheme] = useState(() => localStorage.getItem('quicklink.theme') || 'system');
   const [profileErrors, setProfileErrors] = useState({});
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState('');
+  const profileImageInput = useRef(null);
   const [profileImageSaving, setProfileImageSaving] = useState(false);
   const [password, setPassword] = useState({ currentPassword: '', newPassword: '', confirm: '' });
   const [passwordErrors, setPasswordErrors] = useState({});
@@ -46,10 +50,11 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('quicklink.theme', theme);
-    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
-    document.documentElement.classList.toggle('dark', theme === 'dark' || (theme === 'system' && prefersDark));
-  }, [theme]);
+    if (!profileImage) { setProfileImagePreview(''); return undefined; }
+    const preview = URL.createObjectURL(profileImage);
+    setProfileImagePreview(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [profileImage]);
 
   const saveProfile = async (event) => {
     event.preventDefault();
@@ -86,11 +91,9 @@ export default function SettingsPage() {
     if (!profileImage) return;
     setProfileImageSaving(true);
     try {
-      const body = new FormData();
-      body.append('image', profileImage);
-      const response = await api.post('/auth/profile/image', body);
-      await refresh();
+      await updateProfileImage(profileImage);
       setProfileImage(null);
+      if (profileImageInput.current) profileImageInput.current.value = '';
       toast.success('Profile picture updated.');
     } catch (error) { toast.error(apiError(error).message); }
     finally { setProfileImageSaving(false); }
@@ -125,6 +128,24 @@ export default function SettingsPage() {
     navigate('/login', { replace: true });
   };
 
+  const chooseProfileImage = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) { setProfileImage(null); return; }
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) {
+      toast.error('Choose a PNG, JPEG, or WebP image.');
+      event.target.value = '';
+      setProfileImage(null);
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error('Choose an image that is 3 MB or smaller.');
+      event.target.value = '';
+      setProfileImage(null);
+      return;
+    }
+    setProfileImage(file);
+  };
+
   return <div className="mx-auto max-w-3xl">
     <PageHeader eyebrow="Your account" title="Settings" subtitle="Keep your contact details current, manage security, and install the QuickLink QuickLink app on your device." />
 
@@ -135,19 +156,19 @@ export default function SettingsPage() {
           <div className="flex shrink-0 items-center gap-2"><Badge>{roleLabel(user?.role)}</Badge><button type="button" onClick={signOut} className="btn-ghost min-h-9 px-2.5 text-xs text-slate-600"><LogOut size={14} />Sign out</button></div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-          {user?.profileImageUrl ? (
-            <img src={user.profileImageUrl} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-white" />
-          ) : (
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-700 text-lg font-bold text-white">{user?.name?.slice(0, 1)?.toUpperCase() || '?'}</span>
-          )}
+          <UserAvatar name={user?.name} imageUrl={profileImagePreview || user?.profileImageUrl} className="h-14 w-14 text-lg ring-2 ring-white" />
           <label className="min-w-48 flex-1 text-xs text-slate-500">
-            Profile picture
+            <span className="block font-semibold text-slate-700">Profile picture</span>
             <input
+              ref={profileImageInput}
               type="file"
               accept="image/png,image/jpeg,image/webp"
               className="mt-1 block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-semibold file:text-brand-700"
-              onChange={(event) => setProfileImage(event.target.files?.[0] || null)}
+              onChange={chooseProfileImage}
+              disabled={profileImageSaving}
             />
+            <span className="mt-1 block">PNG, JPEG, or WebP · up to 3 MB</span>
+            {profileImage && <span className="mt-1 block truncate text-brand-700">Selected: {profileImage.name}</span>}
           </label>
           <button type="button" className="btn-secondary" disabled={!profileImage || profileImageSaving} onClick={saveProfileImage}>
             {profileImageSaving ? <Spinner size={16} /> : <Save size={16} />}Upload
@@ -177,7 +198,7 @@ export default function SettingsPage() {
         <p className="mt-1 text-sm text-slate-500">Choose how QuickLink looks on this device.</p>
         <div className="mt-4 grid grid-cols-3 gap-2">
           {[['light', 'Light'], ['dark', 'Dark'], ['system', 'System']].map(([value, label]) => (
-            <button key={value} type="button" onClick={() => setTheme(value)} className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${theme === value ? 'border-brand-500 bg-green-50 text-brand-800 ring-1 ring-green-100' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{label}</button>
+            <button key={value} type="button" aria-pressed={theme === value} onClick={() => setTheme(value)} className={`rounded-xl border px-3 py-3 text-sm font-semibold transition ${theme === value ? 'border-brand-500 bg-green-50 text-brand-800 ring-1 ring-green-100' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{label}</button>
           ))}
         </div>
       </section>

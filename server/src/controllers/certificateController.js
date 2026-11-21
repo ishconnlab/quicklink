@@ -18,6 +18,7 @@ import { isAdmin } from '../security/roles.js';
 import { notifyUsers } from '../services/notifications.js';
 import { recordActivity } from '../services/activityLog.js';
 import { CourseLearningProgress } from '../models/CourseLearningProgress.js';
+import { certificateDownloadAccess } from '../utils/certificateDownloadAccess.js';
 
 const COURSE_FIELDS = [
   'title', 'level', 'active', 'published', 'students', 'learningMaterials', 'modules', 'certificatePayment', 'completionRequirements',
@@ -802,8 +803,9 @@ export const downloadCertificate = asyncHandler(async (req, res) => {
   const certificate = /^[0-9a-fA-F]{24}$/.test(req.params.id)
     ? await CourseCertificate.findById(req.params.id)
     : await CourseCertificate.findOne({ code: req.params.id });
-  if (!certificate || certificate.revokedAt || !['paid', 'not_required'].includes(certificate.paymentStatus || 'not_required')) throw ApiError.notFound('Certificate is unavailable.');
-  if (!isAdmin(req.user) && certificate.student?.toString() !== req.user._id.toString()) throw ApiError.forbidden('You cannot download another student certificate.');
+  const access = certificateDownloadAccess(certificate, req.user);
+  if (access === 'not-found') throw ApiError.notFound('Certificate is unavailable.');
+  if (access === 'forbidden') throw ApiError.forbidden('You cannot download another student certificate.');
   const appUrl = config.mail.appUrl || config.corsOrigin[0];
   if (!appUrl) throw ApiError.conflict('The public application URL is not configured.');
   const verificationUrl = new URL(`/verify/${certificate.code}`, appUrl).toString();

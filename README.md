@@ -335,7 +335,7 @@ The server test suite covers document formats, lesson access, course completion,
 - Use MongoDB reachable by the API service. Mount persistent storage for `LEARNING_BOOKS_DIR`, `BOOK_COVER_DIR`, `SUBMISSIONS_DIR`, `COURSE_IMAGE_DIR`, and `REGISTRATION_IMAGE_DIR` when those features are used; database records refer to those files. Course and registration images use Cloudinary when configured, with local storage as the fallback. Back up local storage together with MongoDB.
 - Configure a strong `JWT_SECRET`, `CORS_ORIGIN`, and HTTPS. Keep LiveKit, SMTP, and Cloudinary credentials on the server. The API host must allow WebSocket upgrades for Socket.IO.
 - Configure `LIVEKIT_URL`, `LIVEKIT_API_KEY`, and `LIVEKIT_API_SECRET` for live media. Set `SMTP_URL`, `MAIL_FROM`, and `APP_URL` to send invitations, registration verification, and enrollment notices. Without SMTP, invitation records show delivery failure.
-- Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, and `CLOUDINARY_FOLDER_PREFIX` for Cloudinary-backed course and registration images.
+- Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` for Cloudinary-backed course and registration images. Uploads use the `quicklink` folder by default.
 - Set `APP_URL` to the public frontend origin and `PUBLIC_API_URL` to the public backend origin for certificate share previews. Set client `VITE_API_URL` to the deployed API origin if no development proxy or same-origin deployment is used.
 - The API exposes `/health` for process liveness and `/health/ready` for readiness, including MongoDB state. One API instance is recommended while Socket.IO presence is held in memory.
 

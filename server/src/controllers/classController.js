@@ -45,11 +45,12 @@ async function assertClassAccess(learningClass, user) {
 
 function personJson(person) {
   const id = (person._id || person).toString();
-  if (!person.name) return { id, name: 'Student', email: '' };
+  if (!person.name) return { id, name: 'Student', email: '', profileImageUrl: '' };
   return {
     id,
     name: person.name,
     email: person.email || '',
+    profileImageUrl: person.profileImageUrl || '',
     whatsapp: person.whatsapp || '',
     country: person.country || '',
     province: person.province || '',
@@ -256,7 +257,7 @@ async function classSessions(ids) {
 }
 
 export const listPeople = asyncHandler(async (req, res) => {
-  const users = await User.find({ role: 'student', isActive: true }).select('name email whatsapp country province').sort({ name: 1 }).limit(2000);
+  const users = await User.find({ role: 'student', isActive: true }).select('name email profileImageUrl whatsapp country province').sort({ name: 1 }).limit(2000);
   res.json({ success: true, data: { people: users.map(personJson) } });
 });
 
@@ -270,7 +271,7 @@ export const listClasses = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page || 1));
   const limit = Math.min(100, Math.max(1, Number(req.query.limit || 24)));
   const [classes, total] = await Promise.all([
-    LearningClass.find(filter).populate('students', 'name email whatsapp country province').sort({ updatedAt: -1 }).skip((page - 1) * limit).limit(limit),
+    LearningClass.find(filter).populate('students', 'name email profileImageUrl whatsapp country province').sort({ updatedAt: -1 }).skip((page - 1) * limit).limit(limit),
     LearningClass.countDocuments(filter),
   ]);
   const { liveByClass, recentByClass } = await classSessions(classes.map((item) => item._id));
@@ -316,7 +317,7 @@ export const listCourses = asyncHandler(async (req, res) => {
   const page = Math.max(1, Number(req.query.page || 1));
   const limit = Math.min(100, Math.max(1, Number(req.query.limit || 50)));
   const [items, total, subjects, trades] = await Promise.all([
-    LearningClass.find(filter).populate('students', 'name')
+    LearningClass.find(filter).populate('students', 'name email profileImageUrl')
       .sort(req.query.sort === 'title' ? { title: 1 } : req.query.sort === 'popular' ? { students: -1, updatedAt: -1 } : req.query.sort === 'level' ? { level: 1, title: 1 } : { updatedAt: -1 })
       .skip((page - 1) * limit).limit(limit).lean(),
     LearningClass.countDocuments(filter),
@@ -339,7 +340,7 @@ export const listCourses = asyncHandler(async (req, res) => {
 });
 
 export const getCourse = asyncHandler(async (req, res) => {
-  const item = await LearningClass.findById(req.params.id).lean();
+  const item = await LearningClass.findById(req.params.id).populate('students', 'name email profileImageUrl').lean();
   if (!item) throw ApiError.notFound('Training not found.');
   const enrollment = isAdmin(req.user) ? null : await getEnrollment(item._id, req.user._id);
   const enrolled = Boolean(enrollment) || (item.students || []).some((student) => student.toString() === req.user._id.toString());
@@ -558,7 +559,7 @@ export const createClass = asyncHandler(async (req, res) => {
     throw error;
   }
   await enrollStudents(item, students.map((student) => student._id));
-  await item.populate('students', 'name email whatsapp country province');
+  await item.populate('students', 'name email profileImageUrl whatsapp country province');
   await recordActivity(req, { action: 'class.created', resourceType: 'class', resourceId: item._id, message: `Created training ${item.title}.` });
   res.status(201).json({ success: true, data: { class: classJson(item, { user: req.user, includeRoster: true }) } });
 });
@@ -631,7 +632,7 @@ export const updateClass = asyncHandler(async (req, res) => {
   }
 
   await item.save();
-  await item.populate('students', 'name email whatsapp country province');
+  await item.populate('students', 'name email profileImageUrl whatsapp country province');
   const additions = addedStudentIds.length ? await User.find({ _id: { $in: addedStudentIds } }).select('name') : [];
   await recordActivity(req, {
     action: 'class.updated',
@@ -667,7 +668,7 @@ export const uploadLessonImage = asyncHandler(async (req, res) => {
 });
 
 export const getClass = asyncHandler(async (req, res) => {
-  const item = await LearningClass.findById(req.params.id).populate('students', 'name email whatsapp country province');
+  const item = await LearningClass.findById(req.params.id).populate('students', 'name email profileImageUrl whatsapp country province');
   await assertClassAccess(item, req.user);
   const enrollment = isAdmin(req.user) ? null : await getEnrollment(item._id, req.user._id);
   const [liveSession, recentSession] = await Promise.all([

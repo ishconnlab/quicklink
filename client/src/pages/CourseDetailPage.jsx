@@ -9,6 +9,7 @@ import api, { apiError } from '../api/client.js';
 import { Badge, Modal, ProgressBar } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';
+import UserAvatar from '../components/UserAvatar.jsx';
 import CertificationAssessment from '../components/CertificationAssessment.jsx';
 import AssessmentSettingsEditor from '../components/AssessmentSettingsEditor.jsx';
 import ProjectTasksSection from '../components/ProjectTasksSection.jsx';
@@ -323,7 +324,7 @@ export default function CourseDetailPage() {
 
           <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5">
             <div><p className="eyebrow">Roster</p><h2 className="mt-1 flex items-center gap-2 text-base font-bold text-slate-950"><Users size={18} className="text-brand-700" />Enrolled students</h2></div>
-            {course.students?.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{course.students.map((student) => <div key={student.id} className="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-brand-800">{student.name?.slice(0, 1)?.toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800">{student.name}</span><span className="block truncate text-xs text-slate-400">{student.email}</span></span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">No students enrolled.</p>}
+            {course.students?.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2">{course.students.map((student) => <div key={student.id} className="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5"><UserAvatar name={student.name} imageUrl={student.profileImageUrl} className="h-8 w-8 text-xs" /><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800">{student.name}</span><span className="block truncate text-xs text-slate-400">{student.email}</span></span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">No students enrolled.</p>}
           </section>
         </> : <>
 

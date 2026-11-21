@@ -8,6 +8,7 @@ import api, { apiError } from '../api/client.js';
 import { Badge, Modal } from '../components/layout.jsx';
 import { EmptyState, PageLoader, Spinner } from '../components/ui.jsx';
 import CourseThumbnail from '../components/CourseThumbnail.jsx';
+import UserAvatar from '../components/UserAvatar.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useDialog } from '../context/DialogContext.jsx';
@@ -199,7 +200,7 @@ export default function ClassDetailPage() {
       </aside>
     </div>
 
-    {admin && <section className="mt-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Roster</p><h2 className="mt-1 text-base font-bold text-slate-950">Enrolled students</h2></div><button className="btn-secondary" onClick={openInvitations}><Send size={15} />Send invitations</button></div>{item.students?.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{item.students.map((student) => <div key={student.id} className="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-xs font-bold text-brand-800">{student.name?.slice(0, 1)?.toUpperCase()}</span><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800">{student.name}</span><span className="block truncate text-xs text-slate-400">{student.email}</span></span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">No students enrolled.</p>}</section>}
+    {admin && <section className="mt-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm shadow-slate-900/[0.03] sm:p-5"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="eyebrow">Roster</p><h2 className="mt-1 text-base font-bold text-slate-950">Enrolled students</h2></div><button className="btn-secondary" onClick={openInvitations}><Send size={15} />Send invitations</button></div>{item.students?.length ? <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{item.students.map((student) => <div key={student.id} className="flex items-center gap-2.5 rounded-xl border border-slate-100 p-2.5"><UserAvatar name={student.name} imageUrl={student.profileImageUrl} className="h-8 w-8 text-xs" /><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-800">{student.name}</span><span className="block truncate text-xs text-slate-400">{student.email}</span></span></div>)}</div> : <p className="mt-3 text-sm text-slate-500">No students enrolled.</p>}</section>}
 
     <Modal open={inviteOpen} onClose={() => !inviteSaving && setInviteOpen(false)} title="Class invitations" size="lg" footer={<><button className="btn-secondary" onClick={() => setInviteOpen(false)} disabled={inviteSaving}>Close</button><button className="btn-primary" onClick={sendInvitations} disabled={!selectedInviteIds.length || inviteSaving}>{inviteSaving ? <Spinner size={16} /> : <Mail size={16} />}Send to selected ({selectedInviteIds.length})</button></>}>
       <div className="space-y-4">

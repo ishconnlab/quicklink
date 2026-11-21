@@ -341,3 +341,162 @@
     height: 2rem;
   }
 }
+
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0b1220;
+  color: #e2e8f0;
+}
+
+html.dark [class*="bg-white"] {
+  background-color: #111827;
+}
+
+html.dark [class*="bg-slate-50"] {
+  background-color: #111827;
+}
+
+html.dark [class*="bg-slate-100"],
+html.dark [class*="bg-slate-200"] {
+  background-color: #1f2937;
+}
+
+html.dark [class*="bg-green-50"],
+html.dark [class*="bg-brand-50"],
+html.dark [class*="bg-emerald-50"] {
+  background-color: #123025;
+}
+
+html.dark [class*="bg-amber-50"],
+html.dark [class*="bg-yellow-50"] {
+  background-color: #352b16;
+}
+
+html.dark [class*="bg-red-50"] {
+  background-color: #3b2027;
+}
+
+html.dark [class*="bg-blue-50"],
+html.dark [class*="bg-indigo-50"],
+html.dark [class*="bg-purple-50"] {
+  background-color: #1e293b;
+}
+
+html.dark [class*="text-slate-950"],
+html.dark [class*="text-slate-900"],
+html.dark [class*="text-slate-800"],
+html.dark [class*="text-slate-700"] {
+  color: #f1f5f9;
+}
+
+html.dark [class*="text-slate-600"],
+html.dark [class*="text-slate-500"] {
+  color: #cbd5e1;
+}
+
+html.dark [class*="text-slate-400"],
+html.dark [class*="text-slate-300"] {
+  color: #94a3b8;
+}
+
+html.dark [class*="text-brand-900"],
+html.dark [class*="text-brand-800"],
+html.dark [class*="text-brand-700"],
+html.dark [class*="text-emerald-900"],
+html.dark [class*="text-emerald-800"],
+html.dark [class*="text-emerald-700"],
+html.dark [class*="text-green-900"],
+html.dark [class*="text-green-800"],
+html.dark [class*="text-green-700"] {
+  color: #86efac;
+}
+
+html.dark [class*="text-red-900"],
+html.dark [class*="text-red-800"],
+html.dark [class*="text-red-700"],
+html.dark [class*="text-red-600"] {
+  color: #fca5a5;
+}
+
+html.dark [class*="text-amber-900"],
+html.dark [class*="text-amber-800"],
+html.dark [class*="text-amber-700"],
+html.dark [class*="text-amber-600"],
+html.dark [class*="text-yellow-900"],
+html.dark [class*="text-yellow-800"],
+html.dark [class*="text-yellow-700"] {
+  color: #fcd34d;
+}
+
+html.dark [class*="border-slate-50"],
+html.dark [class*="border-slate-100"],
+html.dark [class*="border-slate-200"],
+html.dark [class*="border-slate-300"] {
+  border-color: #334155;
+}
+
+html.dark [class*="border-green-100"],
+html.dark [class*="border-green-200"],
+html.dark [class*="border-brand-100"] {
+  border-color: #22543d;
+}
+
+html.dark .input {
+  background-color: #111827;
+  color: #f1f5f9;
+  --tw-ring-color: #475569;
+}
+
+html.dark .input:focus {
+  --tw-ring-color: #22c55e;
+}
+
+html.dark .btn-secondary {
+  background-color: #1f2937;
+  color: #e2e8f0;
+  --tw-ring-color: #475569;
+}
+
+html.dark .btn-secondary:hover {
+  background-color: #273449;
+}
+
+html.dark .btn-ghost:hover,
+html.dark [class*="hover:bg-slate-50"]:hover,
+html.dark [class*="hover:bg-slate-100"]:hover,
+html.dark [class*="hover:bg-green-50"]:hover {
+  background-color: #1f2937;
+}
+
+html.dark .app-loader,
+html.dark .startup-loader {
+  background: #0b1220;
+}
+
+html.dark .app-loader-card,
+html.dark .startup-loader-card {
+  border-color: #334155;
+  background: #111827;
+}
+
+html.dark .app-loader-brand,
+html.dark .app-error-title {
+  color: #f1f5f9;
+}
+
+html.dark .learning-content article {
+  color: #cbd5e1;
+}
+
+html.dark .learning-content article h1,
+html.dark .learning-content article h2,
+html.dark .learning-content article h3 {
+  color: #f1f5f9;
+}
+
+html.dark .learning-status-bar > div {
+  border-color: #334155;
+}

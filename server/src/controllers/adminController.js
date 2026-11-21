@@ -32,6 +32,7 @@ function enrollmentJson(enrollment) {
       id: student._id.toString(),
       name: student.name,
       email: student.email,
+      profileImageUrl: student.profileImageUrl || '',
       whatsapp: student.whatsapp || '',
       country: student.country || '',
       province: student.province || '',
@@ -96,13 +97,13 @@ export const getDashboard = asyncHandler(async (_req, res) => {
   ]);
   const [recentEnrollments, upcomingTrainings, recentActivity, recentProjectSubmissions] = await Promise.all([
     Enrollment.find({ status: 'enrolled' })
-      .populate('student', 'name email whatsapp country province')
+      .populate('student', 'name email profileImageUrl whatsapp country province')
       .populate('learningClass', 'title subject level startsAt payment')
       .sort({ createdAt: -1 }).limit(6).lean(),
     LearningClass.find({ active: true, startsAt: { $gte: new Date() } }).sort({ startsAt: 1 }).limit(5).select('title subject level startsAt students thumbnailUrl thumbnailFile').lean(),
     ActivityLog.find({}).sort({ createdAt: -1 }).limit(8).lean(),
     ProjectSubmission.find({})
-      .populate('student', 'name email')
+      .populate('student', 'name email profileImageUrl')
       .populate('learningClass', 'title')
       .sort({ submittedAt: -1 }).limit(8).lean(),
   ]);
@@ -146,6 +147,7 @@ export const getDashboard = asyncHandler(async (_req, res) => {
         student: submission.student ? {
           name: submission.student.name,
           email: submission.student.email,
+          profileImageUrl: submission.student.profileImageUrl || '',
         } : null,
         course: submission.learningClass ? {
           id: submission.learningClass._id.toString(),
@@ -167,7 +169,7 @@ export const listStudents = asyncHandler(async (req, res) => {
     filter.$or = [{ name: search }, { email: search }, { whatsapp: search }, { country: search }, { province: search }];
   }
   const [students, total] = await Promise.all([
-    User.find(filter).select('name email whatsapp country province isActive createdAt').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    User.find(filter).select('name email profileImageUrl whatsapp country province isActive createdAt').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     User.countDocuments(filter),
   ]);
   const ids = students.map((student) => student._id);
@@ -190,6 +192,7 @@ export const listStudents = asyncHandler(async (req, res) => {
         id: student._id.toString(),
         name: student.name,
         email: student.email,
+        profileImageUrl: student.profileImageUrl || '',
         whatsapp: student.whatsapp || '',
         country: student.country || '',
         province: student.province || '',
@@ -207,7 +210,7 @@ export const listStudents = asyncHandler(async (req, res) => {
 });
 
 export const getStudentDetail = asyncHandler(async (req, res) => {
-  const student = await User.findOne({ _id: req.params.id, role: 'student' }).select('name email whatsapp country province isActive createdAt lastLoginAt').lean();
+  const student = await User.findOne({ _id: req.params.id, role: 'student' }).select('name email profileImageUrl whatsapp country province isActive createdAt lastLoginAt').lean();
   if (!student) throw ApiError.notFound('Student not found.');
   const enrollments = await Enrollment.find({ student: student._id })
     .populate('learningClass', 'title subject level startsAt endsAt payment active')
@@ -237,6 +240,7 @@ export const getStudentDetail = asyncHandler(async (req, res) => {
         id: student._id.toString(),
         name: student.name,
         email: student.email,
+        profileImageUrl: student.profileImageUrl || '',
         whatsapp: student.whatsapp || '',
         country: student.country || '',
         province: student.province || '',
@@ -309,7 +313,7 @@ export const listEnrollments = asyncHandler(async (req, res) => {
   }
   const [enrollments, total] = await Promise.all([
     Enrollment.find(filter)
-      .populate('student', 'name email whatsapp country province')
+      .populate('student', 'name email profileImageUrl whatsapp country province')
       .populate('learningClass', 'title subject level offeringType startsAt endsAt payment')
       .sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Enrollment.countDocuments(filter),
@@ -418,7 +422,7 @@ export const createEnrollment = asyncHandler(async (req, res) => {
   }
   await LearningClass.updateOne({ _id: learningClass._id }, { $addToSet: { students: student._id } });
   await recordActivity(req, { action: 'enrollment.created', resourceType: 'enrollment', resourceId: enrollment._id, message: `Enrolled ${student.name} in ${learningClass.title}.` });
-  const populated = await Enrollment.findById(enrollment._id).populate('student', 'name email whatsapp country province').populate('learningClass', 'title subject level startsAt endsAt payment').lean();
+  const populated = await Enrollment.findById(enrollment._id)  .populate('student', 'name email profileImageUrl whatsapp country province').populate('learningClass', 'title subject level startsAt endsAt payment').lean();
   res.status(201).json({ success: true, data: { enrollment: enrollmentJson(populated) } });
 });
 

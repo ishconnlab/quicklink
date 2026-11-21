@@ -38,7 +38,7 @@ export async function uploadCloudinaryBuffer({ buffer, folder, resourceType = 'a
   const sdk = getCloudinarySdk();
   if (!sdk) return null;
 
-  const resolvedFolder = folder === undefined ? config.cloudinary.folderPrefix || 'quicklink' : folder;
+  const resolvedFolder = folder === undefined ? 'quicklink' : folder;
   const resolvedPublicId = publicId || `${Date.now()}-${randomUUID()}`;
 
   return new Promise((resolve, reject) => {

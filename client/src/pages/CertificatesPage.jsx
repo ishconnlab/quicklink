@@ -14,6 +14,14 @@ import { formatDateTime } from '../lib/format.js';
 import { isAdmin } from '../lib/roles.js';
 
 const PAGE_SIZE = 10;
+const paymentStatusLabels = {
+  unpaid: 'Payment required',
+  pending: 'Payment pending',
+  paid: 'Paid',
+  rejected: 'Payment rejected',
+  waived: 'Waived',
+};
+const paymentStatusColors = { unpaid: 'amber', pending: 'amber', paid: 'green', rejected: 'red', waived: 'green' };
 const todayDateInput = () => {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
@@ -263,6 +271,7 @@ export default function CertificatesPage() {
                 <div className="mt-2 flex flex-wrap items-center gap-1.5">
                   <Badge color={certificate.revoked ? 'red' : 'green'}>{certificate.revoked ? 'Revoked' : 'Valid'}</Badge>
                   <Badge color="slate">{certificate.level}</Badge>
+                  {admin && certificate.paymentStatus && certificate.paymentStatus !== 'not_required' && <Badge color={paymentStatusColors[certificate.paymentStatus] || 'slate'}>{paymentStatusLabels[certificate.paymentStatus] || `Payment: ${certificate.paymentStatus}`}</Badge>}
                   {certificate.kind === 'manual' && <Badge color="slate">Manual issue</Badge>}
                   {certificate.reissueCount > 0 && <Badge color="amber">Reissued {certificate.reissueCount}×</Badge>}
                 </div>
